@@ -4,6 +4,8 @@ import time
 PORT = "/dev/ttyUSB0"
 SLAVE_ID = 1   # change this if scanner finds another ID
 
+
+
 client = ModbusSerialClient(
     port=PORT,
     baudrate=9600,
