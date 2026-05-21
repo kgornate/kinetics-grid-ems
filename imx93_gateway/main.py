@@ -2,31 +2,30 @@
 Main Application Entry Point for i.MX93 EMS Gateway.
 
 Role of this file:
-- Starts the complete EMS Gateway backend on FRDM i.MX93.
-- Connects to chiller over Modbus RTU.
-- Starts periodic chiller polling.
-- Starts UDP telemetry streaming to PC dashboard.
-- Starts TCP command server for PC dashboard control commands.
+- Starts the complete EMS Gateway backend.
+- In REAL mode:
+    - Connects to chiller over Modbus RTU.
+    - Polls chiller data.
+    - Sends UDP telemetry to PC.
+    - Receives TCP commands from PC.
 
-Final runtime flow:
+- In MOCK mode:
+    - Does not use Modbus.
+    - Does not need chiller hardware.
+    - Sends dummy telemetry to PC.
+    - Receives TCP commands and returns mock responses.
 
-    Chiller / Liquid Cooling System
-            ⇅ Modbus RTU / RS485
-    ChillerModbusDriver
-            ⇅
-    ChillerGatewayService
-            ⇅
-    TCPCommandServer + UDPTelemetryStreamer
-            ⇅ Ethernet TCP/UDP
-    PC Dashboard / Flutter GUI
+Run real mode on i.MX93:
 
-Run on i.MX93:
+    python3 imx93_gateway/main.py --pc-ip <PC_IP>
 
-    python3 imx93_gateway/main.py
-
-For network-only mock testing without chiller hardware:
+Run mock mode on i.MX93:
 
     python3 imx93_gateway/main.py --mock --pc-ip <PC_IP>
+
+Run mock mode on PC:
+
+    python imx93_gateway\\main.py --mock --pc-ip 127.0.0.1
 """
 
 import argparse
@@ -50,26 +49,38 @@ if str(IMX93_GATEWAY_DIR) not in sys.path:
 
 
 # -------------------------------------------------
-# Project imports
+# Config Import
 # -------------------------------------------------
 
-import config as cfg
+try:
+    import config as cfg
+except ImportError:
+    cfg = None
 
-from drivers.chiller_modbus_driver import ChillerModbusDriver
-from services.chiller_gateway_service import ChillerGatewayService
+
+# -------------------------------------------------
+# Network imports
+# -------------------------------------------------
+# These do not depend on pymodbus.
+# Safe for both mock mode and real mode.
+# -------------------------------------------------
+
 from network.udp_telemetry_streamer import UDPTelemetryStreamer
 from network.tcp_command_server import TCPCommandServer
 
 
 # -------------------------------------------------
-# Default Config Getter
+# Config Helper
 # -------------------------------------------------
 
 def get_config_value(name: str, default: Any) -> Any:
     """
     Read value from config.py.
-    If not available, use default.
+    If config.py or value is missing, return default.
     """
+
+    if cfg is None:
+        return default
 
     return getattr(cfg, name, default)
 
@@ -77,19 +88,22 @@ def get_config_value(name: str, default: Any) -> Any:
 # -------------------------------------------------
 # Mock Gateway Service
 # -------------------------------------------------
-# This allows Ethernet TCP/UDP testing without actual chiller hardware.
-# Useful before going to the liquid cooling system site.
+# This service is used when --mock is enabled.
+# It does not use Modbus and does not require chiller hardware.
 # -------------------------------------------------
 
 class MockGatewayService:
     """
     Mock service for testing TCP/UDP communication without Modbus hardware.
 
-    It provides the same APIs as ChillerGatewayService:
-        get_telemetry_packet()
-        execute_command()
+    It provides the same main APIs as ChillerGatewayService:
         start_polling()
         stop_polling()
+        get_telemetry_packet()
+        execute_command()
+
+    This allows the Flutter dashboard and PC TCP/UDP tools to be tested
+    before going to the actual chiller site.
     """
 
     def __init__(
@@ -115,7 +129,7 @@ class MockGatewayService:
             "ambient_temp": 37.4,
             "makeup_pump": "ON",
             "fault_code": 0,
-            "control_mode": "mock",
+            "control_mode": 2,
             "set_temperature": 25.0,
             "communication_status": "mock",
         }
@@ -134,12 +148,12 @@ class MockGatewayService:
 
     def get_telemetry_packet(self) -> Dict[str, Any]:
         """
-        Return dummy telemetry packet.
+        Return dummy telemetry packet for UDP streaming.
         """
 
         self.sequence += 1
 
-        # Small changing value to confirm live UDP streaming.
+        # Small changing values to confirm that live UDP telemetry is updating.
         self.mock_state["outlet_water_temp"] = 38.4 + (self.sequence % 5) * 0.1
         self.mock_state["return_water_temp"] = 38.1 + (self.sequence % 5) * 0.1
 
@@ -156,38 +170,254 @@ class MockGatewayService:
     def execute_command(self, command_packet: Dict[str, Any]) -> Dict[str, Any]:
         """
         Mock command execution.
-        Does not talk to real chiller.
+
+        This mimics the real ChillerGatewayService response shapes so the
+        Flutter dashboard can display READ_MODE, READ_TEMP, READ_ONOFF,
+        and READ_SETTINGS properly.
+
+        No real Modbus command is executed.
         """
 
         request_id = command_packet.get("request_id")
         command = str(command_packet.get("command", "")).strip().upper()
         value = command_packet.get("value")
 
-        if command == "SET_TEMP":
-            self.mock_state["set_temperature"] = float(value)
+        def response(message: str, data: Dict[str, Any]) -> Dict[str, Any]:
+            return {
+                "type": "response",
+                "request_id": request_id,
+                "timestamp": self._now(),
+                "status": "ok",
+                "command": command,
+                "message": message,
+                "data": data,
+            }
 
-        elif command == "SET_MODE":
-            self.mock_state["control_mode"] = value
+        def error_response(message: str) -> Dict[str, Any]:
+            return {
+                "type": "response",
+                "request_id": request_id,
+                "timestamp": self._now(),
+                "status": "error",
+                "command": command,
+                "message": message,
+                "data": {},
+            }
 
-        elif command == "CHILLER_ON":
-            self.mock_state["water_pump"] = "RUNNING"
+        try:
+            set_temp = float(self.mock_state.get("set_temperature", 25.0))
+            set_temp_raw = int(set_temp * 10)
 
-        elif command == "CHILLER_OFF":
-            self.mock_state["water_pump"] = "STOPPED"
+            water_pump_running = self.mock_state.get("water_pump") == "RUNNING"
+            onoff_raw = 1 if water_pump_running else 0
+            onoff_status = "ON" if onoff_raw == 1 else "OFF"
 
-        return {
-            "type": "response",
-            "request_id": request_id,
-            "timestamp": self._now(),
-            "status": "ok",
-            "command": command,
-            "message": "Mock command executed successfully. No Modbus command sent.",
-            "data": {
-                "received_command": command,
-                "received_value": value,
-                "mock_state": dict(self.mock_state),
-            },
-        }
+            control_mode_raw = int(self.mock_state.get("control_mode", 2))
+
+            read_mode_map = {
+                1: "Water pump circulation mode",
+                2: "Refrigeration / Cooling mode",
+                3: "Heating mode",
+                4: "System automatic control mode",
+            }
+
+            write_to_readback_mode = {
+                0: 4,
+                1: 2,
+                2: 3,
+                3: 1,
+            }
+
+            write_mode_name = {
+                0: "System automatic control mode",
+                1: "Refrigeration / Cooling mode",
+                2: "Heating mode",
+                3: "Water pump circulation mode",
+            }
+
+            # -------------------------------------------------
+            # Read Commands
+            # -------------------------------------------------
+
+            if command == "READ_ALL":
+                return response(
+                    message="Mock telemetry read successfully",
+                    data=dict(self.mock_state),
+                )
+
+            if command == "READ_TEMP":
+                return response(
+                    message="Mock set temperature read successfully",
+                    data={
+                        "register": 205,
+                        "raw_value": set_temp_raw,
+                        "temperature_celsius": set_temp,
+                    },
+                )
+
+            if command == "READ_ONOFF":
+                return response(
+                    message="Mock ON/OFF status read successfully",
+                    data={
+                        "register": 201,
+                        "raw_value": onoff_raw,
+                        "status": onoff_status,
+                    },
+                )
+
+            if command == "READ_MODE":
+                return response(
+                    message="Mock control mode read successfully",
+                    data={
+                        "register": 200,
+                        "raw_value": control_mode_raw,
+                        "mode": read_mode_map.get(control_mode_raw, "Unknown mode"),
+                    },
+                )
+
+            if command == "READ_SETTINGS":
+                return response(
+                    message="Mock setting parameters read successfully",
+                    data={
+                        "raw_registers_200_to_208": [
+                            control_mode_raw,
+                            onoff_raw,
+                            0,
+                            0,
+                            0,
+                            set_temp_raw,
+                            0,
+                            0,
+                            0,
+                        ],
+                        "control_mode": {
+                            "register": 200,
+                            "raw_value": control_mode_raw,
+                            "mode": read_mode_map.get(control_mode_raw, "Unknown mode"),
+                        },
+                        "on_off_enable": {
+                            "register": 201,
+                            "raw_value": onoff_raw,
+                            "status": onoff_status,
+                        },
+                        "reserved_202": 0,
+                        "reserved_203": 0,
+                        "reserved_204": 0,
+                        "set_temperature": {
+                            "register": 205,
+                            "raw_value": set_temp_raw,
+                            "temperature_celsius": set_temp,
+                        },
+                        "reserved_206": 0,
+                        "reserved_207": 0,
+                        "reserved_208": 0,
+                    },
+                )
+
+            # -------------------------------------------------
+            # Write / Control Commands
+            # -------------------------------------------------
+
+            if command == "SET_TEMP":
+                if value is None:
+                    return error_response("SET_TEMP requires value")
+
+                new_temp = float(value)
+                new_temp_raw = int(new_temp * 10)
+
+                self.mock_state["set_temperature"] = new_temp
+
+                return response(
+                    message="Mock set temperature command executed",
+                    data={
+                        "status": "ok",
+                        "command": "SET_TEMP",
+                        "register": 205,
+                        "temperature_celsius": new_temp,
+                        "written_value": new_temp_raw,
+                        "message": "Mock temperature write command successful",
+                        "readback": {
+                            "register": 205,
+                            "raw_value": new_temp_raw,
+                            "temperature_celsius": new_temp,
+                        },
+                        "verified": True,
+                    },
+                )
+
+            if command == "SET_MODE":
+                if value is None:
+                    return error_response("SET_MODE requires value")
+
+                write_value = int(value)
+                expected_readback = write_to_readback_mode.get(write_value, write_value)
+                requested_mode = write_mode_name.get(write_value, "Unknown mode")
+
+                self.mock_state["control_mode"] = expected_readback
+
+                return response(
+                    message="Mock set mode command executed",
+                    data={
+                        "status": "ok",
+                        "command": "SET_MODE",
+                        "register": 200,
+                        "written_value": write_value,
+                        "requested_mode": requested_mode,
+                        "message": "Mock mode write command successful",
+                        "expected_readback_value": expected_readback,
+                        "readback": {
+                            "register": 200,
+                            "raw_value": expected_readback,
+                            "mode": read_mode_map.get(expected_readback, "Unknown mode"),
+                        },
+                        "verified": True,
+                    },
+                )
+
+            if command == "CHILLER_ON":
+                self.mock_state["water_pump"] = "RUNNING"
+
+                return response(
+                    message="Mock CHILLER_ON command executed",
+                    data={
+                        "status": "ok",
+                        "command": "CHILLER_ON",
+                        "register": 201,
+                        "written_value": 1,
+                        "message": "Mock chiller ON command successful",
+                        "readback": {
+                            "register": 201,
+                            "raw_value": 1,
+                            "status": "ON",
+                        },
+                        "verified": True,
+                    },
+                )
+
+            if command == "CHILLER_OFF":
+                self.mock_state["water_pump"] = "STOPPED"
+
+                return response(
+                    message="Mock CHILLER_OFF command executed",
+                    data={
+                        "status": "ok",
+                        "command": "CHILLER_OFF",
+                        "register": 201,
+                        "written_value": 0,
+                        "message": "Mock chiller OFF command successful",
+                        "readback": {
+                            "register": 201,
+                            "raw_value": 0,
+                            "status": "OFF",
+                        },
+                        "verified": True,
+                    },
+                )
+
+            return error_response(f"Unsupported mock command: {command}")
+
+        except Exception as e:
+            return error_response(str(e))
 
 
 # -------------------------------------------------
@@ -208,7 +438,7 @@ class EMSGatewayApplication:
     def __init__(self, args: argparse.Namespace):
         self.args = args
 
-        self.driver: Optional[ChillerModbusDriver] = None
+        self.driver: Optional[Any] = None
         self.service: Optional[Any] = None
         self.udp_streamer: Optional[UDPTelemetryStreamer] = None
         self.tcp_server: Optional[TCPCommandServer] = None
@@ -218,22 +448,43 @@ class EMSGatewayApplication:
         self.gateway_id = get_config_value("GATEWAY_ID", "imx93_gateway_1")
         self.asset_id = get_config_value("ASSET_ID", "chiller_1")
 
-        self.modbus_port = args.serial_port or get_config_value("MODBUS_PORT", "/dev/ttyUSB0")
+        self.modbus_port = args.serial_port or get_config_value(
+            "MODBUS_PORT",
+            "/dev/ttyUSB0",
+        )
         self.modbus_baudrate = get_config_value("MODBUS_BAUDRATE", 9600)
         self.modbus_bytesize = get_config_value("MODBUS_BYTESIZE", 8)
         self.modbus_parity = get_config_value("MODBUS_PARITY", "N")
         self.modbus_stopbits = get_config_value("MODBUS_STOPBITS", 1)
         self.modbus_timeout = get_config_value("MODBUS_TIMEOUT_SEC", 2.0)
-        self.chiller_slave_id = args.slave_id or get_config_value("CHILLER_SLAVE_ID", 1)
+        self.chiller_slave_id = args.slave_id or get_config_value(
+            "CHILLER_SLAVE_ID",
+            1,
+        )
 
         self.tcp_host = get_config_value("TCP_COMMAND_HOST", "0.0.0.0")
-        self.tcp_port = args.tcp_port or get_config_value("TCP_COMMAND_PORT", 6000)
+        self.tcp_port = args.tcp_port or get_config_value(
+            "TCP_COMMAND_PORT",
+            6000,
+        )
 
-        self.pc_telemetry_ip = args.pc_ip or get_config_value("PC_TELEMETRY_IP", "192.168.1.10")
-        self.udp_telemetry_port = args.udp_port or get_config_value("UDP_TELEMETRY_PORT", 5005)
+        self.pc_telemetry_ip = args.pc_ip or get_config_value(
+            "PC_TELEMETRY_IP",
+            "192.168.10.1",
+        )
+        self.udp_telemetry_port = args.udp_port or get_config_value(
+            "UDP_TELEMETRY_PORT",
+            5005,
+        )
 
-        self.poll_interval_sec = args.poll_interval or get_config_value("CHILLER_POLL_INTERVAL_SEC", 1.0)
-        self.udp_interval_sec = args.udp_interval or get_config_value("UDP_TELEMETRY_INTERVAL_SEC", 1.0)
+        self.poll_interval_sec = args.poll_interval or get_config_value(
+            "CHILLER_POLL_INTERVAL_SEC",
+            1.0,
+        )
+        self.udp_interval_sec = args.udp_interval or get_config_value(
+            "UDP_TELEMETRY_INTERVAL_SEC",
+            1.0,
+        )
 
     # -------------------------------------------------
     # Startup
@@ -262,12 +513,39 @@ class EMSGatewayApplication:
         print("\n[MAIN] EMS Gateway started successfully")
         print("[MAIN] Press Ctrl+C to stop\n")
 
+    def _start_mock_service(self) -> None:
+        """
+        Start mock service for TCP/UDP testing without chiller.
+        """
+
+        print("[MAIN] Starting MOCK gateway service. No Modbus hardware will be used.")
+
+        self.service = MockGatewayService(
+            gateway_id=self.gateway_id,
+            asset_id=self.asset_id,
+        )
+
+        self.service.start_polling()
+
     def _start_real_chiller_service(self) -> None:
         """
         Start real Modbus chiller service.
+
+        Imports are done here intentionally so mock mode can run even if
+        pymodbus is not installed on the PC.
         """
 
         print("[MAIN] Starting real chiller Modbus service...")
+
+        try:
+            from drivers.chiller_modbus_driver import ChillerModbusDriver
+            from services.chiller_gateway_service import ChillerGatewayService
+        except ImportError as e:
+            raise RuntimeError(
+                "Failed to import real Modbus gateway modules. "
+                "Make sure pymodbus and pyserial are installed. "
+                "Install using: pip3 install pymodbus pyserial"
+            ) from e
 
         self.driver = ChillerModbusDriver(
             port=self.modbus_port,
@@ -284,7 +562,7 @@ class EMSGatewayApplication:
         if not connected:
             raise RuntimeError(
                 f"Failed to connect to chiller on {self.modbus_port}. "
-                f"Check USB-RS485, wiring, port, and slave ID."
+                f"Check USB-RS485 adapter, wiring, serial port, and slave ID."
             )
 
         self.service = ChillerGatewayService(
@@ -296,24 +574,13 @@ class EMSGatewayApplication:
 
         self.service.start_polling()
 
-    def _start_mock_service(self) -> None:
-        """
-        Start mock service for TCP/UDP testing without chiller.
-        """
-
-        print("[MAIN] Starting MOCK gateway service. No Modbus hardware will be used.")
-
-        self.service = MockGatewayService(
-            gateway_id=self.gateway_id,
-            asset_id=self.asset_id,
-        )
-
-        self.service.start_polling()
-
     def _start_udp_streamer(self) -> None:
         """
         Start UDP telemetry streamer.
         """
+
+        if self.service is None:
+            raise RuntimeError("Service not initialized before starting UDP streamer")
 
         print("[MAIN] Starting UDP telemetry streamer...")
 
@@ -330,6 +597,9 @@ class EMSGatewayApplication:
         """
         Start TCP command server.
         """
+
+        if self.service is None:
+            raise RuntimeError("Service not initialized before starting TCP server")
 
         print("[MAIN] Starting TCP command server...")
 
@@ -393,7 +663,7 @@ class EMSGatewayApplication:
         print("[MAIN] EMS Gateway stopped")
 
     # -------------------------------------------------
-    # Status / Logging
+    # Banner
     # -------------------------------------------------
 
     def print_startup_banner(self) -> None:

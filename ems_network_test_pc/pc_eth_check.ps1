@@ -1,3 +1,5 @@
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+
 Write-Host "======================================"
 Write-Host "PC Ethernet Check"
 Write-Host "======================================"

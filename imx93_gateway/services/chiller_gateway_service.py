@@ -1,15 +1,12 @@
 """
 Chiller Gateway Service for i.MX93 EMS Gateway.
 
-Role of this file:
-- Uses ChillerModbusDriver to read/write chiller data.
-- Maintains latest chiller state.
-- Provides latest telemetry packet for UDP streaming.
-- Executes control commands received from TCP server.
-- Acts as the bridge between Modbus driver and network layer.
-
-This file does not directly handle TCP or UDP sockets.
-It only provides clean service APIs.
+This service:
+- Polls chiller telemetry from Modbus driver
+- Adds setting/control fields into UDP telemetry
+- Adds fault code description and bit analysis
+- Provides latest telemetry packet for UDP streamer
+- Executes TCP commands from PC / Flutter dashboard
 """
 
 import sys
@@ -19,10 +16,6 @@ from pathlib import Path
 from datetime import datetime
 from typing import Any, Dict, Optional
 
-
-# -------------------------------------------------
-# Import support
-# -------------------------------------------------
 
 CURRENT_FILE = Path(__file__).resolve()
 IMX93_GATEWAY_DIR = CURRENT_FILE.parents[1]
@@ -38,15 +31,22 @@ except ImportError:
 
 class ChillerGatewayService:
     """
-    Main service layer for chiller EMS gateway.
-
-    Responsibilities:
-    1. Poll chiller telemetry periodically
-    2. Store latest chiller state
-    3. Provide telemetry packet to UDP streamer
-    4. Execute commands received from TCP server
-    5. Return ACK/NACK responses
+    Service layer between:
+    - ChillerModbusDriver
+    - UDP telemetry streamer
+    - TCP command server
     """
+
+    FAULT_CODE_MAP = {
+        0: "No fault",
+    }
+
+    MODE_READ_VALUE_MAP = {
+        1: "Water pump circulation mode",
+        2: "Refrigeration / Cooling mode",
+        3: "Heating mode",
+        4: "System automatic control mode",
+    }
 
     def __init__(
         self,
@@ -54,11 +54,13 @@ class ChillerGatewayService:
         gateway_id: str = "imx93_gateway_1",
         asset_id: str = "chiller_1",
         poll_interval_sec: float = 1.0,
+        include_settings_in_poll: bool = True,
     ):
         self.driver = driver
         self.gateway_id = gateway_id
         self.asset_id = asset_id
         self.poll_interval_sec = float(poll_interval_sec)
+        self.include_settings_in_poll = include_settings_in_poll
 
         self.latest_state: Optional[Any] = None
         self.latest_state_dict: Dict[str, Any] = {}
@@ -69,25 +71,17 @@ class ChillerGatewayService:
         self._running = False
         self._poll_thread: Optional[threading.Thread] = None
 
-    # -------------------------------------------------
-    # Utility Functions
-    # -------------------------------------------------
-
     @staticmethod
     def _now() -> str:
         return datetime.now().isoformat(timespec="seconds")
 
     @staticmethod
     def _object_to_dict(obj: Any) -> Dict[str, Any]:
-        """
-        Convert ChillerState object or dictionary into plain dictionary.
-        """
-
         if obj is None:
             return {}
 
         if isinstance(obj, dict):
-            return obj
+            return dict(obj)
 
         if hasattr(obj, "to_dict"):
             return obj.to_dict()
@@ -97,12 +91,145 @@ class ChillerGatewayService:
         except Exception:
             return {"value": str(obj)}
 
-    def _update_latest_state(self, state: Any) -> None:
+    @staticmethod
+    def _safe_int(value: Any, default: int = 0) -> int:
+        try:
+            return int(value)
+        except Exception:
+            return default
+
+    def _decode_fault(self, fault_code: Any) -> Dict[str, Any]:
         """
-        Update latest chiller state safely.
+        Decode fault code.
+
+        Current protocol PDF says:
+            Fault alarm code -> See fault code sheet
+
+        But the actual fault code sheet/table is not present in the uploaded PDF.
+
+        Therefore:
+        - 0 is safely mapped as "No fault"
+        - Other values are reported as unmapped
+        - Bit analysis is added because field value 42 can be interpreted as:
+              42 decimal = 0b0000000000101010
+              active bits = 1, 3, 5
+          if the vendor uses a bitmask-style fault register.
         """
 
-        state_dict = self._object_to_dict(state)
+        try:
+            code = int(fault_code)
+        except Exception:
+            return {
+                "fault_code": fault_code,
+                "fault_description": "Invalid fault code format",
+                "fault_active": True,
+                "fault_binary": None,
+                "fault_active_bits": [],
+                "fault_note": "Fault code is not an integer value.",
+            }
+
+        if code in self.FAULT_CODE_MAP:
+            return {
+                "fault_code": code,
+                "fault_description": self.FAULT_CODE_MAP[code],
+                "fault_active": code != 0,
+                "fault_binary": format(code, "016b"),
+                "fault_active_bits": [],
+                "fault_note": "Mapped direct fault code.",
+            }
+
+        active_bits = [
+            bit for bit in range(16)
+            if code & (1 << bit)
+        ]
+
+        return {
+            "fault_code": code,
+            "fault_description": (
+                f"Unmapped fault code {code}. "
+                "Protocol refers to a separate fault code sheet."
+            ),
+            "fault_active": code != 0,
+            "fault_binary": format(code, "016b"),
+            "fault_active_bits": active_bits,
+            "fault_note": (
+                "If this register is bitmask-based, active bits indicate multiple alarms. "
+                "Exact bit meanings need vendor fault code sheet."
+            ),
+        }
+
+    def _merge_settings_into_telemetry(self, telemetry: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Add holding register information into live telemetry.
+
+        Important:
+        read_all_parameters() mainly reads input registers 0-11.
+        But control mode, ON/OFF status, and set temperature are holding registers:
+
+        - Register 200: Control mode
+        - Register 201: ON/OFF enable
+        - Register 205: Set temperature
+        """
+
+        if not self.include_settings_in_poll:
+            return telemetry
+
+        try:
+            settings = self.driver.read_setting_parameters()
+
+            control_mode = settings.get("control_mode", {})
+            on_off = settings.get("on_off_enable", {})
+            set_temp = settings.get("set_temperature", {})
+
+            control_mode_raw = control_mode.get("raw_value")
+            control_mode_text = control_mode.get("mode")
+
+            if control_mode_text is None and control_mode_raw is not None:
+                control_mode_text = self.MODE_READ_VALUE_MAP.get(
+                    self._safe_int(control_mode_raw),
+                    f"Unknown mode ({control_mode_raw})",
+                )
+
+            telemetry["control_mode_raw"] = control_mode_raw
+            telemetry["control_mode"] = control_mode_text
+
+            telemetry["on_off_raw"] = on_off.get("raw_value")
+            telemetry["on_off_status"] = on_off.get("status")
+
+            telemetry["set_temperature_raw"] = set_temp.get("raw_value")
+            telemetry["set_temperature"] = set_temp.get("temperature_celsius")
+
+            telemetry["settings_registers_200_to_208"] = settings.get(
+                "raw_registers_200_to_208",
+                [],
+            )
+
+        except Exception as e:
+            telemetry["settings_read_error"] = str(e)
+
+        return telemetry
+
+    def _enhance_telemetry(self, state: Any) -> Dict[str, Any]:
+        """
+        Convert driver output into complete dashboard-ready telemetry.
+        """
+
+        telemetry = self._object_to_dict(state)
+
+        fault_info = self._decode_fault(telemetry.get("fault_code", 0))
+        telemetry.update(fault_info)
+
+        telemetry = self._merge_settings_into_telemetry(telemetry)
+
+        telemetry["communication_status"] = telemetry.get(
+            "communication_status",
+            "online",
+        )
+
+        return telemetry
+
+    def _update_latest_state(self, state: Any) -> None:
+        state_dict = self._enhance_telemetry(state)
 
         with self._state_lock:
             self.latest_state = state
@@ -111,10 +238,6 @@ class ChillerGatewayService:
             self.last_error = None
 
     def _set_error(self, error: Exception) -> None:
-        """
-        Store latest communication/error status.
-        """
-
         with self._state_lock:
             self.last_error = str(error)
             self.last_poll_time = self._now()
@@ -124,43 +247,31 @@ class ChillerGatewayService:
                 self.latest_state_dict["last_error"] = str(error)
 
     # -------------------------------------------------
-    # Polling APIs
+    # Polling
     # -------------------------------------------------
 
     def poll_once(self) -> Dict[str, Any]:
-        """
-        Read chiller telemetry once using Modbus driver.
-        """
-
         state = self.driver.read_all_parameters()
         self._update_latest_state(state)
-
         return self.get_latest_state_dict()
 
     def start_polling(self) -> None:
-        """
-        Start periodic Modbus polling in a background thread.
-        """
-
         if self._running:
             print("[SERVICE] Polling already running")
             return
 
         self._running = True
+
         self._poll_thread = threading.Thread(
             target=self._poll_loop,
             name="ChillerPollingThread",
             daemon=True,
         )
-        self._poll_thread.start()
 
+        self._poll_thread.start()
         print("[SERVICE] Chiller polling started")
 
     def stop_polling(self) -> None:
-        """
-        Stop periodic Modbus polling.
-        """
-
         self._running = False
 
         if self._poll_thread:
@@ -169,15 +280,10 @@ class ChillerGatewayService:
         print("[SERVICE] Chiller polling stopped")
 
     def _poll_loop(self) -> None:
-        """
-        Internal polling loop.
-        """
-
         while self._running:
             try:
                 state = self.driver.read_all_parameters()
                 self._update_latest_state(state)
-
                 print("[SERVICE] Chiller telemetry updated")
 
             except Exception as e:
@@ -187,22 +293,14 @@ class ChillerGatewayService:
             time.sleep(self.poll_interval_sec)
 
     # -------------------------------------------------
-    # State / Telemetry APIs
+    # Telemetry
     # -------------------------------------------------
 
     def get_latest_state_dict(self) -> Dict[str, Any]:
-        """
-        Return latest chiller state as plain dictionary.
-        """
-
         with self._state_lock:
             return dict(self.latest_state_dict)
 
     def get_telemetry_packet(self) -> Dict[str, Any]:
-        """
-        Create final telemetry packet for UDP streamer.
-        """
-
         with self._state_lock:
             data = dict(self.latest_state_dict)
             last_error = self.last_error
@@ -226,33 +324,10 @@ class ChillerGatewayService:
         return packet
 
     # -------------------------------------------------
-    # Command Execution APIs
+    # TCP Command Execution
     # -------------------------------------------------
 
     def execute_command(self, command_packet: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Execute command received from TCP command server.
-
-        Expected command packet examples:
-
-        {
-            "request_id": "REQ_001",
-            "command": "READ_ALL"
-        }
-
-        {
-            "request_id": "REQ_002",
-            "command": "SET_TEMP",
-            "value": 25.0
-        }
-
-        {
-            "request_id": "REQ_003",
-            "command": "SET_MODE",
-            "value": 1
-        }
-        """
-
         request_id = command_packet.get("request_id")
         command = str(command_packet.get("command", "")).strip().upper()
         value = command_packet.get("value")
@@ -263,10 +338,6 @@ class ChillerGatewayService:
                 raise ValueError("Missing command field")
 
             print(f"[SERVICE] Executing command: {command}, value={value}")
-
-            # -----------------------------
-            # Read Commands
-            # -----------------------------
 
             if command == "READ_ALL":
                 result = self.poll_once()
@@ -318,12 +389,13 @@ class ChillerGatewayService:
                     data=result,
                 )
 
-            # -----------------------------
-            # Write / Control Commands
-            # -----------------------------
-
             if command == "CHILLER_ON":
                 result = self.driver.turn_on(verify=verify)
+
+                try:
+                    self.poll_once()
+                except Exception:
+                    pass
 
                 return self._ok_response(
                     request_id=request_id,
@@ -334,6 +406,11 @@ class ChillerGatewayService:
 
             if command == "CHILLER_OFF":
                 result = self.driver.turn_off(verify=verify)
+
+                try:
+                    self.poll_once()
+                except Exception:
+                    pass
 
                 return self._ok_response(
                     request_id=request_id,
@@ -348,6 +425,11 @@ class ChillerGatewayService:
 
                 result = self.driver.set_temperature(value, verify=verify)
 
+                try:
+                    self.poll_once()
+                except Exception:
+                    pass
+
                 return self._ok_response(
                     request_id=request_id,
                     command=command,
@@ -360,6 +442,11 @@ class ChillerGatewayService:
                     raise ValueError("SET_MODE requires value field")
 
                 result = self.driver.set_control_mode(value, verify=verify)
+
+                try:
+                    self.poll_once()
+                except Exception:
+                    pass
 
                 return self._ok_response(
                     request_id=request_id,
@@ -417,10 +504,6 @@ class ChillerGatewayService:
         }
 
 
-# -------------------------------------------------
-# Standalone Test
-# -------------------------------------------------
-
 if __name__ == "__main__":
     driver = ChillerModbusDriver(
         port="/dev/ttyUSB0",
@@ -446,20 +529,6 @@ if __name__ == "__main__":
         print("\n[SERVICE TEST] Telemetry packet:")
         packet = service.get_telemetry_packet()
         print(packet)
-
-        print("\n[SERVICE TEST] Testing READ_MODE command...")
-        response = service.execute_command({
-            "request_id": "TEST_001",
-            "command": "READ_MODE"
-        })
-        print(response)
-
-        print("\n[SERVICE TEST] Testing READ_TEMP command...")
-        response = service.execute_command({
-            "request_id": "TEST_002",
-            "command": "READ_TEMP"
-        })
-        print(response)
 
     except Exception as e:
         print(f"[SERVICE TEST] Error: {e}")
