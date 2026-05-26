@@ -1,0 +1,11 @@
+timestamp,sequence_no,gateway_id,asset_id,system_on_off,control_mode,set_temperature,outlet_water_temp,return_water_temp,outlet_water_pressure,return_water_pressure,ambient_temp,water_pump_status,compressor_1_status,compressor_2_status,electric_heater_status,condensate_fan_status,modbus_status,logger_status
+2026-05-26T12:07:17+05:30,1,imx93_gateway_1,chiller_1,ON,AUTO,25.0,28.0,29.0,0.25,0.1,32.0,RUNNING,STOPPED,STOPPED,STOPPED,STOPPED,OK,ok
+2026-05-26T12:07:18+05:30,2,imx93_gateway_1,chiller_1,ON,AUTO,25.0,28.1,29.1,0.25,0.1,32.0,RUNNING,STOPPED,STOPPED,STOPPED,STOPPED,OK,ok
+2026-05-26T12:07:19+05:30,3,imx93_gateway_1,chiller_1,ON,AUTO,25.0,28.2,29.2,0.25,0.1,32.0,RUNNING,STOPPED,STOPPED,STOPPED,STOPPED,OK,ok
+2026-05-26T12:07:20+05:30,4,imx93_gateway_1,chiller_1,ON,AUTO,25.0,28.3,29.3,0.25,0.1,32.0,RUNNING,STOPPED,STOPPED,STOPPED,STOPPED,OK,ok
+2026-05-26T12:07:21+05:30,5,imx93_gateway_1,chiller_1,ON,AUTO,25.0,28.4,29.4,0.25,0.1,32.0,RUNNING,STOPPED,STOPPED,STOPPED,STOPPED,OK,ok
+2026-05-26T12:07:22+05:30,6,imx93_gateway_1,chiller_1,ON,AUTO,25.0,28.5,29.5,0.25,0.1,32.0,RUNNING,STOPPED,STOPPED,STOPPED,STOPPED,OK,ok
+2026-05-26T12:07:23+05:30,7,imx93_gateway_1,chiller_1,ON,AUTO,25.0,28.6,29.6,0.25,0.1,32.0,RUNNING,STOPPED,STOPPED,STOPPED,STOPPED,OK,ok
+2026-05-26T12:07:24+05:30,8,imx93_gateway_1,chiller_1,ON,AUTO,25.0,28.7,29.7,0.25,0.1,32.0,RUNNING,STOPPED,STOPPED,STOPPED,STOPPED,OK,ok
+2026-05-26T12:07:25+05:30,9,imx93_gateway_1,chiller_1,ON,AUTO,25.0,28.8,29.8,0.25,0.1,32.0,RUNNING,STOPPED,STOPPED,STOPPED,STOPPED,OK,ok
+2026-05-26T12:07:26+05:30,10,imx93_gateway_1,chiller_1,ON,AUTO,25.0,28.9,29.9,0.25,0.1,32.0,RUNNING,STOPPED,STOPPED,STOPPED,STOPPED,OK,ok

@@ -7,6 +7,7 @@ This file contains all system-level configuration:
 - TCP command server configuration
 - UDP telemetry streaming configuration
 - Polling intervals
+- Storage logging configuration
 """
 
 # -------------------------------------------------
@@ -27,11 +28,9 @@ CHILLER_SLAVE_ID = 1
 # Ethernet / Network Configuration
 # -------------------------------------------------
 
-# i.MX93 TCP server will listen on all available interfaces
 TCP_COMMAND_HOST = "0.0.0.0"
 TCP_COMMAND_PORT = 6000
 
-# PC IP address where telemetry has to be sent
 # Change this as per your PC Ethernet/Wi-Fi IP
 PC_TELEMETRY_IP = "192.168.1.10"
 UDP_TELEMETRY_PORT = 5005
@@ -51,3 +50,20 @@ UDP_TELEMETRY_INTERVAL_SEC = 1.0
 
 ASSET_ID = "chiller_1"
 GATEWAY_ID = "imx93_gateway_1"
+
+
+# -------------------------------------------------
+# Storage / eMMC / SD Card Logging Configuration
+# -------------------------------------------------
+
+ENABLE_STORAGE_LOGGING = True
+
+# Current development target: i.MX93 eMMC/local filesystem
+LOG_BASE_PATH = "/home/root/ems_logs_test"
+
+# Later, when SD card comes, change only this path:
+# LOG_BASE_PATH = "/mnt/ems_sdcard"
+
+# Modbus polling can be 1 sec, but storage logging should be slower
+# to reduce unnecessary writes.
+LOG_TELEMETRY_INTERVAL_SEC = 5.0

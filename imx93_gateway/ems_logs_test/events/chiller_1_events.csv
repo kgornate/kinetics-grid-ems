@@ -1,0 +1,3 @@
+timestamp,gateway_id,asset_id,event_type,old_value,new_value,source,status,description
+2026-05-26T12:07:17+05:30,imx93_gateway_1,chiller_1,LOGGER_TEST_STARTED,,,test_storage_logger.py,success,Storage logger test started
+2026-05-26T12:07:27+05:30,imx93_gateway_1,chiller_1,LOGGER_TEST_COMPLETED,,,test_storage_logger.py,success,Storage logger test completed

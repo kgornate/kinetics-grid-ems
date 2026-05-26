@@ -1,0 +1,1 @@
+command to copy logs from I.MX93 to PC: scp -r root@192.168.10.2:/home/root/ems_logs_test C:\Users\KunalGupta\Desktop\ems_logs_test

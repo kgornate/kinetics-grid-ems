@@ -1,12 +1,13 @@
 """
 Chiller Gateway Service for i.MX93 EMS Gateway.
 
-This service:
-- Polls chiller telemetry from Modbus driver
-- Adds setting/control fields into UDP telemetry
-- Adds fault code description and bit analysis
-- Provides latest telemetry packet for UDP streamer
-- Executes TCP commands from PC / Flutter dashboard
+Purpose:
+- Poll real chiller telemetry using Modbus RTU driver.
+- Poll setting registers periodically.
+- Provide UDP telemetry packets.
+- Execute TCP commands from PC / Flutter dashboard.
+- Prevent Modbus collision between polling thread and command thread.
+- Log real chiller telemetry, events, and errors to eMMC/SD using StorageLogger.
 """
 
 import sys
@@ -17,11 +18,22 @@ from datetime import datetime
 from typing import Any, Dict, Optional
 
 
+# -------------------------------------------------
+# Import support
+# -------------------------------------------------
+
 CURRENT_FILE = Path(__file__).resolve()
 IMX93_GATEWAY_DIR = CURRENT_FILE.parents[1]
 
 if str(IMX93_GATEWAY_DIR) not in sys.path:
     sys.path.insert(0, str(IMX93_GATEWAY_DIR))
+
+
+try:
+    import config as cfg
+except ImportError:
+    cfg = None
+
 
 try:
     from drivers.chiller_modbus_driver import ChillerModbusDriver
@@ -29,14 +41,20 @@ except ImportError:
     from imx93_gateway.drivers.chiller_modbus_driver import ChillerModbusDriver
 
 
-class ChillerGatewayService:
-    """
-    Service layer between:
-    - ChillerModbusDriver
-    - UDP telemetry streamer
-    - TCP command server
-    """
+try:
+    from services.storage_logger import StorageLogger
+except ImportError:
+    from imx93_gateway.services.storage_logger import StorageLogger
 
+
+def get_config_value(name: str, default: Any) -> Any:
+    if cfg is None:
+        return default
+
+    return getattr(cfg, name, default)
+
+
+class ChillerGatewayService:
     FAULT_CODE_MAP = {
         0: "No fault",
     }
@@ -54,26 +72,66 @@ class ChillerGatewayService:
         gateway_id: str = "imx93_gateway_1",
         asset_id: str = "chiller_1",
         poll_interval_sec: float = 1.0,
+        settings_poll_interval_sec: float = 5.0,
         include_settings_in_poll: bool = True,
     ):
         self.driver = driver
         self.gateway_id = gateway_id
         self.asset_id = asset_id
+
         self.poll_interval_sec = float(poll_interval_sec)
+        self.settings_poll_interval_sec = float(settings_poll_interval_sec)
         self.include_settings_in_poll = include_settings_in_poll
 
         self.latest_state: Optional[Any] = None
         self.latest_state_dict: Dict[str, Any] = {}
+        self.latest_settings_dict: Dict[str, Any] = {}
+
         self.last_poll_time: Optional[str] = None
+        self.last_settings_poll_time: Optional[str] = None
         self.last_error: Optional[str] = None
+        self.last_settings_error: Optional[str] = None
 
         self._state_lock = threading.Lock()
+
+        # This lock protects full Modbus command sequences.
+        # Polling and TCP command execution must not access RS485 at the same time.
+        self._modbus_sequence_lock = threading.Lock()
+
         self._running = False
         self._poll_thread: Optional[threading.Thread] = None
+        self._last_settings_poll_monotonic = 0.0
+
+        # -------------------------------------------------
+        # Storage logger configuration
+        # -------------------------------------------------
+
+        self.enable_storage_logging = bool(
+            get_config_value("ENABLE_STORAGE_LOGGING", False)
+        )
+
+        self.log_base_path = get_config_value(
+            "LOG_BASE_PATH",
+            "/home/root/ems_logs_test",
+        )
+
+        self.log_telemetry_interval_sec = float(
+            get_config_value("LOG_TELEMETRY_INTERVAL_SEC", 5.0)
+        )
+
+        self.storage_logger: Optional[StorageLogger] = None
+        self.last_storage_log_time = 0.0
+        self._storage_logger_lock = threading.Lock()
+
+        self._initialize_storage_logger()
+
+    # -------------------------------------------------
+    # Utility
+    # -------------------------------------------------
 
     @staticmethod
     def _now() -> str:
-        return datetime.now().isoformat(timespec="seconds")
+        return datetime.now().astimezone().isoformat(timespec="seconds")
 
     @staticmethod
     def _object_to_dict(obj: Any) -> Dict[str, Any]:
@@ -99,23 +157,6 @@ class ChillerGatewayService:
             return default
 
     def _decode_fault(self, fault_code: Any) -> Dict[str, Any]:
-        """
-        Decode fault code.
-
-        Current protocol PDF says:
-            Fault alarm code -> See fault code sheet
-
-        But the actual fault code sheet/table is not present in the uploaded PDF.
-
-        Therefore:
-        - 0 is safely mapped as "No fault"
-        - Other values are reported as unmapped
-        - Bit analysis is added because field value 42 can be interpreted as:
-              42 decimal = 0b0000000000101010
-              active bits = 1, 3, 5
-          if the vendor uses a bitmask-style fault register.
-        """
-
         try:
             code = int(fault_code)
         except Exception:
@@ -125,7 +166,6 @@ class ChillerGatewayService:
                 "fault_active": True,
                 "fault_binary": None,
                 "fault_active_bits": [],
-                "fault_note": "Fault code is not an integer value.",
             }
 
         if code in self.FAULT_CODE_MAP:
@@ -135,48 +175,364 @@ class ChillerGatewayService:
                 "fault_active": code != 0,
                 "fault_binary": format(code, "016b"),
                 "fault_active_bits": [],
-                "fault_note": "Mapped direct fault code.",
             }
 
-        active_bits = [
-            bit for bit in range(16)
-            if code & (1 << bit)
-        ]
+        active_bits = [bit for bit in range(16) if code & (1 << bit)]
 
         return {
             "fault_code": code,
             "fault_description": (
                 f"Unmapped fault code {code}. "
-                "Protocol refers to a separate fault code sheet."
+                "Protocol refers to separate fault code sheet."
             ),
             "fault_active": code != 0,
             "fault_binary": format(code, "016b"),
             "fault_active_bits": active_bits,
-            "fault_note": (
-                "If this register is bitmask-based, active bits indicate multiple alarms. "
-                "Exact bit meanings need vendor fault code sheet."
+        }
+
+    # -------------------------------------------------
+    # Storage Logger
+    # -------------------------------------------------
+
+    def _initialize_storage_logger(self) -> None:
+        if not self.enable_storage_logging:
+            print("[STORAGE] Storage logging disabled from config")
+            return
+
+        try:
+            self.storage_logger = StorageLogger(
+                base_path=self.log_base_path,
+                gateway_id=self.gateway_id,
+                asset_id=self.asset_id,
+            )
+
+            init_ok = self.storage_logger.initialize()
+
+            if init_ok:
+                print("[STORAGE] Storage logger initialized successfully")
+                print(f"[STORAGE] Log base path: {self.log_base_path}")
+                print(
+                    f"[STORAGE] Telemetry log interval: "
+                    f"{self.log_telemetry_interval_sec} sec"
+                )
+
+                self._log_storage_event(
+                    event_type="STORAGE_LOGGER_STARTED",
+                    source="chiller_gateway_service.py",
+                    status="success",
+                    description=(
+                        "Storage logger initialized for real chiller telemetry logging"
+                    ),
+                )
+            else:
+                print("[STORAGE] Storage logger initialization failed")
+
+        except Exception as error:
+            print(f"[STORAGE] Storage logger initialization exception: {error}")
+            self.storage_logger = None
+
+    def _log_storage_event(
+        self,
+        event_type: str,
+        old_value: str = "",
+        new_value: str = "",
+        source: str = "chiller_gateway_service.py",
+        status: str = "success",
+        description: str = "",
+    ) -> None:
+        if self.storage_logger is None:
+            return
+
+        try:
+            with self._storage_logger_lock:
+                self.storage_logger.log_event(
+                    event_type=event_type,
+                    old_value=old_value,
+                    new_value=new_value,
+                    source=source,
+                    status=status,
+                    description=description,
+                )
+
+        except Exception as error:
+            print(f"[STORAGE] Event logging exception: {error}")
+
+    def _log_storage_error(
+        self,
+        error_type: str,
+        error_source: str,
+        description: str,
+    ) -> None:
+        if self.storage_logger is None:
+            return
+
+        try:
+            with self._storage_logger_lock:
+                self.storage_logger.log_error(
+                    error_type=error_type,
+                    error_source=error_source,
+                    description=description,
+                )
+
+        except Exception as error:
+            print(f"[STORAGE] Error logging exception: {error}")
+
+    def _get_storage_status(self) -> Dict[str, Any]:
+        if self.storage_logger is None:
+            return {
+                "logger_status": "disabled_or_not_initialized",
+                "base_path": self.log_base_path,
+            }
+
+        try:
+            return self.storage_logger.get_status()
+        except Exception as error:
+            return {
+                "logger_status": "status_read_failed",
+                "error": str(error),
+                "base_path": self.log_base_path,
+            }
+
+    def convert_telemetry_for_logging(self, telemetry: Any) -> Dict[str, Any]:
+        """
+        Converts real chiller telemetry into StorageLogger dictionary format.
+
+        Supports:
+        - dict-based telemetry
+        - object-based telemetry
+        - existing driver field names
+        - merged settings fields
+        """
+
+        data = self._object_to_dict(telemetry)
+
+        if not data:
+            return {
+                "system_on_off": "unknown",
+                "control_mode": "unknown",
+                "set_temperature": "unknown",
+                "outlet_water_temp": "unknown",
+                "return_water_temp": "unknown",
+                "outlet_water_pressure": "unknown",
+                "return_water_pressure": "unknown",
+                "ambient_temp": "unknown",
+                "water_pump_status": "unknown",
+                "compressor_1_status": "unknown",
+                "compressor_2_status": "unknown",
+                "electric_heater_status": "unknown",
+                "condensate_fan_status": "unknown",
+                "modbus_status": "failed",
+            }
+
+        system_on_off = data.get(
+            "system_on_off",
+            data.get(
+                "on_off_status",
+                data.get("system_status", "unknown"),
+            ),
+        )
+
+        control_mode = data.get(
+            "control_mode",
+            data.get("control_mode_raw", "unknown"),
+        )
+
+        set_temperature = data.get(
+            "set_temperature",
+            data.get("set_temperature_celsius", "unknown"),
+        )
+
+        return {
+            "system_on_off": system_on_off,
+            "control_mode": control_mode,
+            "set_temperature": set_temperature,
+            "outlet_water_temp": data.get(
+                "outlet_water_temp",
+                data.get("outlet_water_temperature", "unknown"),
+            ),
+            "return_water_temp": data.get(
+                "return_water_temp",
+                data.get("inlet_water_temp", data.get("return_water_temperature", "unknown")),
+            ),
+            "outlet_water_pressure": data.get(
+                "outlet_water_pressure",
+                "unknown",
+            ),
+            "return_water_pressure": data.get(
+                "return_water_pressure",
+                data.get("inlet_water_pressure", "unknown"),
+            ),
+            "ambient_temp": data.get(
+                "ambient_temp",
+                data.get("ambient_temperature", "unknown"),
+            ),
+            "water_pump_status": data.get(
+                "water_pump_status",
+                data.get("water_pump", "unknown"),
+            ),
+            "compressor_1_status": data.get(
+                "compressor_1_status",
+                data.get("compressor1", data.get("compressor_1", "unknown")),
+            ),
+            "compressor_2_status": data.get(
+                "compressor_2_status",
+                data.get("compressor2", data.get("compressor_2", "unknown")),
+            ),
+            "electric_heater_status": data.get(
+                "electric_heater_status",
+                data.get("electric_heater", "unknown"),
+            ),
+            "condensate_fan_status": data.get(
+                "condensate_fan_status",
+                data.get("condensate_fan", "unknown"),
+            ),
+            "modbus_status": data.get(
+                "modbus_status",
+                data.get("communication_status", "OK"),
             ),
         }
 
-    def _merge_settings_into_telemetry(self, telemetry: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Add holding register information into live telemetry.
+    def _log_latest_telemetry_if_due(self, force: bool = False) -> None:
+        if self.storage_logger is None:
+            return
 
-        Important:
-        read_all_parameters() mainly reads input registers 0-11.
-        But control mode, ON/OFF status, and set temperature are holding registers:
+        now = time.monotonic()
 
-        - Register 200: Control mode
-        - Register 201: ON/OFF enable
-        - Register 205: Set temperature
-        """
+        if not force:
+            if (now - self.last_storage_log_time) < self.log_telemetry_interval_sec:
+                return
 
-        if not self.include_settings_in_poll:
-            return telemetry
+        with self._state_lock:
+            telemetry = dict(self.latest_state_dict)
+
+        if not telemetry:
+            return
+
+        log_data = self.convert_telemetry_for_logging(telemetry)
 
         try:
-            settings = self.driver.read_setting_parameters()
+            with self._storage_logger_lock:
+                status = self.storage_logger.log_telemetry(log_data)
 
+            if status:
+                print("[STORAGE] Real chiller telemetry logged to storage")
+            else:
+                print("[STORAGE] Real chiller telemetry logging failed")
+
+            self.last_storage_log_time = now
+
+        except Exception as error:
+            print(f"[STORAGE] Telemetry logging exception: {error}")
+            self._log_storage_error(
+                error_type="STORAGE_TELEMETRY_LOG_EXCEPTION",
+                error_source="chiller_gateway_service.py",
+                description=str(error),
+            )
+
+    def _log_command_event(
+        self,
+        command: str,
+        value: Any,
+        response_status: str,
+        response_message: str,
+        result: Optional[Dict[str, Any]],
+        client: str = "unknown",
+    ) -> None:
+        event_type_map = {
+            "CHILLER_ON": "SYSTEM_ON_OFF_WRITE",
+            "CHILLER_OFF": "SYSTEM_ON_OFF_WRITE",
+            "SET_TEMP": "SET_TEMPERATURE_WRITE",
+            "SET_MODE": "CONTROL_MODE_WRITE",
+        }
+
+        event_type = event_type_map.get(command)
+
+        if event_type is None:
+            return
+
+        description = (
+            f"command={command}; client={client}; "
+            f"message={response_message}; result={result}"
+        )
+
+        self._log_storage_event(
+            event_type=event_type,
+            old_value="",
+            new_value=str(value),
+            source="flutter_tcp_command",
+            status=response_status,
+            description=description,
+        )
+
+    # -------------------------------------------------
+    # Settings polling / merging
+    # -------------------------------------------------
+
+    def _should_poll_settings(self) -> bool:
+        if not self.include_settings_in_poll:
+            return False
+
+        now = time.monotonic()
+        return (
+            now - self._last_settings_poll_monotonic
+        ) >= self.settings_poll_interval_sec
+
+    def _read_settings_unlocked(self) -> Dict[str, Any]:
+        """
+        Read setting registers.
+
+        Caller must hold _modbus_sequence_lock.
+        """
+
+        print("[SERVICE] Reading setting registers 200-208...")
+        settings = self.driver.read_setting_parameters()
+
+        with self._state_lock:
+            self.latest_settings_dict = dict(settings)
+            self.last_settings_poll_time = self._now()
+            self.last_settings_error = None
+
+        self._last_settings_poll_monotonic = time.monotonic()
+        print(f"[SERVICE] Settings updated: {settings}")
+
+        return settings
+
+    def _read_settings_if_due_unlocked(self) -> None:
+        """
+        Read settings only if interval has elapsed.
+
+        Caller must hold _modbus_sequence_lock.
+        """
+
+        if not self._should_poll_settings():
+            return
+
+        try:
+            self._read_settings_unlocked()
+
+        except Exception as error:
+            with self._state_lock:
+                self.last_settings_error = str(error)
+
+            self._last_settings_poll_monotonic = time.monotonic()
+            print(f"[SERVICE] Settings read error: {error}")
+
+            self._log_storage_error(
+                error_type="SETTINGS_READ_FAILED",
+                error_source="chiller_gateway_service.py",
+                description=str(error),
+            )
+
+    def _merge_cached_settings_into_telemetry(
+        self,
+        telemetry: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        with self._state_lock:
+            settings = dict(self.latest_settings_dict)
+            settings_error = self.last_settings_error
+            settings_time = self.last_settings_poll_time
+
+        if settings:
             control_mode = settings.get("control_mode", {})
             on_off = settings.get("on_off_enable", {})
             set_temp = settings.get("set_temperature", {})
@@ -204,22 +560,24 @@ class ChillerGatewayService:
                 [],
             )
 
-        except Exception as e:
-            telemetry["settings_read_error"] = str(e)
+        telemetry["last_settings_poll_time"] = settings_time
+
+        if settings_error:
+            telemetry["settings_read_error"] = settings_error
 
         return telemetry
 
-    def _enhance_telemetry(self, state: Any) -> Dict[str, Any]:
-        """
-        Convert driver output into complete dashboard-ready telemetry.
-        """
+    # -------------------------------------------------
+    # Telemetry enhancement
+    # -------------------------------------------------
 
+    def _enhance_telemetry(self, state: Any) -> Dict[str, Any]:
         telemetry = self._object_to_dict(state)
 
         fault_info = self._decode_fault(telemetry.get("fault_code", 0))
         telemetry.update(fault_info)
 
-        telemetry = self._merge_settings_into_telemetry(telemetry)
+        telemetry = self._merge_cached_settings_into_telemetry(telemetry)
 
         telemetry["communication_status"] = telemetry.get(
             "communication_status",
@@ -246,13 +604,30 @@ class ChillerGatewayService:
                 self.latest_state_dict["communication_status"] = "error"
                 self.latest_state_dict["last_error"] = str(error)
 
+        self._log_storage_error(
+            error_type="MODBUS_OR_POLLING_ERROR",
+            error_source="chiller_gateway_service.py",
+            description=str(error),
+        )
+
     # -------------------------------------------------
     # Polling
     # -------------------------------------------------
 
     def poll_once(self) -> Dict[str, Any]:
-        state = self.driver.read_all_parameters()
-        self._update_latest_state(state)
+        """
+        One complete polling cycle.
+
+        Protected with sequence lock to avoid collision with TCP commands.
+        """
+
+        with self._modbus_sequence_lock:
+            self._read_settings_if_due_unlocked()
+            state = self.driver.read_all_parameters()
+            self._update_latest_state(state)
+
+        self._log_latest_telemetry_if_due()
+
         return self.get_latest_state_dict()
 
     def start_polling(self) -> None:
@@ -277,23 +652,37 @@ class ChillerGatewayService:
         if self._poll_thread:
             self._poll_thread.join(timeout=2)
 
+        self._log_storage_event(
+            event_type="STORAGE_LOGGER_STOPPED",
+            source="chiller_gateway_service.py",
+            status="success",
+            description="Chiller gateway service polling stopped",
+        )
+
         print("[SERVICE] Chiller polling stopped")
 
     def _poll_loop(self) -> None:
         while self._running:
             try:
-                state = self.driver.read_all_parameters()
-                self._update_latest_state(state)
+                with self._modbus_sequence_lock:
+                    self._read_settings_if_due_unlocked()
+                    state = self.driver.read_all_parameters()
+                    self._update_latest_state(state)
+
                 print("[SERVICE] Chiller telemetry updated")
 
-            except Exception as e:
-                self._set_error(e)
-                print(f"[SERVICE] Polling error: {e}")
+                # Storage logging happens outside the Modbus lock.
+                # This avoids blocking RS485 communication because of file I/O.
+                self._log_latest_telemetry_if_due()
+
+            except Exception as error:
+                self._set_error(error)
+                print(f"[SERVICE] Polling error: {error}")
 
             time.sleep(self.poll_interval_sec)
 
     # -------------------------------------------------
-    # Telemetry
+    # Telemetry packet
     # -------------------------------------------------
 
     def get_latest_state_dict(self) -> Dict[str, Any]:
@@ -312,6 +701,7 @@ class ChillerGatewayService:
             "asset_id": self.asset_id,
             "timestamp": self._now(),
             "last_poll_time": last_poll_time,
+            "storage_logger": self._get_storage_status(),
             "data": data,
         }
 
@@ -332,6 +722,7 @@ class ChillerGatewayService:
         command = str(command_packet.get("command", "")).strip().upper()
         value = command_packet.get("value")
         verify = bool(command_packet.get("verify", True))
+        client = str(command_packet.get("client", "unknown"))
 
         try:
             if not command:
@@ -339,131 +730,238 @@ class ChillerGatewayService:
 
             print(f"[SERVICE] Executing command: {command}, value={value}")
 
-            if command == "READ_ALL":
-                result = self.poll_once()
+            with self._modbus_sequence_lock:
+                if command == "READ_ALL":
+                    self._read_settings_if_due_unlocked()
+                    state = self.driver.read_all_parameters()
+                    self._update_latest_state(state)
 
-                return self._ok_response(
-                    request_id=request_id,
-                    command=command,
-                    message="Chiller telemetry read successfully",
-                    data=result,
-                )
+                    self._log_latest_telemetry_if_due(force=True)
 
-            if command == "READ_SETTINGS":
-                result = self.driver.read_setting_parameters()
+                    result = self.get_latest_state_dict()
 
-                return self._ok_response(
-                    request_id=request_id,
-                    command=command,
-                    message="Chiller setting parameters read successfully",
-                    data=result,
-                )
+                    return self._ok_response(
+                        request_id,
+                        command,
+                        "Chiller telemetry read successfully",
+                        result,
+                    )
 
-            if command == "READ_MODE":
-                result = self.driver.read_control_mode()
+                if command == "READ_SETTINGS":
+                    result = self._read_settings_unlocked()
+                    return self._ok_response(
+                        request_id,
+                        command,
+                        "Chiller setting parameters read successfully",
+                        result,
+                    )
 
-                return self._ok_response(
-                    request_id=request_id,
-                    command=command,
-                    message="Chiller control mode read successfully",
-                    data=result,
-                )
+                if command == "READ_MODE":
+                    result = self.driver.read_control_mode()
+                    return self._ok_response(
+                        request_id,
+                        command,
+                        "Chiller control mode read successfully",
+                        result,
+                    )
 
-            if command == "READ_TEMP":
-                result = self.driver.read_set_temperature()
+                if command == "READ_TEMP":
+                    result = self.driver.read_set_temperature()
+                    return self._ok_response(
+                        request_id,
+                        command,
+                        "Chiller set temperature read successfully",
+                        result,
+                    )
 
-                return self._ok_response(
-                    request_id=request_id,
-                    command=command,
-                    message="Chiller set temperature read successfully",
-                    data=result,
-                )
+                if command == "READ_ONOFF":
+                    result = self.driver.read_on_off_enable()
+                    return self._ok_response(
+                        request_id,
+                        command,
+                        "Chiller ON/OFF status read successfully",
+                        result,
+                    )
 
-            if command == "READ_ONOFF":
-                result = self.driver.read_on_off_enable()
+                if command == "CHILLER_ON":
+                    result = self.driver.turn_on(verify=verify)
+                    self._post_command_refresh_unlocked()
 
-                return self._ok_response(
-                    request_id=request_id,
-                    command=command,
-                    message="Chiller ON/OFF status read successfully",
-                    data=result,
-                )
+                    message = "Chiller ON command executed"
 
-            if command == "CHILLER_ON":
-                result = self.driver.turn_on(verify=verify)
+                    self._log_command_event(
+                        command=command,
+                        value=1,
+                        response_status="success",
+                        response_message=message,
+                        result=result,
+                        client=client,
+                    )
 
-                try:
-                    self.poll_once()
-                except Exception:
-                    pass
+                    self._log_latest_telemetry_if_due(force=True)
 
-                return self._ok_response(
-                    request_id=request_id,
-                    command=command,
-                    message="Chiller ON command executed",
-                    data=result,
-                )
+                    return self._ok_response(
+                        request_id,
+                        command,
+                        message,
+                        result,
+                    )
 
-            if command == "CHILLER_OFF":
-                result = self.driver.turn_off(verify=verify)
+                if command == "CHILLER_OFF":
+                    result = self.driver.turn_off(verify=verify)
+                    self._post_command_refresh_unlocked()
 
-                try:
-                    self.poll_once()
-                except Exception:
-                    pass
+                    message = "Chiller OFF command executed"
 
-                return self._ok_response(
-                    request_id=request_id,
-                    command=command,
-                    message="Chiller OFF command executed",
-                    data=result,
-                )
+                    self._log_command_event(
+                        command=command,
+                        value=0,
+                        response_status="success",
+                        response_message=message,
+                        result=result,
+                        client=client,
+                    )
 
-            if command == "SET_TEMP":
-                if value is None:
-                    raise ValueError("SET_TEMP requires value field")
+                    self._log_latest_telemetry_if_due(force=True)
 
-                result = self.driver.set_temperature(value, verify=verify)
+                    return self._ok_response(
+                        request_id,
+                        command,
+                        message,
+                        result,
+                    )
 
-                try:
-                    self.poll_once()
-                except Exception:
-                    pass
+                if command == "SET_TEMP":
+                    if value is None:
+                        raise ValueError("SET_TEMP requires value field")
 
-                return self._ok_response(
-                    request_id=request_id,
-                    command=command,
-                    message="Chiller set temperature command executed",
-                    data=result,
-                )
+                    result = self.driver.set_temperature(value, verify=verify)
+                    self._post_command_refresh_unlocked()
 
-            if command == "SET_MODE":
-                if value is None:
-                    raise ValueError("SET_MODE requires value field")
+                    message = "Chiller set temperature command executed"
 
-                result = self.driver.set_control_mode(value, verify=verify)
+                    self._log_command_event(
+                        command=command,
+                        value=value,
+                        response_status="success",
+                        response_message=message,
+                        result=result,
+                        client=client,
+                    )
 
-                try:
-                    self.poll_once()
-                except Exception:
-                    pass
+                    self._log_latest_telemetry_if_due(force=True)
 
-                return self._ok_response(
-                    request_id=request_id,
-                    command=command,
-                    message="Chiller set mode command executed",
-                    data=result,
-                )
+                    return self._ok_response(
+                        request_id,
+                        command,
+                        message,
+                        result,
+                    )
 
-            raise ValueError(f"Unsupported command: {command}")
+                if command == "SET_MODE":
+                    if value is None:
+                        raise ValueError("SET_MODE requires value field")
 
-        except Exception as e:
-            print(f"[SERVICE] Command error: {e}")
+                    print(f"[SERVICE] SET_MODE requested GUI/write value: {value}")
 
-            return self._error_response(
-                request_id=request_id,
+                    result = self.driver.set_control_mode(value, verify=verify)
+
+                    print(f"[SERVICE] SET_MODE driver result: {result}")
+
+                    time.sleep(0.5)
+                    self._post_command_refresh_unlocked()
+
+                    verified = bool(result.get("verified", False))
+
+                    if not verified:
+                        message = (
+                            "SET_MODE command sent, but readback verification failed. "
+                            "Check chiller mode permissions/state."
+                        )
+
+                        self._log_command_event(
+                            command=command,
+                            value=value,
+                            response_status="warning",
+                            response_message=message,
+                            result=result,
+                            client=client,
+                        )
+
+                        self._log_latest_telemetry_if_due(force=True)
+
+                        return self._warning_response(
+                            request_id=request_id,
+                            command=command,
+                            message=message,
+                            data=result,
+                        )
+
+                    message = "Chiller set mode command executed and verified"
+
+                    self._log_command_event(
+                        command=command,
+                        value=value,
+                        response_status="success",
+                        response_message=message,
+                        result=result,
+                        client=client,
+                    )
+
+                    self._log_latest_telemetry_if_due(force=True)
+
+                    return self._ok_response(
+                        request_id,
+                        command,
+                        message,
+                        result,
+                    )
+
+                raise ValueError(f"Unsupported command: {command}")
+
+        except Exception as error:
+            print(f"[SERVICE] Command error: {error}")
+
+            self._log_storage_error(
+                error_type="COMMAND_EXECUTION_FAILED",
+                error_source="chiller_gateway_service.py",
+                description=f"command={command}; value={value}; error={error}",
+            )
+
+            self._log_command_event(
                 command=command,
-                message=str(e),
+                value=value,
+                response_status="error",
+                response_message=str(error),
+                result={},
+                client=client,
+            )
+
+            return self._error_response(request_id, command, str(error))
+
+    def _post_command_refresh_unlocked(self) -> None:
+        """
+        Refresh settings + telemetry after a write command.
+
+        Caller must hold _modbus_sequence_lock.
+        """
+
+        try:
+            time.sleep(0.3)
+            self._read_settings_unlocked()
+            state = self.driver.read_all_parameters()
+            self._update_latest_state(state)
+
+        except Exception as error:
+            with self._state_lock:
+                self.last_settings_error = str(error)
+
+            print(f"[SERVICE] Post-command refresh error: {error}")
+
+            self._log_storage_error(
+                error_type="POST_COMMAND_REFRESH_FAILED",
+                error_source="chiller_gateway_service.py",
+                description=str(error),
             )
 
     # -------------------------------------------------
@@ -487,6 +985,23 @@ class ChillerGatewayService:
             "data": data if data is not None else {},
         }
 
+    def _warning_response(
+        self,
+        request_id: Optional[str],
+        command: str,
+        message: str,
+        data: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        return {
+            "type": "response",
+            "request_id": request_id,
+            "timestamp": self._now(),
+            "status": "warning",
+            "command": command,
+            "message": message,
+            "data": data if data is not None else {},
+        }
+
     def _error_response(
         self,
         request_id: Optional[str],
@@ -505,33 +1020,16 @@ class ChillerGatewayService:
 
 
 if __name__ == "__main__":
-    driver = ChillerModbusDriver(
-        port="/dev/ttyUSB0",
-        slave_id=1,
-    )
+    driver = ChillerModbusDriver(port="/dev/ttyUSB0", slave_id=1)
 
     if not driver.connect():
         print("[SERVICE TEST] Failed to connect to chiller")
         sys.exit(1)
 
-    service = ChillerGatewayService(
-        driver=driver,
-        gateway_id="imx93_gateway_1",
-        asset_id="chiller_1",
-        poll_interval_sec=1.0,
-    )
+    service = ChillerGatewayService(driver=driver)
 
     try:
-        print("\n[SERVICE TEST] Reading chiller once...")
-        state = service.poll_once()
-        print(state)
-
-        print("\n[SERVICE TEST] Telemetry packet:")
-        packet = service.get_telemetry_packet()
-        print(packet)
-
-    except Exception as e:
-        print(f"[SERVICE TEST] Error: {e}")
-
+        print(service.poll_once())
+        print(service.get_telemetry_packet())
     finally:
         driver.close()

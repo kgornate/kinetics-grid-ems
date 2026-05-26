@@ -1,0 +1,5 @@
+gateway_id=imx93_gateway_1
+asset_id=chiller_1
+base_path=ems_logs_test
+created_at=2026-05-26T12:07:17+05:30
+logger_type=storage_independent_csv_logger
