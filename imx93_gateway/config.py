@@ -8,6 +8,7 @@ This file contains all system-level configuration:
 - UDP telemetry streaming configuration
 - Polling intervals
 - Storage logging configuration
+- HTTP log API configuration
 """
 
 # -------------------------------------------------
@@ -31,8 +32,9 @@ CHILLER_SLAVE_ID = 1
 TCP_COMMAND_HOST = "0.0.0.0"
 TCP_COMMAND_PORT = 6000
 
-# Change this as per your PC Ethernet/Wi-Fi IP
-PC_TELEMETRY_IP = "192.168.1.10"
+# Change this as per your PC Ethernet/Wi-Fi IP.
+# For direct PC <-> i.MX93 Ethernet, this is commonly 192.168.10.1.
+PC_TELEMETRY_IP = "192.168.10.1"
 UDP_TELEMETRY_PORT = 5005
 
 
@@ -67,3 +69,20 @@ LOG_BASE_PATH = "/home/root/ems_logs_test"
 # Modbus polling can be 1 sec, but storage logging should be slower
 # to reduce unnecessary writes.
 LOG_TELEMETRY_INTERVAL_SEC = 5.0
+
+
+# -------------------------------------------------
+# HTTP Log API Server Configuration
+# -------------------------------------------------
+
+ENABLE_LOG_HTTP_SERVER = True
+
+# Listen on all i.MX93 interfaces so PC/Flutter can access it over Ethernet.
+LOG_HTTP_HOST = "0.0.0.0"
+
+# Browser/Flutter URL example:
+# http://192.168.10.2:7000/api/storage/status
+LOG_HTTP_PORT = 7000
+
+# Maximum rows returned by one log API call.
+LOG_API_MAX_ROWS = 500

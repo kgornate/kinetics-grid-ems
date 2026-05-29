@@ -8,6 +8,7 @@ Purpose:
 - Execute TCP commands from PC / Flutter dashboard.
 - Prevent Modbus collision between polling thread and command thread.
 - Log real chiller telemetry, events, and errors to eMMC/SD using StorageLogger.
+- Log command events with both old_value and new_value.
 """
 
 import sys
@@ -293,6 +294,75 @@ class ChillerGatewayService:
                 "base_path": self.log_base_path,
             }
 
+    def _read_old_value_for_command_unlocked(self, command: str) -> str:
+        """
+        Reads the current value before executing a write command.
+
+        Caller must hold _modbus_sequence_lock.
+        If old value read fails, command execution should still continue.
+        """
+
+        try:
+            if command == "SET_TEMP":
+                result = self.driver.read_set_temperature()
+
+                if isinstance(result, dict):
+                    if "temperature_celsius" in result:
+                        return str(result.get("temperature_celsius"))
+                    if "raw_value" in result:
+                        return str(result.get("raw_value"))
+
+                return str(result)
+
+            if command == "SET_MODE":
+                result = self.driver.read_control_mode()
+
+                if isinstance(result, dict):
+                    mode = result.get("mode")
+                    raw_value = result.get("raw_value")
+
+                    if mode is not None and raw_value is not None:
+                        return f"{mode} ({raw_value})"
+
+                    if mode is not None:
+                        return str(mode)
+
+                    if raw_value is not None:
+                        return str(raw_value)
+
+                return str(result)
+
+            if command in ["CHILLER_ON", "CHILLER_OFF"]:
+                result = self.driver.read_on_off_enable()
+
+                if isinstance(result, dict):
+                    status = result.get("status")
+                    raw_value = result.get("raw_value")
+
+                    if status is not None and raw_value is not None:
+                        return f"{status} ({raw_value})"
+
+                    if status is not None:
+                        return str(status)
+
+                    if raw_value is not None:
+                        return str(raw_value)
+
+                return str(result)
+
+            return ""
+
+        except Exception as error:
+            print(f"[SERVICE] Old value read failed for {command}: {error}")
+
+            self._log_storage_error(
+                error_type="OLD_VALUE_READ_FAILED",
+                error_source="chiller_gateway_service.py",
+                description=f"command={command}; error={error}",
+            )
+
+            return "unknown"
+
     def convert_telemetry_for_logging(self, telemetry: Any) -> Dict[str, Any]:
         """
         Converts real chiller telemetry into StorageLogger dictionary format.
@@ -352,7 +422,10 @@ class ChillerGatewayService:
             ),
             "return_water_temp": data.get(
                 "return_water_temp",
-                data.get("inlet_water_temp", data.get("return_water_temperature", "unknown")),
+                data.get(
+                    "inlet_water_temp",
+                    data.get("return_water_temperature", "unknown"),
+                ),
             ),
             "outlet_water_pressure": data.get(
                 "outlet_water_pressure",
@@ -432,7 +505,8 @@ class ChillerGatewayService:
     def _log_command_event(
         self,
         command: str,
-        value: Any,
+        old_value: Any,
+        new_value: Any,
         response_status: str,
         response_message: str,
         result: Optional[Dict[str, Any]],
@@ -457,8 +531,8 @@ class ChillerGatewayService:
 
         self._log_storage_event(
             event_type=event_type,
-            old_value="",
-            new_value=str(value),
+            old_value=str(old_value),
+            new_value=str(new_value),
             source="flutter_tcp_command",
             status=response_status,
             description=description,
@@ -784,6 +858,8 @@ class ChillerGatewayService:
                     )
 
                 if command == "CHILLER_ON":
+                    old_value = self._read_old_value_for_command_unlocked(command)
+
                     result = self.driver.turn_on(verify=verify)
                     self._post_command_refresh_unlocked()
 
@@ -791,7 +867,8 @@ class ChillerGatewayService:
 
                     self._log_command_event(
                         command=command,
-                        value=1,
+                        old_value=old_value,
+                        new_value="ON (1)",
                         response_status="success",
                         response_message=message,
                         result=result,
@@ -808,6 +885,8 @@ class ChillerGatewayService:
                     )
 
                 if command == "CHILLER_OFF":
+                    old_value = self._read_old_value_for_command_unlocked(command)
+
                     result = self.driver.turn_off(verify=verify)
                     self._post_command_refresh_unlocked()
 
@@ -815,7 +894,8 @@ class ChillerGatewayService:
 
                     self._log_command_event(
                         command=command,
-                        value=0,
+                        old_value=old_value,
+                        new_value="OFF (0)",
                         response_status="success",
                         response_message=message,
                         result=result,
@@ -835,6 +915,8 @@ class ChillerGatewayService:
                     if value is None:
                         raise ValueError("SET_TEMP requires value field")
 
+                    old_value = self._read_old_value_for_command_unlocked(command)
+
                     result = self.driver.set_temperature(value, verify=verify)
                     self._post_command_refresh_unlocked()
 
@@ -842,7 +924,8 @@ class ChillerGatewayService:
 
                     self._log_command_event(
                         command=command,
-                        value=value,
+                        old_value=old_value,
+                        new_value=value,
                         response_status="success",
                         response_message=message,
                         result=result,
@@ -864,6 +947,8 @@ class ChillerGatewayService:
 
                     print(f"[SERVICE] SET_MODE requested GUI/write value: {value}")
 
+                    old_value = self._read_old_value_for_command_unlocked(command)
+
                     result = self.driver.set_control_mode(value, verify=verify)
 
                     print(f"[SERVICE] SET_MODE driver result: {result}")
@@ -881,7 +966,8 @@ class ChillerGatewayService:
 
                         self._log_command_event(
                             command=command,
-                            value=value,
+                            old_value=old_value,
+                            new_value=value,
                             response_status="warning",
                             response_message=message,
                             result=result,
@@ -901,7 +987,8 @@ class ChillerGatewayService:
 
                     self._log_command_event(
                         command=command,
-                        value=value,
+                        old_value=old_value,
+                        new_value=value,
                         response_status="success",
                         response_message=message,
                         result=result,
@@ -930,7 +1017,8 @@ class ChillerGatewayService:
 
             self._log_command_event(
                 command=command,
-                value=value,
+                old_value="unknown",
+                new_value=value,
                 response_status="error",
                 response_message=str(error),
                 result={},

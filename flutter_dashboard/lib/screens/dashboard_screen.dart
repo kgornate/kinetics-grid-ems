@@ -11,6 +11,7 @@ import '../services/udp_telemetry_service.dart';
 import '../widgets/command_panel.dart';
 import '../widgets/status_indicator.dart';
 import '../widgets/telemetry_card.dart';
+import 'logs_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -113,7 +114,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ? 'Command successful: $command'
           : 'Command failed: ${response.message}';
 
-      // If READ_ALL gives complete telemetry over TCP, update cards also.
       if (response.isOk && command.toUpperCase() == 'READ_ALL') {
         final data = _extractDataOrMockState(response.data);
         if (data.isNotEmpty) {
@@ -121,6 +121,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
         }
       }
     });
+  }
+
+  void _openLogsScreen() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => LogsScreen(
+          initialGatewayIp: _gatewayIpController.text.trim(),
+        ),
+      ),
+    );
   }
 
   @override
@@ -174,6 +184,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
       appBar: AppBar(
         title: const Text('EMS Chiller Dashboard'),
         actions: [
+          TextButton.icon(
+            onPressed: _openLogsScreen,
+            icon: const Icon(Icons.history),
+            label: const Text('Logs'),
+          ),
           Padding(
             padding: const EdgeInsets.only(right: 16),
             child: Center(
@@ -250,6 +265,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
             FilledButton.tonal(
               onPressed: _udpRunning ? _stopUdpListener : _startUdpListener,
               child: Text(_udpRunning ? 'Stop UDP' : 'Start UDP'),
+            ),
+            const SizedBox(width: 12),
+            FilledButton.icon(
+              onPressed: _openLogsScreen,
+              icon: const Icon(Icons.history),
+              label: const Text('Logs'),
             ),
             const SizedBox(width: 12),
             if (_commandInProgress)

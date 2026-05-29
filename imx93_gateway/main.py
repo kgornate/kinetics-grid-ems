@@ -8,12 +8,14 @@ Role of this file:
     - Polls chiller data.
     - Sends UDP telemetry to PC.
     - Receives TCP commands from PC.
+    - Exposes eMMC/SD logs over HTTP API.
 
 - In MOCK mode:
     - Does not use Modbus.
     - Does not need chiller hardware.
     - Sends dummy telemetry to PC.
     - Receives TCP commands and returns mock responses.
+    - Can still expose existing logs over HTTP API.
 
 Run real mode on i.MX93:
 
@@ -61,12 +63,11 @@ except ImportError:
 # -------------------------------------------------
 # Network imports
 # -------------------------------------------------
-# These do not depend on pymodbus.
-# Safe for both mock mode and real mode.
-# -------------------------------------------------
 
 from network.udp_telemetry_streamer import UDPTelemetryStreamer
 from network.tcp_command_server import TCPCommandServer
+from network.log_http_server import LogHTTPServer
+from services.log_query_service import LogQueryService
 
 
 # -------------------------------------------------
@@ -88,22 +89,10 @@ def get_config_value(name: str, default: Any) -> Any:
 # -------------------------------------------------
 # Mock Gateway Service
 # -------------------------------------------------
-# This service is used when --mock is enabled.
-# It does not use Modbus and does not require chiller hardware.
-# -------------------------------------------------
 
 class MockGatewayService:
     """
     Mock service for testing TCP/UDP communication without Modbus hardware.
-
-    It provides the same main APIs as ChillerGatewayService:
-        start_polling()
-        stop_polling()
-        get_telemetry_packet()
-        execute_command()
-
-    This allows the Flutter dashboard and PC TCP/UDP tools to be tested
-    before going to the actual chiller site.
     """
 
     def __init__(
@@ -136,7 +125,7 @@ class MockGatewayService:
 
     @staticmethod
     def _now() -> str:
-        return datetime.now().isoformat(timespec="seconds")
+        return datetime.now().astimezone().isoformat(timespec="seconds")
 
     def start_polling(self) -> None:
         self.running = True
@@ -147,13 +136,8 @@ class MockGatewayService:
         print("[MOCK SERVICE] Mock polling stopped")
 
     def get_telemetry_packet(self) -> Dict[str, Any]:
-        """
-        Return dummy telemetry packet for UDP streaming.
-        """
-
         self.sequence += 1
 
-        # Small changing values to confirm that live UDP telemetry is updating.
         self.mock_state["outlet_water_temp"] = 38.4 + (self.sequence % 5) * 0.1
         self.mock_state["return_water_temp"] = 38.1 + (self.sequence % 5) * 0.1
 
@@ -168,16 +152,6 @@ class MockGatewayService:
         }
 
     def execute_command(self, command_packet: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Mock command execution.
-
-        This mimics the real ChillerGatewayService response shapes so the
-        Flutter dashboard can display READ_MODE, READ_TEMP, READ_ONOFF,
-        and READ_SETTINGS properly.
-
-        No real Modbus command is executed.
-        """
-
         request_id = command_packet.get("request_id")
         command = str(command_packet.get("command", "")).strip().upper()
         value = command_packet.get("value")
@@ -234,10 +208,6 @@ class MockGatewayService:
                 2: "Heating mode",
                 3: "Water pump circulation mode",
             }
-
-            # -------------------------------------------------
-            # Read Commands
-            # -------------------------------------------------
 
             if command == "READ_ALL":
                 return response(
@@ -314,17 +284,12 @@ class MockGatewayService:
                     },
                 )
 
-            # -------------------------------------------------
-            # Write / Control Commands
-            # -------------------------------------------------
-
             if command == "SET_TEMP":
                 if value is None:
                     return error_response("SET_TEMP requires value")
 
                 new_temp = float(value)
                 new_temp_raw = int(new_temp * 10)
-
                 self.mock_state["set_temperature"] = new_temp
 
                 return response(
@@ -416,8 +381,8 @@ class MockGatewayService:
 
             return error_response(f"Unsupported mock command: {command}")
 
-        except Exception as e:
-            return error_response(str(e))
+        except Exception as error:
+            return error_response(str(error))
 
 
 # -------------------------------------------------
@@ -433,6 +398,7 @@ class EMSGatewayApplication:
     - Chiller gateway service
     - UDP telemetry streamer
     - TCP command server
+    - HTTP log API server
     """
 
     def __init__(self, args: argparse.Namespace):
@@ -442,6 +408,8 @@ class EMSGatewayApplication:
         self.service: Optional[Any] = None
         self.udp_streamer: Optional[UDPTelemetryStreamer] = None
         self.tcp_server: Optional[TCPCommandServer] = None
+        self.log_query_service: Optional[LogQueryService] = None
+        self.log_http_server: Optional[LogHTTPServer] = None
 
         self.running = False
 
@@ -486,15 +454,28 @@ class EMSGatewayApplication:
             1.0,
         )
 
+        self.enable_log_http_server = bool(
+            get_config_value("ENABLE_LOG_HTTP_SERVER", True)
+        )
+        self.log_http_host = get_config_value("LOG_HTTP_HOST", "0.0.0.0")
+        self.log_http_port = args.log_http_port or get_config_value(
+            "LOG_HTTP_PORT",
+            7000,
+        )
+        self.log_base_path = get_config_value(
+            "LOG_BASE_PATH",
+            "/home/root/ems_logs_test",
+        )
+        self.log_api_max_rows = get_config_value(
+            "LOG_API_MAX_ROWS",
+            500,
+        )
+
     # -------------------------------------------------
     # Startup
     # -------------------------------------------------
 
     def start(self) -> None:
-        """
-        Start complete gateway application.
-        """
-
         self.print_startup_banner()
 
         if self.args.mock:
@@ -508,16 +489,15 @@ class EMSGatewayApplication:
         if not self.args.no_tcp:
             self._start_tcp_server()
 
+        if self.enable_log_http_server and not self.args.no_log_http:
+            self._start_log_http_server()
+
         self.running = True
 
         print("\n[MAIN] EMS Gateway started successfully")
         print("[MAIN] Press Ctrl+C to stop\n")
 
     def _start_mock_service(self) -> None:
-        """
-        Start mock service for TCP/UDP testing without chiller.
-        """
-
         print("[MAIN] Starting MOCK gateway service. No Modbus hardware will be used.")
 
         self.service = MockGatewayService(
@@ -528,24 +508,17 @@ class EMSGatewayApplication:
         self.service.start_polling()
 
     def _start_real_chiller_service(self) -> None:
-        """
-        Start real Modbus chiller service.
-
-        Imports are done here intentionally so mock mode can run even if
-        pymodbus is not installed on the PC.
-        """
-
         print("[MAIN] Starting real chiller Modbus service...")
 
         try:
             from drivers.chiller_modbus_driver import ChillerModbusDriver
             from services.chiller_gateway_service import ChillerGatewayService
-        except ImportError as e:
+        except ImportError as error:
             raise RuntimeError(
                 "Failed to import real Modbus gateway modules. "
                 "Make sure pymodbus and pyserial are installed. "
                 "Install using: pip3 install pymodbus pyserial"
-            ) from e
+            ) from error
 
         self.driver = ChillerModbusDriver(
             port=self.modbus_port,
@@ -575,10 +548,6 @@ class EMSGatewayApplication:
         self.service.start_polling()
 
     def _start_udp_streamer(self) -> None:
-        """
-        Start UDP telemetry streamer.
-        """
-
         if self.service is None:
             raise RuntimeError("Service not initialized before starting UDP streamer")
 
@@ -594,10 +563,6 @@ class EMSGatewayApplication:
         self.udp_streamer.start()
 
     def _start_tcp_server(self) -> None:
-        """
-        Start TCP command server.
-        """
-
         if self.service is None:
             raise RuntimeError("Service not initialized before starting TCP server")
 
@@ -611,15 +576,28 @@ class EMSGatewayApplication:
 
         self.tcp_server.start()
 
+    def _start_log_http_server(self) -> None:
+        print("[MAIN] Starting HTTP log API server...")
+
+        self.log_query_service = LogQueryService(
+            base_path=self.log_base_path,
+            asset_id=self.asset_id,
+            max_rows=self.log_api_max_rows,
+        )
+
+        self.log_http_server = LogHTTPServer(
+            host=self.log_http_host,
+            port=self.log_http_port,
+            log_query_service=self.log_query_service,
+        )
+
+        self.log_http_server.start()
+
     # -------------------------------------------------
     # Runtime Loop
     # -------------------------------------------------
 
     def run_forever(self) -> None:
-        """
-        Keep main application alive.
-        """
-
         while self.running:
             time.sleep(1)
 
@@ -628,37 +606,39 @@ class EMSGatewayApplication:
     # -------------------------------------------------
 
     def stop(self) -> None:
-        """
-        Stop complete gateway application safely.
-        """
-
         print("\n[MAIN] Stopping EMS Gateway...")
 
         self.running = False
 
+        if self.log_http_server is not None:
+            try:
+                self.log_http_server.stop()
+            except Exception as error:
+                print(f"[MAIN] Error while stopping HTTP log server: {error}")
+
         if self.tcp_server is not None:
             try:
                 self.tcp_server.stop()
-            except Exception as e:
-                print(f"[MAIN] Error while stopping TCP server: {e}")
+            except Exception as error:
+                print(f"[MAIN] Error while stopping TCP server: {error}")
 
         if self.udp_streamer is not None:
             try:
                 self.udp_streamer.stop()
-            except Exception as e:
-                print(f"[MAIN] Error while stopping UDP streamer: {e}")
+            except Exception as error:
+                print(f"[MAIN] Error while stopping UDP streamer: {error}")
 
         if self.service is not None:
             try:
                 self.service.stop_polling()
-            except Exception as e:
-                print(f"[MAIN] Error while stopping service: {e}")
+            except Exception as error:
+                print(f"[MAIN] Error while stopping service: {error}")
 
         if self.driver is not None:
             try:
                 self.driver.close()
-            except Exception as e:
-                print(f"[MAIN] Error while closing Modbus driver: {e}")
+            except Exception as error:
+                print(f"[MAIN] Error while closing Modbus driver: {error}")
 
         print("[MAIN] EMS Gateway stopped")
 
@@ -667,10 +647,6 @@ class EMSGatewayApplication:
     # -------------------------------------------------
 
     def print_startup_banner(self) -> None:
-        """
-        Print startup configuration.
-        """
-
         print("\n====================================================")
         print("          i.MX93 EMS Gateway Backend")
         print("====================================================")
@@ -696,6 +672,14 @@ class EMSGatewayApplication:
         print(f"UDP Telemetry Interval  : {self.udp_interval_sec} sec")
         print(f"UDP Disabled            : {self.args.no_udp}")
         print(f"TCP Disabled            : {self.args.no_tcp}")
+        print("")
+        print("HTTP Log API Configuration")
+        print("----------------------------------------------------")
+        print(f"HTTP Log Enabled        : {self.enable_log_http_server and not self.args.no_log_http}")
+        print(f"HTTP Log Host           : {self.log_http_host}")
+        print(f"HTTP Log Port           : {self.log_http_port}")
+        print(f"HTTP Log Base Path      : {self.log_base_path}")
+        print(f"HTTP Log Max Rows       : {self.log_api_max_rows}")
         print("====================================================\n")
 
 
@@ -773,6 +757,19 @@ def parse_args() -> argparse.Namespace:
         help="Disable TCP command server",
     )
 
+    parser.add_argument(
+        "--no-log-http",
+        action="store_true",
+        help="Disable HTTP log API server",
+    )
+
+    parser.add_argument(
+        "--log-http-port",
+        type=int,
+        default=None,
+        help="Override HTTP log API server port",
+    )
+
     return parser.parse_args()
 
 
@@ -799,8 +796,8 @@ def main() -> None:
     except KeyboardInterrupt:
         app.stop()
 
-    except Exception as e:
-        print(f"[MAIN] Fatal error: {e}")
+    except Exception as error:
+        print(f"[MAIN] Fatal error: {error}")
         app.stop()
         sys.exit(1)
 
