@@ -636,6 +636,13 @@ class EMSGatewayApplication:
             poll_interval_sec=self.pcs_poll_interval_sec,
             timeout=self.pcs_timeout,
             retries=self.pcs_retries,
+            gateway_id=self.gateway_id,
+            enable_storage_logging=get_config_value("ENABLE_STORAGE_LOGGING", True),
+            log_base_path=self.log_base_path,
+            log_telemetry_interval_sec=get_config_value(
+                "PCS_LOG_TELEMETRY_INTERVAL_SEC",
+                get_config_value("LOG_TELEMETRY_INTERVAL_SEC", 5.0),
+            ),
         )
 
         # Start background polling. If ModSim/PCS is temporarily unavailable,
@@ -859,12 +866,18 @@ class EMSGatewayApplication:
                     data=self.pcs_service.get_latest_state(),
                 )
 
+            source = f"flutter_tcp_command:{command_packet.get('client', 'unknown')}"
+
             if command == "PCS_POWER_ON":
-                result = self.pcs_service.power_on()
+                result = self.pcs_service.power_on(source=source)
                 return self._pcs_command_response(request_id, command, result)
 
             if command == "PCS_POWER_OFF":
-                result = self.pcs_service.power_off()
+                result = self.pcs_service.power_off(source=source)
+                return self._pcs_command_response(request_id, command, result)
+
+            if command in ["PCS_STANDBY", "PCS_DEVICE_STANDBY"]:
+                result = self.pcs_service.standby(source=source)
                 return self._pcs_command_response(request_id, command, result)
 
             if command == "PCS_SET_ACTIVE_POWER":
@@ -879,7 +892,7 @@ class EMSGatewayApplication:
                         message="PCS_SET_ACTIVE_POWER requires value / kw / active_power_kw",
                     )
 
-                result = self.pcs_service.set_active_power_kw(float(value))
+                result = self.pcs_service.set_active_power_kw(float(value), source=source)
                 return self._pcs_command_response(request_id, command, result)
 
             if command == "PCS_SET_REACTIVE_POWER":
@@ -894,15 +907,15 @@ class EMSGatewayApplication:
                         message="PCS_SET_REACTIVE_POWER requires value / kvar / reactive_power_kvar",
                     )
 
-                result = self.pcs_service.set_reactive_power_kvar(float(value))
+                result = self.pcs_service.set_reactive_power_kvar(float(value), source=source)
                 return self._pcs_command_response(request_id, command, result)
 
             if command == "PCS_RESET_FAULT":
-                result = self.pcs_service.reset_fault()
+                result = self.pcs_service.reset_fault(source=source)
                 return self._pcs_command_response(request_id, command, result)
 
             if command == "PCS_HEARTBEAT":
-                result = self.pcs_service.heartbeat(value=value)
+                result = self.pcs_service.heartbeat(value=value, source=source)
                 return self._pcs_command_response(request_id, command, result)
 
             return self._response(

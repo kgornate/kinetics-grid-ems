@@ -95,29 +95,54 @@ class LogApiService {
     return _getJson('/api/health');
   }
 
-  Future<StorageStatus> fetchStorageStatus() async {
-    final json = await _getJson('/api/storage/status');
+  Future<LogAssetsResponse> fetchAssets() async {
+    final json = await _getJson('/api/logs/assets');
+    return LogAssetsResponse.fromJson(json);
+  }
+
+  Future<StorageStatus> fetchStorageStatus({
+    String assetId = AppConfig.chillerAssetId,
+  }) async {
+    final json = await _getJson(
+      '/api/storage/status',
+      queryParameters: _cleanQuery({
+        'asset_id': assetId,
+      }),
+    );
     return StorageStatus.fromJson(json);
   }
 
-  Future<LogFilesResponse> fetchLogFiles() async {
-    final json = await _getJson('/api/logs/files');
+  Future<LogFilesResponse> fetchLogFiles({
+    String assetId = AppConfig.chillerAssetId,
+  }) async {
+    final json = await _getJson(
+      '/api/logs/files',
+      queryParameters: _cleanQuery({
+        'asset_id': assetId,
+      }),
+    );
     return LogFilesResponse.fromJson(json);
   }
 
   Future<LogApiResponse> fetchTelemetryLogs({
     required String date,
+    String assetId = AppConfig.chillerAssetId,
     int limit = 100,
     String? startTime,
     String? endTime,
     String? fields,
     String? modbusStatus,
     String? loggerStatus,
+    String? vendor,
+    String? commStatus,
+    String? operatingStatus,
+    String? faultStatus,
     String? search,
   }) async {
     final json = await _getJson(
       '/api/logs/telemetry',
       queryParameters: _cleanQuery({
+        'asset_id': assetId,
         'date': date,
         'limit': limit.toString(),
         'start_time': startTime,
@@ -125,6 +150,10 @@ class LogApiService {
         'fields': fields,
         'modbus_status': modbusStatus,
         'logger_status': loggerStatus,
+        'vendor': vendor,
+        'comm_status': commStatus,
+        'operating_status': operatingStatus,
+        'fault_status': faultStatus,
         'search': search,
       }),
     );
@@ -133,6 +162,7 @@ class LogApiService {
   }
 
   Future<LogApiResponse> fetchEventLogs({
+    String assetId = AppConfig.chillerAssetId,
     int limit = 100,
     String? date,
     String? startTime,
@@ -140,12 +170,15 @@ class LogApiService {
     String? eventType,
     String? status,
     String? source,
+    String? command,
+    String? vendor,
     String? search,
     String? fields,
   }) async {
     final json = await _getJson(
       '/api/logs/events',
       queryParameters: _cleanQuery({
+        'asset_id': assetId,
         'limit': limit.toString(),
         'date': date,
         'start_time': startTime,
@@ -153,6 +186,8 @@ class LogApiService {
         'event_type': eventType,
         'status': status,
         'source': source,
+        'command': command,
+        'vendor': vendor,
         'search': search,
         'fields': fields,
       }),
@@ -162,6 +197,7 @@ class LogApiService {
   }
 
   Future<LogApiResponse> fetchErrorLogs({
+    String assetId = AppConfig.chillerAssetId,
     int limit = 100,
     String? date,
     String? startTime,
@@ -174,6 +210,7 @@ class LogApiService {
     final json = await _getJson(
       '/api/logs/errors',
       queryParameters: _cleanQuery({
+        'asset_id': assetId,
         'limit': limit.toString(),
         'date': date,
         'start_time': startTime,
@@ -188,19 +225,28 @@ class LogApiService {
     return LogApiResponse.fromJson(json);
   }
 
-  Future<MetadataResponse> fetchMetadata() async {
-    final json = await _getJson('/api/logs/metadata');
+  Future<MetadataResponse> fetchMetadata({
+    String assetId = AppConfig.chillerAssetId,
+  }) async {
+    final json = await _getJson(
+      '/api/logs/metadata',
+      queryParameters: _cleanQuery({
+        'asset_id': assetId,
+      }),
+    );
     return MetadataResponse.fromJson(json);
   }
 
   String telemetryCsvDownloadUrl({
     required String date,
+    String assetId = AppConfig.chillerAssetId,
   }) {
     return _uri(
       '/api/logs/download/telemetry',
-      queryParameters: {
+      queryParameters: _cleanQuery({
+        'asset_id': assetId,
         'date': date,
-      },
+      }),
     ).toString();
   }
 }

@@ -79,6 +79,7 @@ class LogApiResponse {
   final String? file;
   final String? fileName;
   final String? date;
+  final String assetId;
   final int totalRows;
   final int filteredRows;
   final int rowsCount;
@@ -93,6 +94,7 @@ class LogApiResponse {
     required this.file,
     required this.fileName,
     required this.date,
+    required this.assetId,
     required this.totalRows,
     required this.filteredRows,
     required this.rowsCount,
@@ -109,6 +111,7 @@ class LogApiResponse {
       file: json['file']?.toString(),
       fileName: json['file_name']?.toString(),
       date: json['date']?.toString(),
+      assetId: json['asset_id']?.toString() ?? '',
       totalRows: _toInt(json['total_rows']),
       filteredRows: _toInt(json['filtered_rows']),
       rowsCount: _toInt(json['rows_count']),
@@ -125,6 +128,7 @@ class LogFilesResponse {
   final String status;
   final String? message;
   final String directory;
+  final String assetId;
   final int filesCount;
   final List<String> files;
   final Map<String, dynamic> raw;
@@ -133,6 +137,7 @@ class LogFilesResponse {
     required this.status,
     required this.message,
     required this.directory,
+    required this.assetId,
     required this.filesCount,
     required this.files,
     required this.raw,
@@ -143,6 +148,7 @@ class LogFilesResponse {
       status: json['status']?.toString() ?? 'unknown',
       message: json['message']?.toString(),
       directory: json['directory']?.toString() ?? '',
+      assetId: json['asset_id']?.toString() ?? '',
       filesCount: _toInt(json['files_count']),
       files: _toStringList(json['files']),
       raw: Map<String, dynamic>.from(json),
@@ -176,6 +182,28 @@ class MetadataResponse {
       raw: Map<String, dynamic>.from(json),
     );
   }
+}
+
+class LogAssetsResponse {
+  final String status;
+  final List<String> assets;
+  final Map<String, dynamic> raw;
+
+  LogAssetsResponse({
+    required this.status,
+    required this.assets,
+    required this.raw,
+  });
+
+  factory LogAssetsResponse.fromJson(Map<String, dynamic> json) {
+    return LogAssetsResponse(
+      status: json['status']?.toString() ?? 'unknown',
+      assets: _toStringList(json['assets']),
+      raw: Map<String, dynamic>.from(json),
+    );
+  }
+
+  bool get isOk => status.toLowerCase() == 'ok';
 }
 
 int _toInt(dynamic value) {

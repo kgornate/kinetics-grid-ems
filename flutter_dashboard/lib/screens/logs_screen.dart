@@ -33,10 +33,19 @@ class _LogsScreenState extends State<LogsScreen> {
 
   String _statusMessage = 'Ready to fetch i.MX93 logs';
 
+  String _selectedAssetId = AppConfig.chillerAssetId;
+
   String _modbusStatusFilter = 'All';
   String _loggerStatusFilter = 'All';
+
+  String _pcsVendorFilter = 'All';
+  String _pcsCommStatusFilter = 'All';
+  String _pcsOperatingStatusFilter = 'All';
+  String _pcsFaultStatusFilter = 'All';
+
   String _eventTypeFilter = 'All';
   String _eventStatusFilter = 'All';
+  String _pcsCommandFilter = 'All';
   String _errorTypeFilter = 'All';
 
   StorageStatus? _storageStatus;
@@ -45,10 +54,13 @@ class _LogsScreenState extends State<LogsScreen> {
   LogApiResponse? _eventLogs;
   LogApiResponse? _errorLogs;
   MetadataResponse? _metadata;
+  LogAssetsResponse? _assetsResponse;
 
-  final List<String> _telemetryFieldOrder = const [
+  final List<String> _chillerTelemetryFieldOrder = const [
     'timestamp',
     'sequence_no',
+    'gateway_id',
+    'asset_id',
     'system_on_off',
     'control_mode',
     'set_temperature',
@@ -66,7 +78,92 @@ class _LogsScreenState extends State<LogsScreen> {
     'logger_status',
   ];
 
+  final List<String> _pcsTelemetryFieldOrder = const [
+    'timestamp',
+    'sequence_no',
+    'gateway_id',
+    'asset_id',
+    'vendor',
+    'comm_status',
+    'active_power_kw',
+    'reactive_power_kvar',
+    'apparent_power_kva',
+    'power_factor',
+    'frequency_hz',
+    'battery_voltage_v',
+    'battery_current_a',
+    'dc_power_kw',
+    'bus_voltage_v',
+    'phase_a_voltage_v',
+    'phase_b_voltage_v',
+    'phase_c_voltage_v',
+    'phase_a_current_a',
+    'phase_b_current_a',
+    'phase_c_current_a',
+    'operating_status',
+    'grid_offgrid_status',
+    'fault_status',
+    'igbt_temperature_c',
+    'ambient_temperature_c',
+    'inductance_temperature_c',
+    'error',
+    'logger_status',
+  ];
+
   late Set<String> _selectedTelemetryFields;
+
+  bool get _isPcsAsset => _selectedAssetId == AppConfig.pcsAssetId;
+
+  List<String> get _activeTelemetryFieldOrder {
+    return _isPcsAsset ? _pcsTelemetryFieldOrder : _chillerTelemetryFieldOrder;
+  }
+
+  List<String> get _activeTelemetryPreferredColumns {
+    return _isPcsAsset ? _pcsTelemetryFieldOrder : _chillerTelemetryFieldOrder;
+  }
+
+  List<String> get _activeEventPreferredColumns {
+    if (_isPcsAsset) {
+      return const [
+        'timestamp',
+        'gateway_id',
+        'asset_id',
+        'vendor',
+        'event_type',
+        'command',
+        'old_value',
+        'new_value',
+        'readback_value',
+        'source',
+        'status',
+        'description',
+        'error',
+      ];
+    }
+
+    return const [
+      'timestamp',
+      'gateway_id',
+      'asset_id',
+      'event_type',
+      'old_value',
+      'new_value',
+      'source',
+      'status',
+      'description',
+    ];
+  }
+
+  List<String> get _activeErrorPreferredColumns {
+    return const [
+      'timestamp',
+      'gateway_id',
+      'asset_id',
+      'error_type',
+      'error_source',
+      'description',
+    ];
+  }
 
   @override
   void initState() {
@@ -83,16 +180,7 @@ class _LogsScreenState extends State<LogsScreen> {
     _endTimeController = TextEditingController();
     _searchController = TextEditingController();
 
-    _selectedTelemetryFields = {
-      'timestamp',
-      'outlet_water_temp',
-      'return_water_temp',
-      'set_temperature',
-      'control_mode',
-      'system_on_off',
-      'modbus_status',
-      'logger_status',
-    };
+    _selectedTelemetryFields = _defaultTelemetryFieldsForAsset(_selectedAssetId);
   }
 
   @override
@@ -103,6 +191,37 @@ class _LogsScreenState extends State<LogsScreen> {
     _endTimeController.dispose();
     _searchController.dispose();
     super.dispose();
+  }
+
+  Set<String> _defaultTelemetryFieldsForAsset(String assetId) {
+    if (assetId == AppConfig.pcsAssetId) {
+      return {
+        'timestamp',
+        'vendor',
+        'comm_status',
+        'active_power_kw',
+        'reactive_power_kvar',
+        'power_factor',
+        'frequency_hz',
+        'battery_voltage_v',
+        'battery_current_a',
+        'dc_power_kw',
+        'operating_status',
+        'fault_status',
+        'logger_status',
+      };
+    }
+
+    return {
+      'timestamp',
+      'outlet_water_temp',
+      'return_water_temp',
+      'set_temperature',
+      'control_mode',
+      'system_on_off',
+      'modbus_status',
+      'logger_status',
+    };
   }
 
   String _todayDate() {
@@ -134,7 +253,9 @@ class _LogsScreenState extends State<LogsScreen> {
     if (!_useSelectedTelemetryFields) return null;
     if (_selectedTelemetryFields.isEmpty) return null;
 
-    final ordered = _telemetryFieldOrder.where(_selectedTelemetryFields.contains);
+    final ordered = _activeTelemetryFieldOrder.where(
+      _selectedTelemetryFields.contains,
+    );
 
     return ordered.join(',');
   }
@@ -168,8 +289,23 @@ class _LogsScreenState extends State<LogsScreen> {
   }
 
   Future<String> _loadStorageAndResolveDate(LogApiService api) async {
-    final storage = await api.fetchStorageStatus();
-    final files = await api.fetchLogFiles();
+    final assetsFuture = api.fetchAssets().catchError((_) {
+      return LogAssetsResponse(
+        status: 'fallback',
+        assets: AppConfig.supportedLogAssets,
+        raw: const {},
+      );
+    });
+
+    final results = await Future.wait([
+      assetsFuture,
+      api.fetchStorageStatus(assetId: _selectedAssetId),
+      api.fetchLogFiles(assetId: _selectedAssetId),
+    ]);
+
+    _assetsResponse = results[0] as LogAssetsResponse;
+    final storage = results[1] as StorageStatus;
+    final files = results[2] as LogFilesResponse;
 
     var selectedDate = _dateController.text.trim();
 
@@ -189,7 +325,7 @@ class _LogsScreenState extends State<LogsScreen> {
   Future<void> _refreshAll() async {
     setState(() {
       _loading = true;
-      _statusMessage = 'Fetching logs from i.MX93...';
+      _statusMessage = 'Fetching $_selectedAssetId logs from i.MX93...';
     });
 
     try {
@@ -199,25 +335,35 @@ class _LogsScreenState extends State<LogsScreen> {
 
       final results = await Future.wait([
         api.fetchTelemetryLogs(
+          assetId: _selectedAssetId,
           date: effectiveDate,
           limit: _limit,
           startTime: _filterText(_startTimeController.text),
           endTime: _filterText(_endTimeController.text),
           fields: _telemetryFieldsCsv(),
-          modbusStatus: _filterDropdown(_modbusStatusFilter),
+          modbusStatus: _isPcsAsset ? null : _filterDropdown(_modbusStatusFilter),
           loggerStatus: _filterDropdown(_loggerStatusFilter),
+          vendor: _isPcsAsset ? _filterDropdown(_pcsVendorFilter) : null,
+          commStatus: _isPcsAsset ? _filterDropdown(_pcsCommStatusFilter) : null,
+          operatingStatus:
+              _isPcsAsset ? _filterDropdown(_pcsOperatingStatusFilter) : null,
+          faultStatus: _isPcsAsset ? _filterDropdown(_pcsFaultStatusFilter) : null,
           search: _filterText(_searchController.text),
         ),
         api.fetchEventLogs(
+          assetId: _selectedAssetId,
           date: effectiveDate,
           limit: _limit,
           startTime: _filterText(_startTimeController.text),
           endTime: _filterText(_endTimeController.text),
           eventType: _filterDropdown(_eventTypeFilter),
           status: _filterDropdown(_eventStatusFilter),
+          command: _isPcsAsset ? _filterDropdown(_pcsCommandFilter) : null,
+          vendor: _isPcsAsset ? _filterDropdown(_pcsVendorFilter) : null,
           search: _filterText(_searchController.text),
         ),
         api.fetchErrorLogs(
+          assetId: _selectedAssetId,
           date: effectiveDate,
           limit: _limit,
           startTime: _filterText(_startTimeController.text),
@@ -225,7 +371,7 @@ class _LogsScreenState extends State<LogsScreen> {
           errorType: _filterDropdown(_errorTypeFilter),
           search: _filterText(_searchController.text),
         ),
-        api.fetchMetadata(),
+        api.fetchMetadata(assetId: _selectedAssetId),
       ]);
 
       setState(() {
@@ -234,7 +380,7 @@ class _LogsScreenState extends State<LogsScreen> {
         _errorLogs = results[2] as LogApiResponse;
         _metadata = results[3] as MetadataResponse;
 
-        _statusMessage = 'Logs refreshed successfully';
+        _statusMessage = '$_selectedAssetId logs refreshed successfully';
       });
     } catch (e) {
       setState(() {
@@ -250,7 +396,7 @@ class _LogsScreenState extends State<LogsScreen> {
   Future<void> _fetchTelemetryOnly() async {
     setState(() {
       _loading = true;
-      _statusMessage = 'Fetching telemetry logs...';
+      _statusMessage = 'Fetching $_selectedAssetId telemetry logs...';
     });
 
     try {
@@ -258,19 +404,25 @@ class _LogsScreenState extends State<LogsScreen> {
       final effectiveDate = await _loadStorageAndResolveDate(api);
 
       final logs = await api.fetchTelemetryLogs(
+        assetId: _selectedAssetId,
         date: effectiveDate,
         limit: _limit,
         startTime: _filterText(_startTimeController.text),
         endTime: _filterText(_endTimeController.text),
         fields: _telemetryFieldsCsv(),
-        modbusStatus: _filterDropdown(_modbusStatusFilter),
+        modbusStatus: _isPcsAsset ? null : _filterDropdown(_modbusStatusFilter),
         loggerStatus: _filterDropdown(_loggerStatusFilter),
+        vendor: _isPcsAsset ? _filterDropdown(_pcsVendorFilter) : null,
+        commStatus: _isPcsAsset ? _filterDropdown(_pcsCommStatusFilter) : null,
+        operatingStatus:
+            _isPcsAsset ? _filterDropdown(_pcsOperatingStatusFilter) : null,
+        faultStatus: _isPcsAsset ? _filterDropdown(_pcsFaultStatusFilter) : null,
         search: _filterText(_searchController.text),
       );
 
       setState(() {
         _telemetryLogs = logs;
-        _statusMessage = 'Telemetry logs refreshed';
+        _statusMessage = '$_selectedAssetId telemetry logs refreshed';
       });
     } catch (e) {
       setState(() {
@@ -291,11 +443,42 @@ class _LogsScreenState extends State<LogsScreen> {
 
       _modbusStatusFilter = 'All';
       _loggerStatusFilter = 'All';
+      _pcsVendorFilter = 'All';
+      _pcsCommStatusFilter = 'All';
+      _pcsOperatingStatusFilter = 'All';
+      _pcsFaultStatusFilter = 'All';
       _eventTypeFilter = 'All';
       _eventStatusFilter = 'All';
+      _pcsCommandFilter = 'All';
       _errorTypeFilter = 'All';
 
       _useSelectedTelemetryFields = false;
+      _selectedTelemetryFields = _defaultTelemetryFieldsForAsset(_selectedAssetId);
+    });
+  }
+
+  void _onAssetChanged(String assetId) {
+    setState(() {
+      _selectedAssetId = assetId;
+      _telemetryLogs = null;
+      _eventLogs = null;
+      _errorLogs = null;
+      _storageStatus = null;
+      _logFiles = null;
+      _metadata = null;
+      _selectedTelemetryFields = _defaultTelemetryFieldsForAsset(assetId);
+      _useSelectedTelemetryFields = false;
+
+      _modbusStatusFilter = 'All';
+      _pcsVendorFilter = 'All';
+      _pcsCommStatusFilter = 'All';
+      _pcsOperatingStatusFilter = 'All';
+      _pcsFaultStatusFilter = 'All';
+      _eventTypeFilter = 'All';
+      _pcsCommandFilter = 'All';
+      _errorTypeFilter = 'All';
+
+      _statusMessage = 'Selected asset: $assetId. Press Refresh Logs.';
     });
   }
 
@@ -309,9 +492,24 @@ class _LogsScreenState extends State<LogsScreen> {
     return text;
   }
 
+  List<String> _assetOptions() {
+    final fromApi = _assetsResponse?.assets ?? const <String>[];
+    final merged = <String>{
+      ...AppConfig.supportedLogAssets,
+      ...fromApi,
+    }.toList();
+
+    if (!merged.contains(_selectedAssetId)) {
+      merged.add(_selectedAssetId);
+    }
+
+    return merged;
+  }
+
   @override
   Widget build(BuildContext context) {
     final downloadUrl = _api().telemetryCsvDownloadUrl(
+      assetId: _selectedAssetId,
       date: _dateController.text.trim(),
     );
 
@@ -319,7 +517,7 @@ class _LogsScreenState extends State<LogsScreen> {
       length: 4,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('EMS Logs & History'),
+          title: Text('EMS Logs & History - $_selectedAssetId'),
           actions: [
             Padding(
               padding: const EdgeInsets.only(right: 16),
@@ -405,6 +603,27 @@ class _LogsScreenState extends State<LogsScreen> {
                   ),
                 ),
                 SizedBox(
+                  width: 175,
+                  child: DropdownButtonFormField<String>(
+                    initialValue: _selectedAssetId,
+                    decoration: const InputDecoration(
+                      labelText: 'Asset',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.devices_other),
+                    ),
+                    items: _assetOptions().map((assetId) {
+                      return DropdownMenuItem(
+                        value: assetId,
+                        child: Text(assetId),
+                      );
+                    }).toList(),
+                    onChanged: (value) {
+                      if (value == null) return;
+                      _onAssetChanged(value);
+                    },
+                  ),
+                ),
+                SizedBox(
                   width: 180,
                   child: TextField(
                     controller: _dateController,
@@ -459,15 +678,18 @@ class _LogsScreenState extends State<LogsScreen> {
                   icon: const Icon(Icons.filter_alt_off),
                   label: const Text('Clear Filters'),
                 ),
-                SwitchListTile(
-                  dense: true,
-                  title: const Text('Show Filters'),
-                  value: _showFilters,
-                  onChanged: (value) {
-                    setState(() {
-                      _showFilters = value;
-                    });
-                  },
+                SizedBox(
+                  width: 210,
+                  child: SwitchListTile(
+                    dense: true,
+                    title: const Text('Show Filters'),
+                    value: _showFilters,
+                    onChanged: (value) {
+                      setState(() {
+                        _showFilters = value;
+                      });
+                    },
+                  ),
                 ),
               ],
             ),
@@ -530,14 +752,16 @@ class _LogsScreenState extends State<LogsScreen> {
           ),
         ),
         SizedBox(
-          width: 240,
+          width: 260,
           child: TextField(
             controller: _searchController,
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               labelText: 'Search',
-              hintText: 'temperature, mode, error...',
-              border: OutlineInputBorder(),
-              prefixIcon: Icon(Icons.search),
+              hintText: _isPcsAsset
+                  ? 'njoy, active power, offline...'
+                  : 'temperature, mode, error...',
+              border: const OutlineInputBorder(),
+              prefixIcon: const Icon(Icons.search),
             ),
           ),
         ),
@@ -549,31 +773,7 @@ class _LogsScreenState extends State<LogsScreen> {
   }
 
   List<Widget> _buildTelemetryFilterControls() {
-    return [
-      SizedBox(
-        width: 160,
-        child: DropdownButtonFormField<String>(
-          initialValue: _modbusStatusFilter,
-          decoration: const InputDecoration(
-            labelText: 'Modbus Status',
-            border: OutlineInputBorder(),
-          ),
-          items: const [
-            DropdownMenuItem(value: 'All', child: Text('All')),
-            DropdownMenuItem(value: 'online', child: Text('online')),
-            DropdownMenuItem(value: 'OK', child: Text('OK')),
-            DropdownMenuItem(value: 'failed', child: Text('failed')),
-            DropdownMenuItem(value: 'error', child: Text('error')),
-          ],
-          onChanged: (value) {
-            if (value == null) return;
-
-            setState(() {
-              _modbusStatusFilter = value;
-            });
-          },
-        ),
-      ),
+    final controls = <Widget>[
       SizedBox(
         width: 160,
         child: DropdownButtonFormField<String>(
@@ -613,25 +813,158 @@ class _LogsScreenState extends State<LogsScreen> {
         ),
       ),
     ];
+
+    if (_isPcsAsset) {
+      controls.insertAll(0, [
+        SizedBox(
+          width: 160,
+          child: DropdownButtonFormField<String>(
+            initialValue: _pcsVendorFilter,
+            decoration: const InputDecoration(
+              labelText: 'PCS Vendor',
+              border: OutlineInputBorder(),
+            ),
+            items: const [
+              DropdownMenuItem(value: 'All', child: Text('All')),
+              DropdownMenuItem(value: 'njoy', child: Text('njoy')),
+              DropdownMenuItem(value: 'njoy_125kw', child: Text('njoy_125kw')),
+              DropdownMenuItem(value: 'inpower', child: Text('inpower')),
+              DropdownMenuItem(value: 'inpower_125kw', child: Text('inpower_125kw')),
+            ],
+            onChanged: (value) {
+              if (value == null) return;
+              setState(() => _pcsVendorFilter = value);
+            },
+          ),
+        ),
+        SizedBox(
+          width: 160,
+          child: DropdownButtonFormField<String>(
+            initialValue: _pcsCommStatusFilter,
+            decoration: const InputDecoration(
+              labelText: 'PCS Comm',
+              border: OutlineInputBorder(),
+            ),
+            items: const [
+              DropdownMenuItem(value: 'All', child: Text('All')),
+              DropdownMenuItem(value: 'online', child: Text('online')),
+              DropdownMenuItem(value: 'offline', child: Text('offline')),
+            ],
+            onChanged: (value) {
+              if (value == null) return;
+              setState(() => _pcsCommStatusFilter = value);
+            },
+          ),
+        ),
+        SizedBox(
+          width: 210,
+          child: DropdownButtonFormField<String>(
+            initialValue: _pcsOperatingStatusFilter,
+            decoration: const InputDecoration(
+              labelText: 'Operating Status',
+              border: OutlineInputBorder(),
+            ),
+            items: const [
+              DropdownMenuItem(value: 'All', child: Text('All')),
+              DropdownMenuItem(value: 'running_grid_connected', child: Text('running_grid_connected')),
+              DropdownMenuItem(value: 'grid_connected_operation', child: Text('grid_connected_operation')),
+              DropdownMenuItem(value: 'operation', child: Text('operation')),
+              DropdownMenuItem(value: 'charging', child: Text('charging')),
+              DropdownMenuItem(value: 'discharging', child: Text('discharging')),
+              DropdownMenuItem(value: 'standby', child: Text('standby')),
+              DropdownMenuItem(value: 'fault', child: Text('fault')),
+            ],
+            onChanged: (value) {
+              if (value == null) return;
+              setState(() => _pcsOperatingStatusFilter = value);
+            },
+          ),
+        ),
+        SizedBox(
+          width: 150,
+          child: DropdownButtonFormField<String>(
+            initialValue: _pcsFaultStatusFilter,
+            decoration: const InputDecoration(
+              labelText: 'PCS Fault',
+              border: OutlineInputBorder(),
+            ),
+            items: const [
+              DropdownMenuItem(value: 'All', child: Text('All')),
+              DropdownMenuItem(value: 'True', child: Text('True')),
+              DropdownMenuItem(value: 'False', child: Text('False')),
+              DropdownMenuItem(value: 'true', child: Text('true')),
+              DropdownMenuItem(value: 'false', child: Text('false')),
+            ],
+            onChanged: (value) {
+              if (value == null) return;
+              setState(() => _pcsFaultStatusFilter = value);
+            },
+          ),
+        ),
+      ]);
+    } else {
+      controls.insert(
+        0,
+        SizedBox(
+          width: 160,
+          child: DropdownButtonFormField<String>(
+            initialValue: _modbusStatusFilter,
+            decoration: const InputDecoration(
+              labelText: 'Modbus Status',
+              border: OutlineInputBorder(),
+            ),
+            items: const [
+              DropdownMenuItem(value: 'All', child: Text('All')),
+              DropdownMenuItem(value: 'online', child: Text('online')),
+              DropdownMenuItem(value: 'OK', child: Text('OK')),
+              DropdownMenuItem(value: 'failed', child: Text('failed')),
+              DropdownMenuItem(value: 'error', child: Text('error')),
+            ],
+            onChanged: (value) {
+              if (value == null) return;
+
+              setState(() {
+                _modbusStatusFilter = value;
+              });
+            },
+          ),
+        ),
+      );
+    }
+
+    return controls;
   }
 
   List<Widget> _buildEventFilterControls() {
     return [
       SizedBox(
-        width: 230,
+        width: 250,
         child: DropdownButtonFormField<String>(
           initialValue: _eventTypeFilter,
           decoration: const InputDecoration(
             labelText: 'Event Type',
             border: OutlineInputBorder(),
           ),
-          items: const [
-            DropdownMenuItem(value: 'All', child: Text('All')),
-            DropdownMenuItem(value: 'SET_TEMPERATURE_WRITE', child: Text('SET_TEMP')),
-            DropdownMenuItem(value: 'CONTROL_MODE_WRITE', child: Text('SET_MODE')),
-            DropdownMenuItem(value: 'SYSTEM_ON_OFF_WRITE', child: Text('ON/OFF')),
-            DropdownMenuItem(value: 'STORAGE_LOGGER_STARTED', child: Text('LOGGER START')),
-            DropdownMenuItem(value: 'STORAGE_LOGGER_STOPPED', child: Text('LOGGER STOP')),
+          items: [
+            const DropdownMenuItem(value: 'All', child: Text('All')),
+            if (!_isPcsAsset) ...const [
+              DropdownMenuItem(value: 'SET_TEMPERATURE_WRITE', child: Text('SET_TEMP')),
+              DropdownMenuItem(value: 'CONTROL_MODE_WRITE', child: Text('SET_MODE')),
+              DropdownMenuItem(value: 'SYSTEM_ON_OFF_WRITE', child: Text('ON/OFF')),
+              DropdownMenuItem(value: 'STORAGE_LOGGER_STARTED', child: Text('LOGGER START')),
+              DropdownMenuItem(value: 'STORAGE_LOGGER_STOPPED', child: Text('LOGGER STOP')),
+            ],
+            if (_isPcsAsset) ...const [
+              DropdownMenuItem(value: 'PCS_SERVICE_STARTED', child: Text('PCS STARTED')),
+              DropdownMenuItem(value: 'PCS_SERVICE_STOPPED', child: Text('PCS STOPPED')),
+              DropdownMenuItem(value: 'PCS_COMM_STATUS_CHANGED', child: Text('COMM STATUS')),
+              DropdownMenuItem(value: 'PCS_POWER_ON_WRITE', child: Text('POWER ON')),
+              DropdownMenuItem(value: 'PCS_POWER_OFF_WRITE', child: Text('POWER OFF')),
+              DropdownMenuItem(value: 'PCS_ACTIVE_POWER_WRITE', child: Text('ACTIVE POWER')),
+              DropdownMenuItem(value: 'PCS_REACTIVE_POWER_WRITE', child: Text('REACTIVE POWER')),
+              DropdownMenuItem(value: 'PCS_FAULT_RESET_WRITE', child: Text('FAULT RESET')),
+              DropdownMenuItem(value: 'PCS_HEARTBEAT_WRITE', child: Text('HEARTBEAT')),
+            ],
           ],
           onChanged: (value) {
             if (value == null) return;
@@ -642,6 +975,31 @@ class _LogsScreenState extends State<LogsScreen> {
           },
         ),
       ),
+      if (_isPcsAsset)
+        SizedBox(
+          width: 210,
+          child: DropdownButtonFormField<String>(
+            initialValue: _pcsCommandFilter,
+            decoration: const InputDecoration(
+              labelText: 'PCS Command',
+              border: OutlineInputBorder(),
+            ),
+            items: const [
+              DropdownMenuItem(value: 'All', child: Text('All')),
+              DropdownMenuItem(value: 'power_on', child: Text('power_on')),
+              DropdownMenuItem(value: 'power_off', child: Text('power_off')),
+              DropdownMenuItem(value: 'set_active_power_kw', child: Text('set_active_power_kw')),
+              DropdownMenuItem(value: 'set_reactive_power_kvar', child: Text('set_reactive_power_kvar')),
+              DropdownMenuItem(value: 'reset_fault', child: Text('reset_fault')),
+              DropdownMenuItem(value: 'heartbeat', child: Text('heartbeat')),
+              DropdownMenuItem(value: 'standby', child: Text('standby')),
+            ],
+            onChanged: (value) {
+              if (value == null) return;
+              setState(() => _pcsCommandFilter = value);
+            },
+          ),
+        ),
       SizedBox(
         width: 150,
         child: DropdownButtonFormField<String>(
@@ -653,8 +1011,11 @@ class _LogsScreenState extends State<LogsScreen> {
           items: const [
             DropdownMenuItem(value: 'All', child: Text('All')),
             DropdownMenuItem(value: 'success', child: Text('success')),
+            DropdownMenuItem(value: 'ok', child: Text('ok')),
             DropdownMenuItem(value: 'warning', child: Text('warning')),
+            DropdownMenuItem(value: 'failed', child: Text('failed')),
             DropdownMenuItem(value: 'error', child: Text('error')),
+            DropdownMenuItem(value: 'unsupported', child: Text('unsupported')),
           ],
           onChanged: (value) {
             if (value == null) return;
@@ -671,20 +1032,27 @@ class _LogsScreenState extends State<LogsScreen> {
   List<Widget> _buildErrorFilterControls() {
     return [
       SizedBox(
-        width: 260,
+        width: 300,
         child: DropdownButtonFormField<String>(
           initialValue: _errorTypeFilter,
           decoration: const InputDecoration(
             labelText: 'Error Type',
             border: OutlineInputBorder(),
           ),
-          items: const [
-            DropdownMenuItem(value: 'All', child: Text('All')),
-            DropdownMenuItem(value: 'SETTINGS_READ_FAILED', child: Text('SETTINGS_READ_FAILED')),
-            DropdownMenuItem(value: 'MODBUS_OR_POLLING_ERROR', child: Text('MODBUS_OR_POLLING_ERROR')),
-            DropdownMenuItem(value: 'COMMAND_EXECUTION_FAILED', child: Text('COMMAND_EXECUTION_FAILED')),
-            DropdownMenuItem(value: 'POST_COMMAND_REFRESH_FAILED', child: Text('POST_COMMAND_REFRESH_FAILED')),
-            DropdownMenuItem(value: 'OLD_VALUE_READ_FAILED', child: Text('OLD_VALUE_READ_FAILED')),
+          items: [
+            const DropdownMenuItem(value: 'All', child: Text('All')),
+            if (!_isPcsAsset) ...const [
+              DropdownMenuItem(value: 'SETTINGS_READ_FAILED', child: Text('SETTINGS_READ_FAILED')),
+              DropdownMenuItem(value: 'MODBUS_OR_POLLING_ERROR', child: Text('MODBUS_OR_POLLING_ERROR')),
+              DropdownMenuItem(value: 'COMMAND_EXECUTION_FAILED', child: Text('COMMAND_EXECUTION_FAILED')),
+              DropdownMenuItem(value: 'POST_COMMAND_REFRESH_FAILED', child: Text('POST_COMMAND_REFRESH_FAILED')),
+              DropdownMenuItem(value: 'OLD_VALUE_READ_FAILED', child: Text('OLD_VALUE_READ_FAILED')),
+            ],
+            if (_isPcsAsset) ...const [
+              DropdownMenuItem(value: 'PCS_POLLING_ERROR', child: Text('PCS_POLLING_ERROR')),
+              DropdownMenuItem(value: 'PCS_COMMAND_FAILED', child: Text('PCS_COMMAND_FAILED')),
+              DropdownMenuItem(value: 'PCS_TELEMETRY_LOG_EXCEPTION', child: Text('PCS_TELEMETRY_LOG_EXCEPTION')),
+            ],
           ],
           onChanged: (value) {
             if (value == null) return;
@@ -705,16 +1073,16 @@ class _LogsScreenState extends State<LogsScreen> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Select Telemetry Fields'),
+          title: Text('Select Telemetry Fields - $_selectedAssetId'),
           content: SizedBox(
-            width: 420,
+            width: 620,
             child: StatefulBuilder(
               builder: (context, setDialogState) {
                 return SingleChildScrollView(
                   child: Wrap(
                     spacing: 8,
                     runSpacing: 8,
-                    children: _telemetryFieldOrder.map((field) {
+                    children: _activeTelemetryFieldOrder.map((field) {
                       final selected = tempSelection.contains(field);
 
                       return FilterChip(
@@ -740,10 +1108,18 @@ class _LogsScreenState extends State<LogsScreen> {
             TextButton(
               onPressed: () {
                 tempSelection.clear();
-                tempSelection.addAll(_telemetryFieldOrder);
+                tempSelection.addAll(_activeTelemetryFieldOrder);
                 Navigator.of(context).pop(tempSelection);
               },
               child: const Text('Select All'),
+            ),
+            TextButton(
+              onPressed: () {
+                tempSelection.clear();
+                tempSelection.addAll(_defaultTelemetryFieldsForAsset(_selectedAssetId));
+                Navigator.of(context).pop(tempSelection);
+              },
+              child: const Text('Default'),
             ),
             TextButton(
               onPressed: () {
@@ -772,56 +1148,25 @@ class _LogsScreenState extends State<LogsScreen> {
 
   Widget _buildTelemetryTab() {
     return _buildLogTable(
-      title: 'Telemetry Logs',
+      title: 'Telemetry Logs - $_selectedAssetId',
       response: _telemetryLogs,
-      preferredColumns: const [
-        'timestamp',
-        'sequence_no',
-        'system_on_off',
-        'control_mode',
-        'set_temperature',
-        'outlet_water_temp',
-        'return_water_temp',
-        'outlet_water_pressure',
-        'return_water_pressure',
-        'ambient_temp',
-        'water_pump_status',
-        'compressor_1_status',
-        'compressor_2_status',
-        'electric_heater_status',
-        'condensate_fan_status',
-        'modbus_status',
-        'logger_status',
-      ],
+      preferredColumns: _activeTelemetryPreferredColumns,
     );
   }
 
   Widget _buildEventsTab() {
     return _buildLogTable(
-      title: 'Event Logs',
+      title: 'Event Logs - $_selectedAssetId',
       response: _eventLogs,
-      preferredColumns: const [
-        'timestamp',
-        'event_type',
-        'old_value',
-        'new_value',
-        'source',
-        'status',
-        'description',
-      ],
+      preferredColumns: _activeEventPreferredColumns,
     );
   }
 
   Widget _buildErrorsTab() {
     return _buildLogTable(
-      title: 'Error Logs',
+      title: 'Error Logs - $_selectedAssetId',
       response: _errorLogs,
-      preferredColumns: const [
-        'timestamp',
-        'error_type',
-        'error_source',
-        'description',
-      ],
+      preferredColumns: _activeErrorPreferredColumns,
     );
   }
 
@@ -934,6 +1279,7 @@ class _LogsScreenState extends State<LogsScreen> {
               fontWeight: FontWeight.w700,
             ),
           ),
+          Text('Asset: ${response.assetId.isNotEmpty ? response.assetId : _selectedAssetId}'),
           Text('File: ${response.fileName ?? '--'}'),
           Text('Total rows: ${response.totalRows}'),
           Text('Filtered: ${response.filteredRows}'),
@@ -1019,7 +1365,7 @@ class _LogsScreenState extends State<LogsScreen> {
       elevation: 1,
       child: ExpansionTile(
         initiallyExpanded: true,
-        title: const Text('Available Telemetry Log Files'),
+        title: Text('Available Telemetry Log Files - $_selectedAssetId'),
         subtitle: Text(
           files == null ? 'Not loaded' : '${files.filesCount} file(s) available',
         ),
@@ -1035,6 +1381,7 @@ class _LogsScreenState extends State<LogsScreen> {
                 dense: true,
                 leading: const Icon(Icons.description),
                 title: Text(file),
+                subtitle: Text(_selectedAssetId),
                 onTap: () {
                   final date = file.replaceAll('.csv', '');
 

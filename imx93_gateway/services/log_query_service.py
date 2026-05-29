@@ -4,6 +4,9 @@ Log Query Service for i.MX93 EMS Gateway.
 Purpose:
 - Read telemetry, event, and error CSV logs from eMMC/SD card.
 - Provide structured data to the HTTP Log API server.
+- Support multiple assets:
+    - chiller_1
+    - pcs_1
 - Support date/time filtering, field selection, status filtering, and search.
 - Keep log reading separate from Modbus polling and storage writing.
 
@@ -30,24 +33,43 @@ class LogQueryService:
         self.max_rows = int(max_rows)
 
     # -------------------------------------------------
+    # Asset helpers
+    # -------------------------------------------------
+
+    def _resolve_asset_id(self, asset_id: Optional[Any] = None) -> str:
+        value = str(asset_id or self.asset_id).strip()
+
+        if not value:
+            value = self.asset_id
+
+        # Basic path traversal protection.
+        if "/" in value or "\\" in value or ".." in value:
+            raise ValueError(f"Invalid asset_id: {value}")
+
+        return value
+
+    # -------------------------------------------------
     # Path helpers
     # -------------------------------------------------
 
-    def telemetry_dir(self) -> Path:
-        return self.base_path / "logs" / self.asset_id
+    def telemetry_dir(self, asset_id: Optional[Any] = None) -> Path:
+        resolved_asset_id = self._resolve_asset_id(asset_id)
+        return self.base_path / "logs" / resolved_asset_id
 
-    def events_file(self) -> Path:
-        return self.base_path / "events" / f"{self.asset_id}_events.csv"
+    def events_file(self, asset_id: Optional[Any] = None) -> Path:
+        resolved_asset_id = self._resolve_asset_id(asset_id)
+        return self.base_path / "events" / f"{resolved_asset_id}_events.csv"
 
-    def errors_file(self) -> Path:
-        return self.base_path / "errors" / f"{self.asset_id}_errors.csv"
+    def errors_file(self, asset_id: Optional[Any] = None) -> Path:
+        resolved_asset_id = self._resolve_asset_id(asset_id)
+        return self.base_path / "errors" / f"{resolved_asset_id}_errors.csv"
 
     def metadata_file(self) -> Path:
         return self.base_path / "metadata" / "gateway_info.txt"
 
-    def telemetry_file_for_date(self, date_str: str) -> Path:
+    def telemetry_file_for_date(self, date_str: str, asset_id: Optional[Any] = None) -> Path:
         safe_date = self._validate_date_string(date_str)
-        return self.telemetry_dir() / f"{safe_date}.csv"
+        return self.telemetry_dir(asset_id) / f"{safe_date}.csv"
 
     # -------------------------------------------------
     # Validation helpers
@@ -341,7 +363,41 @@ class LogQueryService:
     # Public APIs
     # -------------------------------------------------
 
-    def get_storage_status(self) -> Dict[str, Any]:
+    def list_assets(self) -> Dict[str, Any]:
+        assets = set()
+
+        logs_dir = self.base_path / "logs"
+        events_dir = self.base_path / "events"
+        errors_dir = self.base_path / "errors"
+
+        if logs_dir.exists():
+            for path in logs_dir.iterdir():
+                if path.is_dir():
+                    assets.add(path.name)
+
+        if events_dir.exists():
+            for path in events_dir.glob("*_events.csv"):
+                assets.add(path.name.replace("_events.csv", ""))
+
+        if errors_dir.exists():
+            for path in errors_dir.glob("*_errors.csv"):
+                assets.add(path.name.replace("_errors.csv", ""))
+
+        if not assets:
+            assets.add(self.asset_id)
+
+        ordered_assets = sorted(assets)
+
+        return {
+            "status": "ok",
+            "base_path": str(self.base_path),
+            "assets_count": len(ordered_assets),
+            "assets": ordered_assets,
+            "default_asset_id": self.asset_id,
+        }
+
+    def get_storage_status(self, asset_id: Optional[Any] = None) -> Dict[str, Any]:
+        resolved_asset_id = self._resolve_asset_id(asset_id)
         exists = self.base_path.exists()
 
         total_bytes = 0
@@ -356,28 +412,28 @@ class LogQueryService:
         except Exception:
             pass
 
-        telemetry_files_response = self.list_telemetry_files()
+        telemetry_files_response = self.list_telemetry_files(asset_id=resolved_asset_id)
         telemetry_files = telemetry_files_response.get("files", [])
 
         latest_telemetry_file = telemetry_files[0] if telemetry_files else None
 
-        telemetry_bytes = self._directory_size(self.telemetry_dir())
-        events_bytes = self._file_size(self.events_file())
-        errors_bytes = self._file_size(self.errors_file())
+        telemetry_bytes = self._directory_size(self.telemetry_dir(resolved_asset_id))
+        events_bytes = self._file_size(self.events_file(resolved_asset_id))
+        errors_bytes = self._file_size(self.errors_file(resolved_asset_id))
         metadata_bytes = self._file_size(self.metadata_file())
         log_total_bytes = self._directory_size(self.base_path)
 
         return {
             "status": "ok",
             "base_path": str(self.base_path),
-            "asset_id": self.asset_id,
+            "asset_id": resolved_asset_id,
             "exists": exists,
-            "telemetry_dir": str(self.telemetry_dir()),
-            "telemetry_dir_exists": self.telemetry_dir().exists(),
-            "events_file": str(self.events_file()),
-            "events_file_exists": self.events_file().exists(),
-            "errors_file": str(self.errors_file()),
-            "errors_file_exists": self.errors_file().exists(),
+            "telemetry_dir": str(self.telemetry_dir(resolved_asset_id)),
+            "telemetry_dir_exists": self.telemetry_dir(resolved_asset_id).exists(),
+            "events_file": str(self.events_file(resolved_asset_id)),
+            "events_file_exists": self.events_file(resolved_asset_id).exists(),
+            "errors_file": str(self.errors_file(resolved_asset_id)),
+            "errors_file_exists": self.errors_file(resolved_asset_id).exists(),
             "metadata_file": str(self.metadata_file()),
             "metadata_file_exists": self.metadata_file().exists(),
             "telemetry_files_count": len(telemetry_files),
@@ -393,12 +449,14 @@ class LogQueryService:
             "metadata_bytes": metadata_bytes,
         }
 
-    def list_telemetry_files(self) -> Dict[str, Any]:
-        directory = self.telemetry_dir()
+    def list_telemetry_files(self, asset_id: Optional[Any] = None) -> Dict[str, Any]:
+        resolved_asset_id = self._resolve_asset_id(asset_id)
+        directory = self.telemetry_dir(resolved_asset_id)
 
         if not directory.exists():
             return {
                 "status": "error",
+                "asset_id": resolved_asset_id,
                 "message": "Telemetry log directory not found",
                 "directory": str(directory),
                 "files_count": 0,
@@ -412,6 +470,7 @@ class LogQueryService:
 
         return {
             "status": "ok",
+            "asset_id": resolved_asset_id,
             "directory": str(directory),
             "files_count": len(files),
             "files": files,
@@ -427,8 +486,14 @@ class LogQueryService:
         modbus_status: Optional[Any] = None,
         logger_status: Optional[Any] = None,
         search: Optional[Any] = None,
+        asset_id: Optional[Any] = None,
+        vendor: Optional[Any] = None,
+        comm_status: Optional[Any] = None,
+        operating_status: Optional[Any] = None,
+        fault_status: Optional[Any] = None,
     ) -> Dict[str, Any]:
-        file_path = self.telemetry_file_for_date(date)
+        resolved_asset_id = self._resolve_asset_id(asset_id)
+        file_path = self.telemetry_file_for_date(date, asset_id=resolved_asset_id)
 
         response = self._read_csv_filtered(
             file_path=file_path,
@@ -440,11 +505,16 @@ class LogQueryService:
             exact_filters={
                 "modbus_status": modbus_status,
                 "logger_status": logger_status,
+                "vendor": vendor,
+                "comm_status": comm_status,
+                "operating_status": operating_status,
+                "fault_status": fault_status,
             },
             search=search,
         )
 
         response["log_type"] = "telemetry"
+        response["asset_id"] = resolved_asset_id
         response["date"] = date
         return response
 
@@ -459,9 +529,14 @@ class LogQueryService:
         source: Optional[Any] = None,
         search: Optional[Any] = None,
         fields: Optional[Any] = None,
+        asset_id: Optional[Any] = None,
+        vendor: Optional[Any] = None,
+        command: Optional[Any] = None,
     ) -> Dict[str, Any]:
+        resolved_asset_id = self._resolve_asset_id(asset_id)
+
         response = self._read_csv_filtered(
-            file_path=self.events_file(),
+            file_path=self.events_file(resolved_asset_id),
             limit=limit,
             date=date,
             start_time=start_time,
@@ -471,11 +546,14 @@ class LogQueryService:
                 "event_type": event_type,
                 "status": status,
                 "source": source,
+                "vendor": vendor,
+                "command": command,
             },
             search=search,
         )
 
         response["log_type"] = "events"
+        response["asset_id"] = resolved_asset_id
         return response
 
     def get_error_logs(
@@ -488,9 +566,12 @@ class LogQueryService:
         error_source: Optional[Any] = None,
         search: Optional[Any] = None,
         fields: Optional[Any] = None,
+        asset_id: Optional[Any] = None,
     ) -> Dict[str, Any]:
+        resolved_asset_id = self._resolve_asset_id(asset_id)
+
         response = self._read_csv_filtered(
-            file_path=self.errors_file(),
+            file_path=self.errors_file(resolved_asset_id),
             limit=limit,
             date=date,
             start_time=start_time,
@@ -504,6 +585,7 @@ class LogQueryService:
         )
 
         response["log_type"] = "errors"
+        response["asset_id"] = resolved_asset_id
         return response
 
     def get_metadata(self) -> Dict[str, Any]:
@@ -544,10 +626,13 @@ class LogQueryService:
                 "metadata": {},
             }
 
-    def get_telemetry_csv_download_path(self, date: str) -> Path:
-        file_path = self.telemetry_file_for_date(date)
+    def get_telemetry_csv_download_path(self, date: str, asset_id: Optional[Any] = None) -> Path:
+        resolved_asset_id = self._resolve_asset_id(asset_id)
+        file_path = self.telemetry_file_for_date(date, asset_id=resolved_asset_id)
 
         if not file_path.exists():
-            raise FileNotFoundError(f"Telemetry CSV not found for date {date}")
+            raise FileNotFoundError(
+                f"Telemetry CSV not found for asset_id={resolved_asset_id}, date={date}"
+            )
 
         return file_path

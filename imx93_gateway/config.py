@@ -85,16 +85,19 @@ GATEWAY_ID = "imx93_gateway_1"
 
 ENABLE_STORAGE_LOGGING = True
 
-# Existing chiller logging path.
+# Existing chiller + PCS logging path.
 # Keeping this unchanged to avoid breaking the current working log flow.
 LOG_BASE_PATH = "/home/root/ems_logs_test"
 
 # Later, when SD card comes, change only this path:
 # LOG_BASE_PATH = "/mnt/ems_sdcard"
 
-# Modbus polling can be 1 sec, but storage logging should be slower
+# Modbus polling can be fast, but storage logging should be slower
 # to reduce unnecessary writes.
 LOG_TELEMETRY_INTERVAL_SEC = 5.0
+
+# PCS can use the same logging interval or a separate interval.
+PCS_LOG_TELEMETRY_INTERVAL_SEC = 5.0
 
 
 # -------------------------------------------------
@@ -107,7 +110,7 @@ ENABLE_LOG_HTTP_SERVER = True
 LOG_HTTP_HOST = "0.0.0.0"
 
 # Browser/Flutter URL example:
-# http://192.168.10.2:7000/api/storage/status
+# http://192.168.10.2:7000/api/storage/status?asset_id=pcs_1
 LOG_HTTP_PORT = 7000
 
 # Maximum rows returned by one log API call.

@@ -5,6 +5,9 @@ Purpose:
 - Expose eMMC/SD card logs to Flutter dashboard over HTTP.
 - Provide REST APIs for telemetry logs, event logs, error logs, metadata, and storage status.
 - Support filters for date, time range, fields, status, event type, error type, source, and search.
+- Support multiple assets using query parameter:
+    asset_id=chiller_1
+    asset_id=pcs_1
 - Uses only Python standard library, so no Flask/FastAPI dependency is required.
 """
 
@@ -101,6 +104,14 @@ class LogHTTPServer:
             def _q(query: Dict[str, Any], key: str, default=None):
                 return query.get(key, [default])[0]
 
+            @staticmethod
+            def _asset_id(query: Dict[str, Any]):
+                return (
+                    query.get("asset_id", [None])[0]
+                    or query.get("asset", [None])[0]
+                    or None
+                )
+
             def _send_json(self, data: Dict[str, Any], status_code: int = 200) -> None:
                 body = json.dumps(data, default=str, indent=2).encode("utf-8")
 
@@ -151,6 +162,8 @@ class LogHTTPServer:
                 query = parse_qs(parsed.query)
 
                 try:
+                    asset_id = self._asset_id(query)
+
                     if path == "/":
                         self._send_json(
                             {
@@ -159,13 +172,15 @@ class LogHTTPServer:
                                 "message": "EMS Log HTTP API Server",
                                 "endpoints": [
                                     "/api/health",
-                                    "/api/storage/status",
-                                    "/api/logs/files",
-                                    "/api/logs/telemetry?date=YYYY-MM-DD&limit=100&start_time=HH:MM:SS&end_time=HH:MM:SS&fields=timestamp,outlet_water_temp",
-                                    "/api/logs/events?date=YYYY-MM-DD&event_type=SET_TEMPERATURE_WRITE&status=success&limit=100",
-                                    "/api/logs/errors?date=YYYY-MM-DD&error_type=SETTINGS_READ_FAILED&limit=100",
+                                    "/api/storage/status?asset_id=chiller_1",
+                                    "/api/storage/status?asset_id=pcs_1",
+                                    "/api/logs/assets",
+                                    "/api/logs/files?asset_id=pcs_1",
+                                    "/api/logs/telemetry?asset_id=pcs_1&date=YYYY-MM-DD&limit=100",
+                                    "/api/logs/events?asset_id=pcs_1&event_type=PCS_ACTIVE_POWER_WRITE&status=success&limit=100",
+                                    "/api/logs/errors?asset_id=pcs_1&limit=100",
                                     "/api/logs/metadata",
-                                    "/api/logs/download/telemetry?date=YYYY-MM-DD",
+                                    "/api/logs/download/telemetry?asset_id=pcs_1&date=YYYY-MM-DD",
                                 ],
                             }
                         )
@@ -181,12 +196,20 @@ class LogHTTPServer:
                         )
                         return
 
+                    if path == "/api/logs/assets":
+                        self._send_json(log_query_service.list_assets())
+                        return
+
                     if path == "/api/storage/status":
-                        self._send_json(log_query_service.get_storage_status())
+                        self._send_json(
+                            log_query_service.get_storage_status(asset_id=asset_id)
+                        )
                         return
 
                     if path == "/api/logs/files":
-                        self._send_json(log_query_service.list_telemetry_files())
+                        self._send_json(
+                            log_query_service.list_telemetry_files(asset_id=asset_id)
+                        )
                         return
 
                     if path == "/api/logs/telemetry":
@@ -199,6 +222,7 @@ class LogHTTPServer:
 
                         self._send_json(
                             log_query_service.get_telemetry_logs(
+                                asset_id=asset_id,
                                 date=date,
                                 limit=limit,
                                 start_time=self._q(query, "start_time"),
@@ -206,6 +230,10 @@ class LogHTTPServer:
                                 fields=self._q(query, "fields"),
                                 modbus_status=self._q(query, "modbus_status"),
                                 logger_status=self._q(query, "logger_status"),
+                                vendor=self._q(query, "vendor"),
+                                comm_status=self._q(query, "comm_status"),
+                                operating_status=self._q(query, "operating_status"),
+                                fault_status=self._q(query, "fault_status"),
                                 search=self._q(query, "search"),
                             )
                         )
@@ -216,6 +244,7 @@ class LogHTTPServer:
 
                         self._send_json(
                             log_query_service.get_event_logs(
+                                asset_id=asset_id,
                                 limit=limit,
                                 date=self._q(query, "date"),
                                 start_time=self._q(query, "start_time"),
@@ -223,6 +252,8 @@ class LogHTTPServer:
                                 event_type=self._q(query, "event_type"),
                                 status=self._q(query, "status"),
                                 source=self._q(query, "source"),
+                                vendor=self._q(query, "vendor"),
+                                command=self._q(query, "command"),
                                 search=self._q(query, "search"),
                                 fields=self._q(query, "fields"),
                             )
@@ -234,6 +265,7 @@ class LogHTTPServer:
 
                         self._send_json(
                             log_query_service.get_error_logs(
+                                asset_id=asset_id,
                                 limit=limit,
                                 date=self._q(query, "date"),
                                 start_time=self._q(query, "start_time"),
@@ -257,11 +289,20 @@ class LogHTTPServer:
                             self._error("Missing required query parameter: date")
                             return
 
-                        file_path = log_query_service.get_telemetry_csv_download_path(date)
+                        effective_asset_id = asset_id or getattr(
+                            log_query_service,
+                            "asset_id",
+                            "chiller_1",
+                        )
+
+                        file_path = log_query_service.get_telemetry_csv_download_path(
+                            date=date,
+                            asset_id=effective_asset_id,
+                        )
 
                         self._send_file_download(
                             file_path=file_path,
-                            download_name=f"chiller_telemetry_{date}.csv",
+                            download_name=f"{effective_asset_id}_telemetry_{date}.csv",
                         )
                         return
 
