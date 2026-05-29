@@ -2,8 +2,8 @@
 Configuration file for i.MX93 EMS Gateway Backend.
 
 This file contains all system-level configuration:
-- Modbus RTU serial configuration
-- Chiller slave ID
+- Modbus RTU serial configuration for Chiller
+- Modbus TCP configuration for PCS/Inverter
 - TCP command server configuration
 - UDP telemetry streaming configuration
 - Polling intervals
@@ -12,8 +12,10 @@ This file contains all system-level configuration:
 """
 
 # -------------------------------------------------
-# Modbus RTU Configuration
+# Modbus RTU Configuration - Chiller
 # -------------------------------------------------
+
+CHILLER_ENABLED = True
 
 MODBUS_PORT = "/dev/ttyUSB0"
 MODBUS_BAUDRATE = 9600
@@ -26,14 +28,37 @@ CHILLER_SLAVE_ID = 1
 
 
 # -------------------------------------------------
+# Modbus TCP Configuration - PCS / Inverter
+# -------------------------------------------------
+# Current MVP setup:
+# PC / ModSim IP  = 192.168.10.1
+# i.MX93 IP       = 192.168.10.2
+#
+# Later field setup:
+# PCS_HOST can be changed to actual inverter IP, for example 192.168.1.200.
+
+PCS_ENABLED = True
+
+PCS_VENDOR = "njoy"
+PCS_ASSET_ID = "pcs_1"
+
+PCS_HOST = "192.168.10.1"
+PCS_PORT = 502
+PCS_UNIT_ID = 1
+
+PCS_TIMEOUT_SEC = 3.0
+PCS_RETRIES = 2
+PCS_POLL_INTERVAL_SEC = 5.0
+
+
+# -------------------------------------------------
 # Ethernet / Network Configuration
 # -------------------------------------------------
 
 TCP_COMMAND_HOST = "0.0.0.0"
 TCP_COMMAND_PORT = 6000
 
-# Change this as per your PC Ethernet/Wi-Fi IP.
-# For direct PC <-> i.MX93 Ethernet, this is commonly 192.168.10.1.
+# PC running Flutter dashboard / UDP listener.
 PC_TELEMETRY_IP = "192.168.10.1"
 UDP_TELEMETRY_PORT = 5005
 
@@ -60,7 +85,8 @@ GATEWAY_ID = "imx93_gateway_1"
 
 ENABLE_STORAGE_LOGGING = True
 
-# Current development target: i.MX93 eMMC/local filesystem
+# Existing chiller logging path.
+# Keeping this unchanged to avoid breaking the current working log flow.
 LOG_BASE_PATH = "/home/root/ems_logs_test"
 
 # Later, when SD card comes, change only this path:

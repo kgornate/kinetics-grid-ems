@@ -4,7 +4,7 @@ TCP Command Server for i.MX93 EMS Gateway.
 Role of this file:
 - Runs a TCP server on i.MX93.
 - Receives control/read commands from PC Dashboard.
-- Passes commands to ChillerGatewayService.
+- Passes commands to the main EMS command handler.
 - Sends ACK/NACK response back to PC.
 
 Direction:
@@ -15,12 +15,20 @@ Protocol:
 - JSON message format
 - Newline-delimited JSON
 
-Example command from PC:
+Example chiller command from PC:
 
 {
     "request_id": "REQ_001",
     "command": "SET_TEMP",
     "value": 25.0
+}
+
+Example PCS command from PC:
+
+{
+    "request_id": "REQ_101",
+    "command": "PCS_SET_ACTIVE_POWER",
+    "value": 20
 }
 
 Example response from i.MX93:
@@ -30,7 +38,7 @@ Example response from i.MX93:
     "request_id": "REQ_001",
     "status": "ok",
     "command": "SET_TEMP",
-    "message": "Chiller set temperature command executed",
+    "message": "Command executed",
     "data": {...}
 }
 
@@ -53,13 +61,13 @@ class TCPCommandServer:
     It listens for commands from PC dashboard and passes them to a callback.
 
     The callback is usually:
-        service.execute_command
+        app.execute_command
 
     Example:
         server = TCPCommandServer(
             host="0.0.0.0",
             port=6000,
-            command_handler=service.execute_command
+            command_handler=app.execute_command
         )
 
         server.start()
@@ -70,7 +78,7 @@ class TCPCommandServer:
         host: str,
         port: int,
         command_handler: Callable[[Dict[str, Any]], Dict[str, Any]],
-        server_name: str = "chiller_tcp_command_server",
+        server_name: str = "ems_tcp_command_server",
         recv_buffer_size: int = 4096,
     ):
         self.host = host
@@ -311,8 +319,9 @@ class TCPCommandServer:
         Primary expected format:
             JSON
 
-        Example:
+        Examples:
             {"request_id":"REQ_001","command":"SET_TEMP","value":25.0}
+            {"request_id":"REQ_101","command":"PCS_SET_ACTIVE_POWER","value":20}
 
         Also supports simple text commands for manual testing:
             READ_ALL
@@ -324,6 +333,14 @@ class TCPCommandServer:
             CHILLER_OFF
             SET_TEMP 25.0
             SET_MODE 1
+
+            PCS_READ
+            PCS_POWER_ON
+            PCS_POWER_OFF
+            PCS_SET_ACTIVE_POWER 20
+            PCS_SET_REACTIVE_POWER 0
+            PCS_RESET_FAULT
+            PCS_HEARTBEAT 1
         """
 
         raw_message = raw_message.strip()
@@ -353,14 +370,24 @@ class TCPCommandServer:
             "command": command,
         }
 
-        if command in ["SET_TEMP", "SET_MODE"]:
+        commands_requiring_value = {
+            "SET_TEMP",
+            "SET_MODE",
+            "PCS_SET_ACTIVE_POWER",
+            "PCS_SET_REACTIVE_POWER",
+            "PCS_HEARTBEAT",
+        }
+
+        if command in commands_requiring_value:
             if len(parts) < 2:
                 raise ValueError(f"{command} requires value")
 
             value = parts[1]
 
-            if command == "SET_TEMP":
+            if command in ["SET_TEMP", "PCS_SET_ACTIVE_POWER", "PCS_SET_REACTIVE_POWER"]:
                 packet["value"] = float(value)
+            elif command in ["SET_MODE", "PCS_HEARTBEAT"]:
+                packet["value"] = int(float(value))
             else:
                 packet["value"] = value
 
@@ -391,11 +418,11 @@ class TCPCommandServer:
 # -------------------------------------------------
 # Standalone Mock Test
 # -------------------------------------------------
-# This does not require chiller hardware.
+# This does not require chiller or PCS hardware.
 # It allows testing PC -> i.MX93 TCP command flow.
 #
 # Run on i.MX93:
-#   python3 imx93_gateway/network/tcp_command_server.py
+#   python3 network/tcp_command_server.py
 #
 # Then from PC:
 #   Send TCP command to i.MX93_IP:6000
@@ -404,7 +431,7 @@ class TCPCommandServer:
 def _mock_command_handler(command_packet: Dict[str, Any]) -> Dict[str, Any]:
     """
     Dummy command handler for testing TCP communication only.
-    This does not use Modbus or chiller hardware.
+    This does not use Modbus or hardware.
     """
 
     command = str(command_packet.get("command", "")).upper()
@@ -431,7 +458,7 @@ if __name__ == "__main__":
     Standalone mock execution.
 
     This starts only the TCP server with dummy command handler.
-    Useful for network testing without chiller hardware.
+    Useful for network testing without chiller/PCS hardware.
     """
 
     HOST = "0.0.0.0"

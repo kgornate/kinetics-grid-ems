@@ -10,7 +10,11 @@ class AppConfig {
   static const Duration httpTimeout = Duration(seconds: 8);
 
   static const String gatewayId = 'imx93_gateway_1';
-  static const String assetId = 'chiller_1';
+  static const String chillerAssetId = 'chiller_1';
+  static const String pcsAssetId = 'pcs_1';
+
+  // Kept for backward compatibility with existing chiller code.
+  static const String assetId = chillerAssetId;
 
   static String logApiBaseUrl(String gatewayIp) {
     return 'http://$gatewayIp:$logHttpPort';

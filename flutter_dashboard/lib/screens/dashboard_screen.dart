@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../config/app_config.dart';
 import '../models/chiller_telemetry.dart';
 import '../models/gateway_response.dart';
+import '../models/pcs_telemetry.dart';
 import '../services/tcp_command_service.dart';
 import '../services/udp_telemetry_service.dart';
 import '../widgets/command_panel.dart';
@@ -27,9 +28,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
       TextEditingController(text: AppConfig.defaultGatewayIp);
 
   StreamSubscription<ChillerTelemetry>? _telemetrySubscription;
+  StreamSubscription<PcsTelemetry>? _pcsTelemetrySubscription;
   StreamSubscription<Map<String, dynamic>>? _rawPacketSubscription;
 
   ChillerTelemetry? _latestTelemetry;
+  PcsTelemetry? _latestPcsTelemetry;
   Map<String, dynamic>? _latestRawPacket;
   GatewayResponse? _lastResponse;
 
@@ -49,7 +52,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
       setState(() {
         _latestTelemetry = telemetry;
         _statusMessage =
-            'Telemetry received at ${_formatTime(telemetry.receivedAt)}';
+            'Chiller telemetry received at ${_formatTime(telemetry.receivedAt)}';
+      });
+    });
+
+    _pcsTelemetrySubscription =
+        _udpService.pcsTelemetryStream.listen((pcsTelemetry) {
+      setState(() {
+        _latestPcsTelemetry = pcsTelemetry;
+        _statusMessage =
+            'PCS telemetry received at ${_formatTime(pcsTelemetry.receivedAt)}';
       });
     });
 
@@ -114,10 +126,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ? 'Command successful: $command'
           : 'Command failed: ${response.message}';
 
-      if (response.isOk && command.toUpperCase() == 'READ_ALL') {
+      final upperCommand = command.toUpperCase();
+
+      if (response.isOk && upperCommand == 'READ_ALL') {
         final data = _extractDataOrMockState(response.data);
         if (data.isNotEmpty) {
           _latestTelemetry = ChillerTelemetry.fromJson(data);
+        }
+      }
+
+      if (response.isOk &&
+          (upperCommand == 'PCS_READ' || upperCommand == 'READ_PCS')) {
+        if (response.data.isNotEmpty) {
+          _latestPcsTelemetry = PcsTelemetry.fromJson(response.data);
+        }
+      }
+
+      if (response.isOk &&
+          (upperCommand == 'READ_ALL_ASSETS' ||
+              upperCommand == 'READ_GATEWAY_TELEMETRY')) {
+        final pcs = _extractPcsFromTelemetryPacket(response.data);
+        if (pcs.isNotEmpty) {
+          _latestPcsTelemetry = PcsTelemetry.fromJson(pcs);
         }
       }
     });
@@ -137,6 +167,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void dispose() {
     _gatewayIpController.dispose();
     _telemetrySubscription?.cancel();
+    _pcsTelemetrySubscription?.cancel();
     _rawPacketSubscription?.cancel();
     _udpService.dispose();
     super.dispose();
@@ -176,13 +207,33 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return data;
   }
 
+  Map<String, dynamic> _extractPcsFromTelemetryPacket(Map<String, dynamic> packet) {
+    final payload = _asMap(packet['payload']).isNotEmpty
+        ? _asMap(packet['payload'])
+        : packet;
+
+    final directPcs = _asMap(payload['pcs']);
+    if (directPcs.isNotEmpty) return directPcs;
+
+    final assets = _asMap(payload['assets']);
+    final assetsPcs = _asMap(assets['pcs']);
+    if (assetsPcs.isNotEmpty) return assetsPcs;
+
+    final data = _asMap(packet['data']);
+    final dataPcs = _asMap(data['pcs']);
+    if (dataPcs.isNotEmpty) return dataPcs;
+
+    return {};
+  }
+
   @override
   Widget build(BuildContext context) {
-    final telemetry = _latestTelemetry;
+    final chiller = _latestTelemetry;
+    final pcs = _latestPcsTelemetry;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('EMS Chiller Dashboard'),
+        title: const Text('EMS Dashboard - Chiller + PCS'),
         actions: [
           TextButton.icon(
             onPressed: _openLogsScreen,
@@ -214,9 +265,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 children: [
                   _buildTopConfigCard(),
                   const SizedBox(height: 16),
-                  _buildStatusRow(telemetry),
+                  _buildStatusRow(chiller, pcs),
                   const SizedBox(height: 16),
-                  _buildTelemetryGrid(telemetry),
+                  _sectionHeader('PCS / Inverter Telemetry'),
+                  const SizedBox(height: 10),
+                  _buildPcsTelemetryGrid(pcs),
+                  const SizedBox(height: 20),
+                  _sectionHeader('Chiller Telemetry'),
+                  const SizedBox(height: 10),
+                  _buildChillerTelemetryGrid(chiller),
                   const SizedBox(height: 16),
                   _buildRawPacketCard(),
                 ],
@@ -225,7 +282,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
           Container(width: 1, color: Colors.black12),
           SizedBox(
-            width: 430,
+            width: 450,
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(18),
               child: Column(
@@ -241,6 +298,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _sectionHeader(String title) {
+    return Text(
+      title,
+      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.bold,
+          ),
     );
   }
 
@@ -285,7 +351,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildStatusRow(ChillerTelemetry? telemetry) {
+  Widget _buildStatusRow(ChillerTelemetry? chiller, PcsTelemetry? pcs) {
     return Wrap(
       spacing: 12,
       runSpacing: 12,
@@ -296,30 +362,150 @@ class _DashboardScreenState extends State<DashboardScreen> {
           active: _udpRunning,
         ),
         StatusIndicator(
+          label: 'PCS Comm',
+          status: pcs?.commStatus,
+          active: pcs?.isOnline ?? false,
+        ),
+        StatusIndicator(
+          label: 'PCS Status',
+          status: pcs?.operatingStatus,
+          active: pcs?.isRunning ?? false,
+        ),
+        StatusIndicator(
+          label: 'PCS Fault',
+          status: pcs == null ? '--' : (pcs.faultStatus ? 'FAULT' : 'NORMAL'),
+          active: pcs != null && !pcs.faultStatus,
+        ),
+        StatusIndicator(
           label: 'Chiller Comm',
-          status: telemetry?.communicationStatus,
-          active: telemetry?.isOnline ?? false,
+          status: chiller?.communicationStatus,
+          active: chiller?.isOnline ?? false,
         ),
         StatusIndicator(
           label: 'Water Pump',
-          status: telemetry?.waterPump,
-          active: telemetry?.waterPump == 'RUNNING',
-        ),
-        StatusIndicator(
-          label: 'Compressor 1',
-          status: telemetry?.compressor1,
-          active: telemetry?.compressor1 == 'RUNNING',
-        ),
-        StatusIndicator(
-          label: 'Fault',
-          status: _value(telemetry?.faultCode),
-          active: telemetry?.faultCode == 0 || telemetry?.faultCode == '0',
+          status: chiller?.waterPump,
+          active: chiller?.waterPump == 'RUNNING',
         ),
       ],
     );
   }
 
-  Widget _buildTelemetryGrid(ChillerTelemetry? t) {
+  Widget _buildPcsTelemetryGrid(PcsTelemetry? p) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        int crossAxisCount = 3;
+
+        if (constraints.maxWidth < 900) {
+          crossAxisCount = 2;
+        }
+
+        if (constraints.maxWidth < 560) {
+          crossAxisCount = 1;
+        }
+
+        return GridView.count(
+          crossAxisCount: crossAxisCount,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          childAspectRatio: 2.35,
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 12,
+          children: [
+            TelemetryCard(
+              title: 'Active Power',
+              value: _doubleValue(p?.activePowerKw),
+              unit: 'kW',
+              icon: Icons.bolt,
+            ),
+            TelemetryCard(
+              title: 'Reactive Power',
+              value: _doubleValue(p?.reactivePowerKvar),
+              unit: 'kvar',
+              icon: Icons.electrical_services,
+            ),
+            TelemetryCard(
+              title: 'Power Factor',
+              value: _doubleValue(p?.powerFactor, digits: 2),
+              icon: Icons.speed,
+            ),
+            TelemetryCard(
+              title: 'Frequency',
+              value: _doubleValue(p?.frequencyHz, digits: 2),
+              unit: 'Hz',
+              icon: Icons.show_chart,
+            ),
+            TelemetryCard(
+              title: 'Battery Voltage',
+              value: _doubleValue(p?.batteryVoltageV),
+              unit: 'V',
+              icon: Icons.battery_charging_full,
+            ),
+            TelemetryCard(
+              title: 'Battery Current',
+              value: _doubleValue(p?.batteryCurrentA),
+              unit: 'A',
+              icon: Icons.electric_meter,
+            ),
+            TelemetryCard(
+              title: 'DC Power',
+              value: _doubleValue(p?.dcPowerKw),
+              unit: 'kW',
+              icon: Icons.power,
+            ),
+            TelemetryCard(
+              title: 'Bus Voltage',
+              value: _doubleValue(p?.busVoltageV),
+              unit: 'V',
+              icon: Icons.cable,
+            ),
+            TelemetryCard(
+              title: 'AB Line Voltage',
+              value: _doubleValue(p?.abVoltageV),
+              unit: 'V',
+              icon: Icons.offline_bolt,
+            ),
+            TelemetryCard(
+              title: 'BC Line Voltage',
+              value: _doubleValue(p?.bcVoltageV),
+              unit: 'V',
+              icon: Icons.offline_bolt,
+            ),
+            TelemetryCard(
+              title: 'CA Line Voltage',
+              value: _doubleValue(p?.caVoltageV),
+              unit: 'V',
+              icon: Icons.offline_bolt,
+            ),
+            TelemetryCard(
+              title: 'Phase A Current',
+              value: _doubleValue(p?.phaseACurrentA),
+              unit: 'A',
+              icon: Icons.electrical_services,
+            ),
+            TelemetryCard(
+              title: 'IGBT Temp',
+              value: _doubleValue(p?.igbtTemperatureC),
+              unit: '°C',
+              icon: Icons.device_thermostat,
+            ),
+            TelemetryCard(
+              title: 'Ambient Temp',
+              value: _doubleValue(p?.ambientTemperatureC),
+              unit: '°C',
+              icon: Icons.thermostat,
+            ),
+            TelemetryCard(
+              title: 'Last PCS Update',
+              value: _formatTime(p?.receivedAt),
+              icon: Icons.access_time,
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildChillerTelemetryGrid(ChillerTelemetry? t) {
     return LayoutBuilder(
       builder: (context, constraints) {
         int crossAxisCount = 3;
@@ -387,7 +573,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               icon: Icons.water_drop,
             ),
             TelemetryCard(
-              title: 'Last Received',
+              title: 'Last Chiller Received',
               value: _formatTime(t?.receivedAt),
               icon: Icons.access_time,
             ),
@@ -485,6 +671,31 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _resultRow('Return Temp', '${_value(mockState['return_water_temp'])} °C'),
         _resultRow('Fault Code', _value(mockState['fault_code'])),
       ];
+    }
+
+    if (command == 'PCS_READ' || command == 'READ_PCS' || command == 'PCS_STATUS') {
+      return _buildPcsStateRows(data);
+    }
+
+    if (command.startsWith('PCS_')) {
+      return [
+        _resultSectionTitle('PCS Command Result'),
+        _resultRow('PCS Command', _value(data['command'])),
+        _resultRow('Status', _value(data['status'])),
+        _resultRow('Old Value', _value(data['old_value'])),
+        _resultRow('New Value', _value(data['new_value'])),
+        _resultRow('Readback', _value(data['readback_value'])),
+        _resultRow('Description', _value(data['description'])),
+        if (_value(data['error']) != '--' && _value(data['error']).isNotEmpty)
+          _resultRow('Error', _value(data['error'])),
+      ];
+    }
+
+    if (command == 'READ_ALL_ASSETS' || command == 'READ_GATEWAY_TELEMETRY') {
+      final pcs = _extractPcsFromTelemetryPacket(data);
+      if (pcs.isNotEmpty) {
+        return _buildPcsStateRows(pcs);
+      }
     }
 
     if (command == 'READ_TEMP') {
@@ -607,6 +818,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ...data.entries.map(
         (entry) => _resultRow(entry.key, _value(entry.value)),
       ),
+    ];
+  }
+
+  List<Widget> _buildPcsStateRows(Map<String, dynamic> data) {
+    return [
+      _resultSectionTitle('PCS State'),
+      _resultRow('Asset ID', _value(data['asset_id'])),
+      _resultRow('Vendor', _value(data['vendor'])),
+      _resultRow('Comm Status', _value(data['comm_status'])),
+      _resultRow('Operating Status', _value(data['operating_status'])),
+      _resultRow('Grid Status', _value(data['grid_offgrid_status'])),
+      _resultRow('Fault Status', _value(data['fault_status'])),
+      _resultRow('Active Power', '${_value(data['active_power_kw'])} kW'),
+      _resultRow('Reactive Power', '${_value(data['reactive_power_kvar'])} kvar'),
+      _resultRow('Frequency', '${_value(data['frequency_hz'])} Hz'),
+      _resultRow('Battery Voltage', '${_value(data['battery_voltage_v'])} V'),
+      _resultRow('Battery Current', '${_value(data['battery_current_a'])} A'),
+      _resultRow('DC Power', '${_value(data['dc_power_kw'])} kW'),
+      _resultRow('Power Factor', _value(data['power_factor'])),
+      _resultRow('Last Update', _value(data['last_update_ts'])),
     ];
   }
 

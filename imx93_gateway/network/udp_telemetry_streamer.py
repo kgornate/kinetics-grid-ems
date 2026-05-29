@@ -2,9 +2,9 @@
 UDP Telemetry Streamer for i.MX93 EMS Gateway.
 
 Role of this file:
-- Sends latest chiller telemetry from i.MX93 Gateway to PC Dashboard.
+- Sends latest EMS telemetry from i.MX93 Gateway to PC Dashboard.
 - Uses UDP socket communication.
-- Gets latest telemetry packet from ChillerGatewayService.
+- Gets latest telemetry packet from the EMS application/service callback.
 - Sends telemetry periodically, for example every 1 second.
 
 Direction:
@@ -14,9 +14,9 @@ This file does not directly communicate with Modbus.
 It only sends already-prepared telemetry packets over Ethernet using UDP.
 
 Final flow:
-    ChillerModbusDriver
+    ChillerModbusDriver / PcsGatewayService
             ↓
-    ChillerGatewayService
+    EMS Gateway Application telemetry callback
             ↓
     UDPTelemetryStreamer
             ↓
@@ -41,13 +41,13 @@ class UDPTelemetryStreamer:
     telemetry packet and sends it to the PC dashboard using UDP.
 
     Example callback:
-        service.get_telemetry_packet
+        app.get_udp_telemetry_packet
 
     Example usage:
         streamer = UDPTelemetryStreamer(
-            pc_ip="192.168.1.10",
+            pc_ip="192.168.10.1",
             pc_port=5005,
-            get_telemetry_callback=service.get_telemetry_packet,
+            get_telemetry_callback=app.get_udp_telemetry_packet,
             interval_sec=1.0
         )
 
@@ -60,7 +60,7 @@ class UDPTelemetryStreamer:
         pc_port: int,
         get_telemetry_callback: Callable[[], Dict[str, Any]],
         interval_sec: float = 1.0,
-        streamer_name: str = "chiller_udp_telemetry_streamer",
+        streamer_name: str = "ems_udp_telemetry_streamer",
     ):
         self.pc_ip = pc_ip
         self.pc_port = int(pc_port)
@@ -248,11 +248,11 @@ class UDPTelemetryStreamer:
 # -------------------------------------------------
 # Standalone Mock Test
 # -------------------------------------------------
-# This does not require chiller hardware.
+# This does not require chiller or PCS hardware.
 # It only sends dummy telemetry to PC UDP listener.
 #
 # Later test command:
-#   python3 imx93_gateway/network/udp_telemetry_streamer.py
+#   python3 network/udp_telemetry_streamer.py
 #
 # Make sure PC UDP listener is running on UDP port 5005.
 # -------------------------------------------------
@@ -260,29 +260,34 @@ class UDPTelemetryStreamer:
 def _mock_telemetry_packet() -> Dict[str, Any]:
     """
     Dummy telemetry packet for testing UDP communication only.
-    This does not use Modbus or chiller hardware.
+    This does not use Modbus or hardware.
     """
 
     return {
         "type": "telemetry",
         "gateway_id": "imx93_gateway_1",
-        "asset_id": "chiller_1",
         "timestamp": datetime.now().isoformat(timespec="seconds"),
         "status": "ok",
-        "data": {
-            "water_pump": "RUNNING",
-            "compressor1": "STOPPED",
-            "compressor2": "STOPPED",
-            "electric_heater": "STOPPED",
-            "condensate_fan": "STOPPED",
-            "outlet_water_temp": 38.4,
-            "return_water_temp": 38.1,
-            "outlet_water_pressure": 0.27,
-            "return_water_pressure": 0.07,
-            "ambient_temp": 37.4,
-            "makeup_pump": "ON",
-            "fault_code": 0,
-            "communication_status": "mock",
+        "mode": "mock",
+        "assets": {
+            "chiller": {
+                "asset_id": "chiller_1",
+                "status": "ok",
+                "data": {
+                    "water_pump": "RUNNING",
+                    "outlet_water_temp": 38.4,
+                    "return_water_temp": 38.1,
+                    "communication_status": "mock",
+                },
+            },
+            "pcs": {
+                "asset_id": "pcs_1",
+                "comm_status": "online",
+                "active_power_kw": 20.0,
+                "dc_power_kw": 20.0,
+                "frequency_hz": 50.0,
+                "operating_status": "running_grid_connected",
+            },
         },
     }
 
@@ -295,8 +300,7 @@ if __name__ == "__main__":
     In final gateway, this class will be started from main.py.
     """
 
-    # Change this to your PC IP during testing.
-    PC_IP = "192.168.1.10"
+    PC_IP = "192.168.10.1"
     PC_PORT = 5005
 
     streamer = UDPTelemetryStreamer(

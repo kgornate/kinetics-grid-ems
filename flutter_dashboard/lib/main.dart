@@ -12,7 +12,7 @@ class EMSDashboardApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'EMS Chiller Dashboard',
+      title: 'EMS Dashboard',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,

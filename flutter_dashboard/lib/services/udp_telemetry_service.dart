@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import '../models/chiller_telemetry.dart';
+import '../models/pcs_telemetry.dart';
 
 class UdpTelemetryService {
   RawDatagramSocket? _socket;
@@ -10,10 +11,14 @@ class UdpTelemetryService {
   final StreamController<ChillerTelemetry> _telemetryController =
       StreamController<ChillerTelemetry>.broadcast();
 
+  final StreamController<PcsTelemetry> _pcsTelemetryController =
+      StreamController<PcsTelemetry>.broadcast();
+
   final StreamController<Map<String, dynamic>> _rawPacketController =
       StreamController<Map<String, dynamic>>.broadcast();
 
   Stream<ChillerTelemetry> get telemetryStream => _telemetryController.stream;
+  Stream<PcsTelemetry> get pcsTelemetryStream => _pcsTelemetryController.stream;
   Stream<Map<String, dynamic>> get rawPacketStream => _rawPacketController.stream;
 
   bool get isRunning => _socket != null;
@@ -37,9 +42,14 @@ class UdpTelemetryService {
 
         _rawPacketController.add(decoded);
 
-        final telemetry = _parseTelemetry(decoded);
-        if (telemetry != null) {
-          _telemetryController.add(telemetry);
+        final chillerTelemetry = _parseChillerTelemetry(decoded);
+        if (chillerTelemetry != null) {
+          _telemetryController.add(chillerTelemetry);
+        }
+
+        final pcsTelemetry = _parsePcsTelemetry(decoded);
+        if (pcsTelemetry != null) {
+          _pcsTelemetryController.add(pcsTelemetry);
         }
       } catch (_) {
         // Ignore malformed UDP packets and keep listener alive.
@@ -47,16 +57,47 @@ class UdpTelemetryService {
     });
   }
 
-  ChillerTelemetry? _parseTelemetry(Map<String, dynamic> packet) {
-    final payload = packet['payload'] is Map<String, dynamic>
-        ? Map<String, dynamic>.from(packet['payload'])
+  ChillerTelemetry? _parseChillerTelemetry(Map<String, dynamic> packet) {
+    final payload = _asMap(packet['payload']).isNotEmpty
+        ? _asMap(packet['payload'])
         : packet;
 
-    final data = payload['data'];
+    final data = _asMap(payload['data']);
+    if (data.isEmpty) return null;
 
-    if (data is! Map<String, dynamic>) return null;
+    // In PCS-only mode backend sends data: {"message": "PCS-only..."}.
+    // Avoid treating that as chiller telemetry.
+    final hasChillerKeys = data.containsKey('water_pump') ||
+        data.containsKey('outlet_water_temp') ||
+        data.containsKey('return_water_temp') ||
+        data.containsKey('communication_status');
 
-    return ChillerTelemetry.fromJson(Map<String, dynamic>.from(data));
+    if (!hasChillerKeys) return null;
+
+    return ChillerTelemetry.fromJson(data);
+  }
+
+  PcsTelemetry? _parsePcsTelemetry(Map<String, dynamic> packet) {
+    final payload = _asMap(packet['payload']).isNotEmpty
+        ? _asMap(packet['payload'])
+        : packet;
+
+    Map<String, dynamic> pcs = _asMap(payload['pcs']);
+
+    if (pcs.isEmpty) {
+      final assets = _asMap(payload['assets']);
+      pcs = _asMap(assets['pcs']);
+    }
+
+    if (pcs.isEmpty) return null;
+
+    return PcsTelemetry.fromJson(pcs);
+  }
+
+  Map<String, dynamic> _asMap(dynamic value) {
+    if (value is Map<String, dynamic>) return value;
+    if (value is Map) return Map<String, dynamic>.from(value);
+    return {};
   }
 
   Future<void> stop() async {
@@ -67,6 +108,7 @@ class UdpTelemetryService {
   Future<void> dispose() async {
     await stop();
     await _telemetryController.close();
+    await _pcsTelemetryController.close();
     await _rawPacketController.close();
   }
 }
