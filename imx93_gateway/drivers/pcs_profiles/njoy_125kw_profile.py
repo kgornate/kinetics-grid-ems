@@ -13,7 +13,7 @@ Important protocol points:
 - Negative active power means charge.
 """
 
-from typing import Dict, Any
+from typing import Dict, Any, List
 
 from drivers.pcs_modbus_tcp_driver import PcsModbusTcpDriver
 
@@ -69,6 +69,129 @@ REG_ACTIVE_POWER_SETTING = 0x500E
 REG_REACTIVE_POWER_SETTING = 0x500F
 REG_FAULT_RESET_COMMAND = 0x5064
 REG_HEARTBEAT = 0x508E
+
+
+# -----------------------------
+# Detailed fault word registers
+# -----------------------------
+REG_HARDWARE_FAULT_WORD_1 = 0x1700
+REG_HARDWARE_FAULT_WORD_2 = 0x1701
+REG_GRID_FAULT_WORD = 0x1702
+REG_BUS_FAULT_WORD = 0x1703
+REG_AC_CAPACITOR_FAULT_WORD = 0x1704
+REG_SYSTEM_FAULT_WORD = 0x1705
+REG_SWITCH_FAULT_WORD = 0x1706
+REG_OTHER_FAULT_WORD = 0x1707
+
+
+FAULT_WORD_DEFINITIONS = {
+    "hardware_fault_word_1": {
+        0: "EPO fault",
+        1: "IGBT OCP fault",
+        2: "Bus hardware overvoltage fault",
+        4: "Power module wave-by-wave current limiting fault",
+        5: "Balance module wave-by-wave current limiting fault",
+    },
+    "hardware_fault_word_2": {
+        0: "24V power supply fault",
+        1: "Fan failure",
+        2: "Connection fault",
+        6: "External input dry contact 3 fault",
+        7: "Inductor overtemperature fault flag",
+        8: "Power module overtemperature fault",
+        9: "Balance module overtemperature fault",
+        10: "15V power supply fault",
+        11: "System fire alarm fault",
+        12: "External input dry contact 1 fault",
+        13: "External input dry contact 2 fault",
+        14: "Ambient temperature over-temperature fault",
+        15: "Dry contact over-temperature fault",
+    },
+    "grid_fault_word": {
+        0: "Phase A grid overvoltage fault",
+        1: "Phase B grid overvoltage fault",
+        2: "Phase C grid overvoltage fault",
+        3: "Phase A grid undervoltage fault",
+        4: "Phase B grid undervoltage fault",
+        5: "Phase C grid undervoltage fault",
+        6: "Grid overfrequency fault",
+        7: "Grid underfrequency fault",
+        8: "Grid phase sequence error fault",
+        9: "Phase A software overcurrent fault",
+        10: "Phase B software overcurrent fault",
+        11: "Phase C software overcurrent fault",
+        12: "Grid voltage imbalance fault",
+        13: "Grid current imbalance fault",
+        14: "Grid phase loss fault",
+        15: "N-wire overcurrent fault",
+    },
+    "bus_fault_word": {
+        0: "Precharge bus overvoltage fault",
+        1: "Precharge bus undervoltage fault",
+        4: "Operating bus overvoltage fault",
+        5: "Operating bus undervoltage fault",
+        6: "Positive/negative bus imbalance fault",
+        7: "Battery undervoltage fault",
+        9: "Battery overvoltage fault",
+        10: "DC precharge overcurrent fault",
+        11: "DC overcurrent fault",
+        12: "Balancing module software overcurrent fault",
+        15: "Battery reverse connection fault",
+    },
+    "ac_capacitor_fault_word": {
+        0: "Precharge timeout fault",
+        1: "Precharge Phase A overcurrent fault",
+        2: "Precharge Phase B overcurrent fault",
+        3: "Precharge Phase C overcurrent fault",
+        6: "Leakage current overcurrent fault",
+        7: "DC component current limit fault",
+        8: "Power mismatch fault",
+    },
+    "system_fault_word": {
+        0: "Control board RAM fault",
+        1: "Control board EEPROM fault",
+        2: "AD zero drift fault",
+        3: "Background communication protocol fault",
+        4: "CAN communication protocol fault",
+        5: "CPLD communication protocol failure",
+        6: "DataLog data fault",
+        8: "Insulation detection fault",
+        9: "Software/Firmware mismatch fault",
+        11: "BMS battery status fault",
+        12: "STS communication fault",
+        13: "BMS communication fault",
+        14: "Slave CAN communication failure in parallel system",
+        15: "EMS communication fault",
+    },
+    "switch_fault_word": {
+        0: "Precharge relay closure fault",
+        1: "Precharge relay open fault",
+        2: "Precharge relay closed state fault",
+        3: "Precharge relay open state fault",
+        4: "Main relay closed fault",
+        5: "Main relay open fault",
+        6: "Main relay closed state fault",
+        7: "Main relay open state fault",
+        8: "AC main relay sticking fault - contact manufacturer immediately",
+        9: "DC relay open circuit fault - contact manufacturer immediately",
+        10: "AC main relay open circuit fault - contact manufacturer immediately",
+    },
+    "other_fault_word": {
+        0: "Inverter voltage phase A overvoltage fault",
+        1: "Inverter voltage phase B overvoltage fault",
+        2: "Inverter voltage phase C overvoltage fault",
+        3: "Grid islanding fault",
+        5: "System resonance fault",
+        6: "Software overvoltage/overcurrent fault",
+        8: "High voltage ride-through timeout fault",
+        9: "Inverter voltage phase A undervoltage fault",
+        10: "Inverter voltage phase B undervoltage fault",
+        11: "Inverter voltage phase C undervoltage fault",
+        12: "Off-grid no synchronization signal fault",
+        14: "Off-grid output short-circuit fault",
+        15: "Low voltage ride-through timeout fault",
+    },
+}
 
 
 def raw_to_s16(raw: int) -> int:
@@ -147,6 +270,35 @@ def decode_grid_offgrid_status(raw: int) -> str:
     return mapping.get(raw, f"unknown_{raw}")
 
 
+def decode_fault_word(raw: int, definitions: Dict[int, str]) -> List[str]:
+    """Return active fault descriptions from a 16-bit fault word."""
+    value = raw & 0xFFFF
+    faults: List[str] = []
+    for bit, description in definitions.items():
+        if value & (1 << bit):
+            faults.append(description)
+    return faults
+
+
+def decode_fault_words(fault_words_raw: Dict[str, int]) -> Dict[str, List[str]]:
+    """Decode all NJOY/Enjoy PCS detailed fault-word categories."""
+    decoded: Dict[str, List[str]] = {}
+    for word_name, raw in fault_words_raw.items():
+        decoded[word_name] = decode_fault_word(
+            raw, FAULT_WORD_DEFINITIONS.get(word_name, {})
+        )
+    return decoded
+
+
+def flatten_active_faults(fault_categories: Dict[str, List[str]]) -> List[str]:
+    active_faults: List[str] = []
+    for category, faults in fault_categories.items():
+        pretty_category = category.replace("_", " ").title()
+        for fault in faults:
+            active_faults.append(f"{pretty_category}: {fault}")
+    return active_faults
+
+
 def read_telemetry(driver: PcsModbusTcpDriver) -> Dict[str, Any]:
     """
     Read foundation-level Njoy/Enjoy PCS telemetry.
@@ -212,6 +364,64 @@ def read_telemetry(driver: PcsModbusTcpDriver) -> Dict[str, Any]:
         "ambient_temperature_c": raw_to_s16(dc(REG_AMBIENT_TEMPERATURE - dc_start)) / 10.0,
         "inductance_temperature_c": raw_to_s16(dc(REG_INDUCTANCE_TEMPERATURE - dc_start)) / 10.0,
     }
+
+    # Detailed fault words from 0x1700 to 0x1707.
+    # Keep this read non-fatal so telemetry remains available even if a PCS
+    # firmware build rejects the detailed fault block.
+    try:
+        fault_regs = driver.read_holding_registers(REG_HARDWARE_FAULT_WORD_1, 8)
+        fault_words_raw = {
+            "hardware_fault_word_1": fault_regs[0],
+            "hardware_fault_word_2": fault_regs[1],
+            "grid_fault_word": fault_regs[2],
+            "bus_fault_word": fault_regs[3],
+            "ac_capacitor_fault_word": fault_regs[4],
+            "system_fault_word": fault_regs[5],
+            "switch_fault_word": fault_regs[6],
+            "other_fault_word": fault_regs[7],
+        }
+        fault_categories = decode_fault_words(fault_words_raw)
+        active_faults = flatten_active_faults(fault_categories)
+
+        telemetry.update({
+            "hardware_fault_word_1_raw": fault_words_raw["hardware_fault_word_1"],
+            "hardware_fault_word_2_raw": fault_words_raw["hardware_fault_word_2"],
+            "grid_fault_word_raw": fault_words_raw["grid_fault_word"],
+            "bus_fault_word_raw": fault_words_raw["bus_fault_word"],
+            "ac_capacitor_fault_word_raw": fault_words_raw["ac_capacitor_fault_word"],
+            "system_fault_word_raw": fault_words_raw["system_fault_word"],
+            "switch_fault_word_raw": fault_words_raw["switch_fault_word"],
+            "other_fault_word_raw": fault_words_raw["other_fault_word"],
+            "fault_words_raw": fault_words_raw,
+            "fault_categories": fault_categories,
+            "active_faults": active_faults,
+            "fault_count": len(active_faults),
+            "detailed_fault_status": len(active_faults) > 0,
+            "fault_words_read_error": "",
+        })
+    except Exception as exc:
+        telemetry.update({
+            "hardware_fault_word_1_raw": None,
+            "hardware_fault_word_2_raw": None,
+            "grid_fault_word_raw": None,
+            "bus_fault_word_raw": None,
+            "ac_capacitor_fault_word_raw": None,
+            "system_fault_word_raw": None,
+            "switch_fault_word_raw": None,
+            "other_fault_word_raw": None,
+            "fault_words_raw": {},
+            "fault_categories": {},
+            "active_faults": [],
+            "fault_count": 0,
+            "detailed_fault_status": False,
+            "fault_words_read_error": str(exc),
+        })
+
+    telemetry["fault_status"] = (
+        telemetry.get("detailed_fault_status") is True
+        or str(telemetry.get("operating_status", "")).lower() == "fault"
+        or str(telemetry.get("grid_offgrid_status", "")).lower() == "fault"
+    )
 
     return telemetry
 

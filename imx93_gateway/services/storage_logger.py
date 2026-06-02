@@ -53,8 +53,12 @@ class StorageLogger:
             "ca_voltage_v", "phase_a_voltage_v", "phase_b_voltage_v", "phase_c_voltage_v",
             "phase_a_current_a", "phase_b_current_a", "phase_c_current_a",
             "operating_status", "operating_status_raw", "grid_offgrid_status",
-            "grid_offgrid_status_raw", "fault_status", "igbt_temperature_c",
-            "ambient_temperature_c", "inductance_temperature_c", "error", "logger_status",
+            "grid_offgrid_status_raw", "fault_status", "detailed_fault_status", "fault_count",
+            "hardware_fault_word_1_raw", "hardware_fault_word_2_raw", "grid_fault_word_raw",
+            "bus_fault_word_raw", "ac_capacitor_fault_word_raw", "system_fault_word_raw",
+            "switch_fault_word_raw", "other_fault_word_raw", "active_faults",
+            "fault_words_read_error", "igbt_temperature_c", "ambient_temperature_c",
+            "inductance_temperature_c", "error", "logger_status",
         ]
 
         self.bms_telemetry_header = [
@@ -262,6 +266,15 @@ class StorageLogger:
                 self._value(telemetry, "phase_c_current_a"), self._value(telemetry, "operating_status", "unknown"),
                 self._value(telemetry, "operating_status_raw"), self._value(telemetry, "grid_offgrid_status", "unknown"),
                 self._value(telemetry, "grid_offgrid_status_raw"), self._value(telemetry, "fault_status"),
+                self._value(telemetry, "detailed_fault_status"), self._value(telemetry, "fault_count"),
+                self._value(telemetry, "hardware_fault_word_1_raw"),
+                self._value(telemetry, "hardware_fault_word_2_raw"),
+                self._value(telemetry, "grid_fault_word_raw"), self._value(telemetry, "bus_fault_word_raw"),
+                self._value(telemetry, "ac_capacitor_fault_word_raw"),
+                self._value(telemetry, "system_fault_word_raw"), self._value(telemetry, "switch_fault_word_raw"),
+                self._value(telemetry, "other_fault_word_raw"),
+                self._stringify(self._value(telemetry, "active_faults")),
+                self._value(telemetry, "fault_words_read_error"),
                 self._value(telemetry, "igbt_temperature_c"), self._value(telemetry, "ambient_temperature_c"),
                 self._value(telemetry, "inductance_temperature_c"), self._value(telemetry, "error"), self.logger_status,
             ]

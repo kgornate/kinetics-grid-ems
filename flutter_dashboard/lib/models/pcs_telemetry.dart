@@ -38,6 +38,23 @@ class PcsTelemetry {
 
   final bool faultStatus;
 
+  // Detailed NJOY/Enjoy fault words 0x1700..0x1707 from i.MX93 backend.
+  final int? hardwareFaultWord1Raw;
+  final int? hardwareFaultWord2Raw;
+  final int? gridFaultWordRaw;
+  final int? busFaultWordRaw;
+  final int? acCapacitorFaultWordRaw;
+  final int? systemFaultWordRaw;
+  final int? switchFaultWordRaw;
+  final int? otherFaultWordRaw;
+
+  final Map<String, dynamic> faultWordsRaw;
+  final Map<String, List<String>> faultCategories;
+  final List<String> activeFaults;
+  final int faultCount;
+  final bool detailedFaultStatus;
+  final String? faultWordsReadError;
+
   final double? igbtTemperatureC;
   final double? ambientTemperatureC;
   final double? inductanceTemperatureC;
@@ -74,6 +91,20 @@ class PcsTelemetry {
     this.gridOffgridStatusRaw,
     this.gridOffgridStatus,
     this.faultStatus = false,
+    this.hardwareFaultWord1Raw,
+    this.hardwareFaultWord2Raw,
+    this.gridFaultWordRaw,
+    this.busFaultWordRaw,
+    this.acCapacitorFaultWordRaw,
+    this.systemFaultWordRaw,
+    this.switchFaultWordRaw,
+    this.otherFaultWordRaw,
+    this.faultWordsRaw = const {},
+    this.faultCategories = const {},
+    this.activeFaults = const [],
+    this.faultCount = 0,
+    this.detailedFaultStatus = false,
+    this.faultWordsReadError,
     this.igbtTemperatureC,
     this.ambientTemperatureC,
     this.inductanceTemperatureC,
@@ -81,6 +112,15 @@ class PcsTelemetry {
   });
 
   factory PcsTelemetry.fromJson(Map<String, dynamic> json) {
+    final activeFaults = _toStringList(json['active_faults']);
+    final faultCategories = _toFaultCategories(json['fault_categories']);
+    final faultWordsRaw = _toStringDynamicMap(json['fault_words_raw']);
+    final faultCount = _toInt(json['fault_count']) ?? activeFaults.length;
+    final detailedFaultStatus = _toBool(json['detailed_fault_status']) ||
+        activeFaults.isNotEmpty ||
+        faultCount > 0;
+    final faultStatus = _toBool(json['fault_status']) || detailedFaultStatus;
+
     return PcsTelemetry(
       assetId: json['asset_id']?.toString(),
       vendor: json['vendor']?.toString(),
@@ -110,7 +150,21 @@ class PcsTelemetry {
       operatingStatus: json['operating_status']?.toString(),
       gridOffgridStatusRaw: _toInt(json['grid_offgrid_status_raw']),
       gridOffgridStatus: json['grid_offgrid_status']?.toString(),
-      faultStatus: _toBool(json['fault_status']),
+      faultStatus: faultStatus,
+      hardwareFaultWord1Raw: _toInt(json['hardware_fault_word_1_raw']),
+      hardwareFaultWord2Raw: _toInt(json['hardware_fault_word_2_raw']),
+      gridFaultWordRaw: _toInt(json['grid_fault_word_raw']),
+      busFaultWordRaw: _toInt(json['bus_fault_word_raw']),
+      acCapacitorFaultWordRaw: _toInt(json['ac_capacitor_fault_word_raw']),
+      systemFaultWordRaw: _toInt(json['system_fault_word_raw']),
+      switchFaultWordRaw: _toInt(json['switch_fault_word_raw']),
+      otherFaultWordRaw: _toInt(json['other_fault_word_raw']),
+      faultWordsRaw: faultWordsRaw,
+      faultCategories: faultCategories,
+      activeFaults: activeFaults,
+      faultCount: faultCount,
+      detailedFaultStatus: detailedFaultStatus,
+      faultWordsReadError: json['fault_words_read_error']?.toString(),
       igbtTemperatureC: _toDouble(json['igbt_temperature_c']),
       ambientTemperatureC: _toDouble(json['ambient_temperature_c']),
       inductanceTemperatureC: _toDouble(json['inductance_temperature_c']),
@@ -139,10 +193,46 @@ class PcsTelemetry {
     return text == 'true' || text == '1' || text == 'yes' || text == 'fault';
   }
 
+  static List<String> _toStringList(dynamic value) {
+    if (value == null) return const [];
+    if (value is List) {
+      return value.map((item) => item.toString()).where((item) => item.isNotEmpty).toList();
+    }
+    final text = value.toString().trim();
+    if (text.isEmpty) return const [];
+    return text
+        .split(';')
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty)
+        .toList();
+  }
+
+  static Map<String, dynamic> _toStringDynamicMap(dynamic value) {
+    if (value is Map<String, dynamic>) return value;
+    if (value is Map) return Map<String, dynamic>.from(value);
+    return const {};
+  }
+
+  static Map<String, List<String>> _toFaultCategories(dynamic value) {
+    final map = _toStringDynamicMap(value);
+    if (map.isEmpty) return const {};
+
+    final parsed = <String, List<String>>{};
+    map.forEach((key, rawValue) {
+      parsed[key.toString()] = _toStringList(rawValue);
+    });
+    return parsed;
+  }
+
   bool get isOnline => commStatus?.toLowerCase() == 'online';
 
   bool get isRunning {
     final status = operatingStatus?.toLowerCase() ?? '';
     return status.contains('running') || status.contains('operation');
   }
+
+  bool get hasDetailedFault =>
+      detailedFaultStatus || faultCount > 0 || activeFaults.isNotEmpty;
+
+  bool get hasAnyFault => faultStatus || hasDetailedFault;
 }

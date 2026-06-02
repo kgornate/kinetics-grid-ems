@@ -15,6 +15,7 @@ import '../widgets/status_indicator.dart';
 import '../widgets/telemetry_card.dart';
 import 'bms_screen.dart';
 import 'logs_screen.dart';
+import 'pcs_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -202,6 +203,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  void _openPcsScreen(PcsTelemetry? pcs) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => PcsScreen(
+          gatewayIp: _gatewayIpController.text.trim(),
+          initialTelemetry: pcs,
+          pcsTelemetryStream: _udpService.pcsTelemetryStream,
+        ),
+      ),
+    );
+  }
+
   @override
   void dispose() {
     _gatewayIpController.dispose();
@@ -346,6 +359,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   _sectionHeader('PCS / Inverter Telemetry'),
                   const SizedBox(height: 10),
                   _buildPcsTelemetryGrid(pcs),
+                  const SizedBox(height: 12),
+                  FilledButton.icon(
+                    onPressed: () => _openPcsScreen(pcs),
+                    icon: const Icon(Icons.electrical_services),
+                    label: const Text('Open PCS Detail Screen'),
+                  ),
                   const SizedBox(height: 20),
                   _sectionHeader('Chiller Telemetry'),
                   const SizedBox(height: 10),

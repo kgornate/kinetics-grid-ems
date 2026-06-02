@@ -10,7 +10,7 @@ Purpose:
 
 from dataclasses import dataclass, field, asdict
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 
 def now_iso() -> str:
@@ -62,6 +62,23 @@ class PcsState:
 
     fault_status: bool = False
 
+    # Detailed NJOY/Enjoy fault words 0x1700..0x1707
+    hardware_fault_word_1_raw: Optional[int] = None
+    hardware_fault_word_2_raw: Optional[int] = None
+    grid_fault_word_raw: Optional[int] = None
+    bus_fault_word_raw: Optional[int] = None
+    ac_capacitor_fault_word_raw: Optional[int] = None
+    system_fault_word_raw: Optional[int] = None
+    switch_fault_word_raw: Optional[int] = None
+    other_fault_word_raw: Optional[int] = None
+
+    fault_words_raw: Dict[str, Any] = field(default_factory=dict)
+    fault_categories: Dict[str, Any] = field(default_factory=dict)
+    active_faults: List[str] = field(default_factory=list)
+    fault_count: int = 0
+    detailed_fault_status: bool = False
+    fault_words_read_error: str = ""
+
     # Temperature
     igbt_temperature_c: Optional[float] = None
     ambient_temperature_c: Optional[float] = None
@@ -88,8 +105,16 @@ class PcsState:
         operating_status = str(telemetry.get("operating_status", "")).lower()
         grid_status = str(telemetry.get("grid_offgrid_status", "")).lower()
 
+        telemetry_fault_status = telemetry.get("fault_status") is True
+        detailed_fault_status = telemetry.get("detailed_fault_status") is True
+        active_faults = telemetry.get("active_faults", [])
+        has_active_faults = isinstance(active_faults, list) and len(active_faults) > 0
+
         self.fault_status = (
-            operating_status == "fault"
+            telemetry_fault_status
+            or detailed_fault_status
+            or has_active_faults
+            or operating_status == "fault"
             or grid_status == "fault"
             or "fault" in operating_status
             or "fault" in grid_status
