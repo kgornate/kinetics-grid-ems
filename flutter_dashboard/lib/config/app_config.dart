@@ -13,10 +13,12 @@ class AppConfig {
 
   static const String chillerAssetId = 'chiller_1';
   static const String pcsAssetId = 'pcs_1';
+  static const String bmsAssetId = 'bms_1';
 
   static const List<String> supportedLogAssets = [
     chillerAssetId,
     pcsAssetId,
+    bmsAssetId,
   ];
 
   static const List<String> supportedPcsVendors = [

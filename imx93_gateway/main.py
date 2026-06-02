@@ -7,15 +7,17 @@ Role of this file:
 In REAL mode:
     - Optionally connects to chiller over Modbus RTU.
     - Optionally connects to PCS/Inverter over Modbus TCP.
+    - Optionally connects to BMS/BCU over Modbus TCP.
     - Polls chiller data.
     - Polls PCS data.
+    - Polls BMS data.
     - Sends UDP telemetry to PC.
     - Receives TCP commands from PC.
     - Exposes eMMC/SD logs over HTTP API.
 
 In MOCK mode:
     - Does not use Modbus.
-    - Does not need chiller or PCS hardware.
+    - Does not need chiller, PCS, or BMS hardware.
     - Sends dummy chiller telemetry to PC.
     - Receives TCP commands and returns mock responses.
     - Can still expose existing logs over HTTP API.
@@ -28,7 +30,10 @@ Run real mode on i.MX93:
     python3 main.py --pc-ip 192.168.10.1
 
 Run PCS-only real mode on i.MX93:
-    python3 main.py --no-chiller --pc-ip 192.168.10.1
+    python3 main.py --no-chiller --no-bms --pc-ip 192.168.10.1
+
+Run BMS-only real mode on i.MX93:
+    python3 main.py --no-chiller --no-pcs --bms-host 192.168.10.1 --pc-ip 192.168.10.1
 
 Run mock mode on i.MX93:
     python3 main.py --mock --pc-ip 192.168.10.1
@@ -403,6 +408,7 @@ class EMSGatewayApplication:
     This class owns:
     - Chiller Modbus RTU driver/service
     - PCS Modbus TCP service
+    - BMS/BCU Modbus TCP service
     - UDP telemetry streamer
     - TCP command server
     - HTTP log API server
@@ -416,6 +422,8 @@ class EMSGatewayApplication:
         self.mock_service: Optional[MockGatewayService] = None
 
         self.pcs_service: Optional[Any] = None
+        self.bms_service: Optional[Any] = None
+        self.bms_storage_logger: Optional[Any] = None
 
         self.udp_streamer: Optional[UDPTelemetryStreamer] = None
         self.tcp_server: Optional[TCPCommandServer] = None
@@ -455,6 +463,27 @@ class EMSGatewayApplication:
         self.pcs_retries = get_config_value("PCS_RETRIES", 2)
         self.pcs_poll_interval_sec = args.pcs_poll_interval or get_config_value(
             "PCS_POLL_INTERVAL_SEC",
+            5.0,
+        )
+
+        # BMS configuration
+        self.bms_enabled = bool(get_config_value("BMS_ENABLED", False)) and not args.no_bms
+        self.bms_asset_id = get_config_value("BMS_ASSET_ID", "bms_1")
+        self.bms_host = args.bms_host or get_config_value("BMS_MODBUS_HOST", "192.168.10.1")
+        self.bms_port = args.bms_port or get_config_value("BMS_MODBUS_PORT", 502)
+        self.bms_unit_id = args.bms_unit or get_config_value("BMS_UNIT_ID", 1)
+        self.bms_timeout = get_config_value("BMS_MODBUS_TIMEOUT_SEC", 2.0)
+        self.bms_address_offset = get_config_value("BMS_ADDRESS_OFFSET", 0)
+        self.bms_poll_interval_sec = args.bms_poll_interval or get_config_value(
+            "BMS_POLL_INTERVAL_SEC",
+            1.0,
+        )
+        self.bms_command_verify_delay_sec = get_config_value(
+            "BMS_COMMAND_VERIFY_DELAY_SEC",
+            0.3,
+        )
+        self.bms_communication_lost_after_sec = get_config_value(
+            "BMS_COMMUNICATION_LOST_AFTER_SEC",
             5.0,
         )
 
@@ -547,8 +576,13 @@ class EMSGatewayApplication:
             else:
                 print("[MAIN] PCS service disabled")
 
-            if not self.chiller_enabled and not self.pcs_enabled:
-                raise RuntimeError("Both Chiller and PCS services are disabled. Nothing to run.")
+            if self.bms_enabled:
+                self._start_bms_service()
+            else:
+                print("[MAIN] BMS service disabled")
+
+            if not self.chiller_enabled and not self.pcs_enabled and not self.bms_enabled:
+                raise RuntimeError("Chiller, PCS, and BMS services are disabled. Nothing to run.")
 
         if not self.args.no_udp:
             self._start_udp_streamer()
@@ -655,6 +689,64 @@ class EMSGatewayApplication:
             f"port={self.pcs_port}, unit={self.pcs_unit_id}"
         )
 
+    def _start_bms_service(self) -> None:
+        print("[MAIN] Starting BMS/BCU Modbus TCP service...")
+
+        try:
+            from services.bms_gateway_service import BmsGatewayService, BmsServiceConfig
+            from services.storage_logger import StorageLogger
+        except ImportError as error:
+            raise RuntimeError(
+                "Failed to import BMS gateway modules. "
+                "Make sure drivers/bms_register_map.py, drivers/bms_modbus_tcp_driver.py, "
+                "models/bms_state.py, and services/bms_gateway_service.py exist."
+            ) from error
+
+        enable_storage_logging = bool(get_config_value("ENABLE_STORAGE_LOGGING", True)) and bool(
+            get_config_value("BMS_ENABLE_STORAGE_LOGGING", True)
+        )
+
+        self.bms_storage_logger = None
+        if enable_storage_logging:
+            self.bms_storage_logger = StorageLogger(
+                base_path=self.log_base_path,
+                gateway_id=self.gateway_id,
+                asset_id=self.bms_asset_id,
+                asset_type="bms",
+            )
+            self.bms_storage_logger.initialize()
+
+        self.bms_service = BmsGatewayService(
+            config=BmsServiceConfig(
+                gateway_id=self.gateway_id,
+                asset_id=self.bms_asset_id,
+                host=self.bms_host,
+                port=self.bms_port,
+                unit_id=self.bms_unit_id,
+                timeout=self.bms_timeout,
+                address_offset=self.bms_address_offset,
+                poll_interval_sec=self.bms_poll_interval_sec,
+                command_verify_delay_sec=self.bms_command_verify_delay_sec,
+                communication_lost_after_sec=self.bms_communication_lost_after_sec,
+                enable_storage_logging=enable_storage_logging,
+                telemetry_log_interval_sec=get_config_value(
+                    "BMS_TELEMETRY_LOG_INTERVAL_SEC",
+                    get_config_value("BMS_LOG_TELEMETRY_INTERVAL_SEC", get_config_value("LOG_TELEMETRY_INTERVAL_SEC", 5.0)),
+                ),
+                print_status=True,
+            ),
+            storage_logger=self.bms_storage_logger,
+        )
+
+        # Start background polling. If ModSim/BCU is temporarily unavailable,
+        # the BMS service will mark itself offline and keep retrying.
+        self.bms_service.start()
+
+        print(
+            f"[MAIN] BMS service started | "
+            f"host={self.bms_host}, port={self.bms_port}, unit={self.bms_unit_id}"
+        )
+
     def _start_udp_streamer(self) -> None:
         print("[MAIN] Starting UDP telemetry streamer...")
 
@@ -715,6 +807,7 @@ class EMSGatewayApplication:
 
         chiller_packet: Optional[Dict[str, Any]] = None
         pcs_packet: Optional[Dict[str, Any]] = None
+        bms_packet: Optional[Dict[str, Any]] = None
 
         if self.args.mock and self.mock_service is not None:
             chiller_packet = self.mock_service.get_telemetry_packet()
@@ -746,6 +839,16 @@ class EMSGatewayApplication:
                     "error": str(error),
                 }
 
+        if self.bms_service is not None:
+            try:
+                bms_packet = self.bms_service.get_telemetry_payload()
+            except Exception as error:
+                bms_packet = {
+                    "asset_id": self.bms_asset_id,
+                    "communication_status": "offline",
+                    "error": str(error),
+                }
+
         # If chiller is running, keep chiller packet as base to avoid breaking
         # existing Flutter code that expects top-level chiller telemetry.
         if chiller_packet is not None:
@@ -756,26 +859,36 @@ class EMSGatewayApplication:
             packet["assets"] = {
                 "chiller": chiller_packet,
                 "pcs": pcs_packet,
+                "bms": bms_packet,
             }
             packet["pcs"] = pcs_packet
+            packet["bms"] = bms_packet
             return packet
 
-        # PCS-only packet
+        # PCS/BMS-only packet when chiller is disabled.
+        primary_asset_id = None
+        if pcs_packet:
+            primary_asset_id = self.pcs_asset_id
+        elif bms_packet:
+            primary_asset_id = self.bms_asset_id
+
         return {
             "type": "telemetry",
             "gateway_id": self.gateway_id,
-            "asset_id": self.pcs_asset_id if pcs_packet else None,
+            "asset_id": primary_asset_id,
             "timestamp": timestamp,
-            "status": "ok" if pcs_packet else "error",
+            "status": "ok" if (pcs_packet or bms_packet) else "error",
             "mode": "real",
             "data": {
-                "message": "PCS-only telemetry packet",
+                "message": "Combined PCS/BMS telemetry packet",
             },
             "assets": {
                 "chiller": None,
                 "pcs": pcs_packet,
+                "bms": bms_packet,
             },
             "pcs": pcs_packet,
+            "bms": bms_packet,
         }
 
     # -------------------------------------------------
@@ -821,6 +934,17 @@ class EMSGatewayApplication:
                 data=self.get_udp_telemetry_packet(),
             )
 
+        # BMS command routing
+        bms_tcp_commands = set(get_config_value("BMS_TCP_COMMANDS", set()))
+        if (
+            command in bms_tcp_commands
+            or command.startswith("BMS_")
+            or command in ["READ_BMS", "READ_BMS_ALL", "READ_BMS_ALARMS", "START_BMS_PRECHARGE", "STOP_BMS_PRECHARGE", "START_BMS_INSULATION_TEST", "START_INSULATION_TEST", "RESET_BCU", "RESET_BMS"]
+            or str(command_packet.get("asset_type", "")).lower() == "bms"
+            or str(command_packet.get("asset_id", "")).lower() == self.bms_asset_id.lower()
+        ):
+            return self._execute_bms_command(command_packet)
+
         # PCS command routing
         if (
             command.startswith("PCS_")
@@ -841,6 +965,46 @@ class EMSGatewayApplication:
             command=command,
             status="error",
             message=f"No service available to handle command: {command}",
+        )
+
+    def _execute_bms_command(self, command_packet: Dict[str, Any]) -> Dict[str, Any]:
+        request_id = command_packet.get("request_id")
+        command = str(command_packet.get("command", "")).strip().upper()
+
+        if self.bms_service is None:
+            return self._response(
+                request_id=request_id,
+                command=command,
+                status="error",
+                message="BMS service is not running",
+            )
+
+        try:
+            result = self.bms_service.execute_command(command)
+            return self._bms_command_response(request_id, command, result)
+        except Exception as error:
+            return self._response(
+                request_id=request_id,
+                command=command,
+                status="error",
+                message=str(error),
+            )
+
+    def _bms_command_response(
+        self,
+        request_id: Optional[Any],
+        command: str,
+        result: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        bms_status = str(result.get("status", "")).lower()
+        response_status = "ok" if bms_status in {"success", "ok"} else "error"
+
+        return self._response(
+            request_id=request_id,
+            command=command,
+            status=response_status,
+            message=result.get("message", result.get("description", "BMS command executed")),
+            data=result,
         )
 
     def _execute_pcs_command(self, command_packet: Dict[str, Any]) -> Dict[str, Any]:
@@ -977,6 +1141,15 @@ class EMSGatewayApplication:
                 "unit_id": self.pcs_unit_id,
                 "state": self.pcs_service.get_latest_state() if self.pcs_service else None,
             },
+            "bms": {
+                "enabled": self.bms_enabled,
+                "running": self.bms_service is not None,
+                "asset_id": self.bms_asset_id,
+                "host": self.bms_host,
+                "port": self.bms_port,
+                "unit_id": self.bms_unit_id,
+                "state": self.bms_service.get_latest_state_dict() if self.bms_service else None,
+            },
             "network": {
                 "tcp_host": self.tcp_host,
                 "tcp_port": self.tcp_port,
@@ -1028,6 +1201,12 @@ class EMSGatewayApplication:
             except Exception as error:
                 print(f"[MAIN] Error while stopping UDP streamer: {error}")
 
+        if self.bms_service is not None:
+            try:
+                self.bms_service.stop()
+            except Exception as error:
+                print(f"[MAIN] Error while stopping BMS service: {error}")
+
         if self.pcs_service is not None:
             try:
                 self.pcs_service.stop()
@@ -1067,6 +1246,8 @@ class EMSGatewayApplication:
                 active_assets.append("CHILLER")
             if self.pcs_enabled:
                 active_assets.append("PCS")
+            if self.bms_enabled:
+                active_assets.append("BMS")
             mode_text = "REAL " + "+".join(active_assets) if active_assets else "REAL NONE"
 
         print("\n====================================================")
@@ -1097,6 +1278,16 @@ class EMSGatewayApplication:
         print(f"PCS Timeout             : {self.pcs_timeout} sec")
         print(f"PCS Retries             : {self.pcs_retries}")
         print(f"PCS Poll Interval       : {self.pcs_poll_interval_sec} sec")
+        print("")
+        print("BMS / Modbus TCP Configuration")
+        print("----------------------------------------------------")
+        print(f"BMS Enabled             : {self.bms_enabled and not self.args.mock}")
+        print(f"BMS Asset ID            : {self.bms_asset_id}")
+        print(f"BMS Host                : {self.bms_host}")
+        print(f"BMS Port                : {self.bms_port}")
+        print(f"BMS Unit ID             : {self.bms_unit_id}")
+        print(f"BMS Timeout             : {self.bms_timeout} sec")
+        print(f"BMS Poll Interval       : {self.bms_poll_interval_sec} sec")
         print("")
         print("Ethernet / Network Configuration")
         print("----------------------------------------------------")
@@ -1214,6 +1405,33 @@ def parse_args() -> argparse.Namespace:
     )
 
     parser.add_argument(
+        "--bms-host",
+        default=None,
+        help="Override BMS/ModSim IP address, example: 192.168.10.1",
+    )
+
+    parser.add_argument(
+        "--bms-port",
+        type=int,
+        default=None,
+        help="Override BMS Modbus TCP port, example: 502 or 1502",
+    )
+
+    parser.add_argument(
+        "--bms-unit",
+        type=int,
+        default=None,
+        help="Override BMS Modbus unit ID, example: 1",
+    )
+
+    parser.add_argument(
+        "--bms-poll-interval",
+        type=float,
+        default=None,
+        help="Override BMS polling interval in seconds",
+    )
+
+    parser.add_argument(
         "--no-chiller",
         action="store_true",
         help="Disable real chiller service",
@@ -1223,6 +1441,12 @@ def parse_args() -> argparse.Namespace:
         "--no-pcs",
         action="store_true",
         help="Disable PCS service",
+    )
+
+    parser.add_argument(
+        "--no-bms",
+        action="store_true",
+        help="Disable BMS service",
     )
 
     parser.add_argument(

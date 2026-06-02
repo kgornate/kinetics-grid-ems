@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import '../models/bms_telemetry.dart';
 import '../models/chiller_telemetry.dart';
 import '../models/pcs_telemetry.dart';
 
@@ -14,11 +15,15 @@ class UdpTelemetryService {
   final StreamController<PcsTelemetry> _pcsTelemetryController =
       StreamController<PcsTelemetry>.broadcast();
 
+  final StreamController<BmsTelemetry> _bmsTelemetryController =
+      StreamController<BmsTelemetry>.broadcast();
+
   final StreamController<Map<String, dynamic>> _rawPacketController =
       StreamController<Map<String, dynamic>>.broadcast();
 
   Stream<ChillerTelemetry> get telemetryStream => _telemetryController.stream;
   Stream<PcsTelemetry> get pcsTelemetryStream => _pcsTelemetryController.stream;
+  Stream<BmsTelemetry> get bmsTelemetryStream => _bmsTelemetryController.stream;
   Stream<Map<String, dynamic>> get rawPacketStream => _rawPacketController.stream;
 
   bool get isRunning => _socket != null;
@@ -50,6 +55,11 @@ class UdpTelemetryService {
         final pcsTelemetry = _parsePcsTelemetry(decoded);
         if (pcsTelemetry != null) {
           _pcsTelemetryController.add(pcsTelemetry);
+        }
+
+        final bmsTelemetry = _parseBmsTelemetry(decoded);
+        if (bmsTelemetry != null) {
+          _bmsTelemetryController.add(bmsTelemetry);
         }
       } catch (_) {
         // Ignore malformed UDP packets and keep listener alive.
@@ -94,6 +104,33 @@ class UdpTelemetryService {
     return PcsTelemetry.fromJson(pcs);
   }
 
+
+  BmsTelemetry? _parseBmsTelemetry(Map<String, dynamic> packet) {
+    final payload = _asMap(packet['payload']).isNotEmpty
+        ? _asMap(packet['payload'])
+        : packet;
+
+    Map<String, dynamic> bms = _asMap(payload['bms']);
+
+    if (bms.isEmpty) {
+      final assets = _asMap(payload['assets']);
+      bms = _asMap(assets['bms']);
+    }
+
+    if (bms.isEmpty) {
+      final data = _asMap(payload['data']);
+      final hasBmsKeys = data.containsKey('soc_percent') ||
+          data.containsKey('rack_voltage_v') ||
+          data.containsKey('max_cell_voltage_mv') ||
+          data['asset_id']?.toString() == 'bms_1';
+      if (hasBmsKeys) bms = data;
+    }
+
+    if (bms.isEmpty) return null;
+
+    return BmsTelemetry.fromJson(bms);
+  }
+
   Map<String, dynamic> _asMap(dynamic value) {
     if (value is Map<String, dynamic>) return value;
     if (value is Map) return Map<String, dynamic>.from(value);
@@ -109,6 +146,7 @@ class UdpTelemetryService {
     await stop();
     await _telemetryController.close();
     await _pcsTelemetryController.close();
+    await _bmsTelemetryController.close();
     await _rawPacketController.close();
   }
 }

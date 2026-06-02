@@ -112,18 +112,51 @@ class _LogsScreenState extends State<LogsScreen> {
 
   late Set<String> _selectedTelemetryFields;
 
+  final List<String> _bmsTelemetryFieldOrder = const [
+    'timestamp',
+    'sequence_no',
+    'gateway_id',
+    'asset_id',
+    'comm_status',
+    'soc_percent',
+    'soh_percent',
+    'rack_voltage_v',
+    'rack_current_a',
+    'power_kw',
+    'max_cell_voltage_mv',
+    'min_cell_voltage_mv',
+    'cell_voltage_diff_mv',
+    'max_cell_temp_c',
+    'min_cell_temp_c',
+    'avg_temp_c',
+    'insulation_resistance_kohm',
+    'positive_insulation_resistance_kohm',
+    'negative_insulation_resistance_kohm',
+    'precharge_stage',
+    'bcu_state',
+    'current_state',
+    'alarm_count',
+    'active_alarms',
+    'logger_status',
+  ];
+
   bool get _isPcsAsset => _selectedAssetId == AppConfig.pcsAssetId;
+  bool get _isBmsAsset => _selectedAssetId == AppConfig.bmsAssetId;
 
   List<String> get _activeTelemetryFieldOrder {
-    return _isPcsAsset ? _pcsTelemetryFieldOrder : _chillerTelemetryFieldOrder;
+    if (_isPcsAsset) return _pcsTelemetryFieldOrder;
+    if (_isBmsAsset) return _bmsTelemetryFieldOrder;
+    return _chillerTelemetryFieldOrder;
   }
 
   List<String> get _activeTelemetryPreferredColumns {
-    return _isPcsAsset ? _pcsTelemetryFieldOrder : _chillerTelemetryFieldOrder;
+    if (_isPcsAsset) return _pcsTelemetryFieldOrder;
+    if (_isBmsAsset) return _bmsTelemetryFieldOrder;
+    return _chillerTelemetryFieldOrder;
   }
 
   List<String> get _activeEventPreferredColumns {
-    if (_isPcsAsset) {
+    if (_isPcsAsset || _isBmsAsset) {
       return const [
         'timestamp',
         'gateway_id',
@@ -208,6 +241,29 @@ class _LogsScreenState extends State<LogsScreen> {
         'dc_power_kw',
         'operating_status',
         'fault_status',
+        'logger_status',
+      };
+    }
+
+    if (assetId == AppConfig.bmsAssetId) {
+      return {
+        'timestamp',
+        'comm_status',
+        'soc_percent',
+        'soh_percent',
+        'rack_voltage_v',
+        'rack_current_a',
+        'power_kw',
+        'max_cell_voltage_mv',
+        'min_cell_voltage_mv',
+        'cell_voltage_diff_mv',
+        'max_cell_temp_c',
+        'min_cell_temp_c',
+        'insulation_resistance_kohm',
+        'precharge_stage',
+        'bcu_state',
+        'current_state',
+        'alarm_count',
         'logger_status',
       };
     }
@@ -344,7 +400,7 @@ class _LogsScreenState extends State<LogsScreen> {
           modbusStatus: _isPcsAsset ? null : _filterDropdown(_modbusStatusFilter),
           loggerStatus: _filterDropdown(_loggerStatusFilter),
           vendor: _isPcsAsset ? _filterDropdown(_pcsVendorFilter) : null,
-          commStatus: _isPcsAsset ? _filterDropdown(_pcsCommStatusFilter) : null,
+          commStatus: (_isPcsAsset || _isBmsAsset) ? _filterDropdown(_pcsCommStatusFilter) : null,
           operatingStatus:
               _isPcsAsset ? _filterDropdown(_pcsOperatingStatusFilter) : null,
           faultStatus: _isPcsAsset ? _filterDropdown(_pcsFaultStatusFilter) : null,
@@ -358,7 +414,7 @@ class _LogsScreenState extends State<LogsScreen> {
           endTime: _filterText(_endTimeController.text),
           eventType: _filterDropdown(_eventTypeFilter),
           status: _filterDropdown(_eventStatusFilter),
-          command: _isPcsAsset ? _filterDropdown(_pcsCommandFilter) : null,
+          command: (_isPcsAsset || _isBmsAsset) ? _filterDropdown(_pcsCommandFilter) : null,
           vendor: _isPcsAsset ? _filterDropdown(_pcsVendorFilter) : null,
           search: _filterText(_searchController.text),
         ),
@@ -413,7 +469,7 @@ class _LogsScreenState extends State<LogsScreen> {
         modbusStatus: _isPcsAsset ? null : _filterDropdown(_modbusStatusFilter),
         loggerStatus: _filterDropdown(_loggerStatusFilter),
         vendor: _isPcsAsset ? _filterDropdown(_pcsVendorFilter) : null,
-        commStatus: _isPcsAsset ? _filterDropdown(_pcsCommStatusFilter) : null,
+        commStatus: (_isPcsAsset || _isBmsAsset) ? _filterDropdown(_pcsCommStatusFilter) : null,
         operatingStatus:
             _isPcsAsset ? _filterDropdown(_pcsOperatingStatusFilter) : null,
         faultStatus: _isPcsAsset ? _filterDropdown(_pcsFaultStatusFilter) : null,

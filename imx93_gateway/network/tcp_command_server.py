@@ -15,36 +15,18 @@ Protocol:
 - JSON message format
 - Newline-delimited JSON
 
-Example chiller command from PC:
-
-{
-    "request_id": "REQ_001",
-    "command": "SET_TEMP",
-    "value": 25.0
-}
-
-Example PCS command from PC:
-
-{
-    "request_id": "REQ_101",
-    "command": "PCS_SET_ACTIVE_POWER",
-    "value": 20
-}
-
-Example response from i.MX93:
-
-{
-    "type": "response",
-    "request_id": "REQ_001",
-    "status": "ok",
-    "command": "SET_TEMP",
-    "message": "Command executed",
-    "data": {...}
-}
+Examples:
+    {"request_id":"REQ_001","command":"SET_TEMP","value":25.0}
+    {"request_id":"REQ_101","command":"PCS_SET_ACTIVE_POWER","value":20}
+    {"request_id":"REQ_201","command":"READ_BMS_ALL"}
+    {"request_id":"REQ_202","command":"START_BMS_PRECHARGE"}
+    {"request_id":"REQ_203","command":"BMS_FAN_ON"}
 
 Important:
 TCP is stream-based, not packet-based.
-So every message must end with newline: \\n
+So every message must end with newline: \n
+This class is asset-agnostic. It does not know Chiller/PCS/BMS details;
+main.py performs the actual command routing.
 """
 
 import json
@@ -55,24 +37,6 @@ from typing import Callable, Dict, Any, Optional, Tuple
 
 
 class TCPCommandServer:
-    """
-    TCP command server for EMS Gateway.
-
-    It listens for commands from PC dashboard and passes them to a callback.
-
-    The callback is usually:
-        app.execute_command
-
-    Example:
-        server = TCPCommandServer(
-            host="0.0.0.0",
-            port=6000,
-            command_handler=app.execute_command
-        )
-
-        server.start()
-    """
-
     def __init__(
         self,
         host: str,
@@ -97,10 +61,6 @@ class TCPCommandServer:
         self.last_command_time: Optional[str] = None
         self.last_error: Optional[str] = None
 
-    # -------------------------------------------------
-    # Utility
-    # -------------------------------------------------
-
     @staticmethod
     def _now() -> str:
         return datetime.now().isoformat(timespec="seconds")
@@ -110,198 +70,105 @@ class TCPCommandServer:
         return json.dumps(data, default=str) + "\n"
 
     def _create_socket(self) -> None:
-        """
-        Create TCP server socket.
-        """
-
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
-        # Allows quick restart without waiting for OS socket timeout.
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-
         self.sock.bind((self.host, self.port))
         self.sock.listen(5)
 
     def _close_socket(self) -> None:
-        """
-        Close TCP server socket.
-        """
-
         if self.sock is not None:
             try:
                 self.sock.close()
             except Exception:
                 pass
-
             self.sock = None
 
-    # -------------------------------------------------
-    # Start / Stop APIs
-    # -------------------------------------------------
-
     def start(self) -> None:
-        """
-        Start TCP command server in a background thread.
-        """
-
         if self._running:
             print("[TCP] Command server already running")
             return
-
         self._create_socket()
-
         self._running = True
-
         self._server_thread = threading.Thread(
             target=self._server_loop,
             name="TCPCommandServerThread",
             daemon=True,
         )
-
         self._server_thread.start()
-
-        print(
-            f"[TCP] Command server started | "
-            f"listening={self.host}:{self.port}"
-        )
+        print(f"[TCP] Command server started | listening={self.host}:{self.port}")
 
     def stop(self) -> None:
-        """
-        Stop TCP command server.
-        """
-
         if not self._running:
             return
-
         self._running = False
         self._close_socket()
-
         if self._server_thread is not None:
             self._server_thread.join(timeout=2)
-
         print("[TCP] Command server stopped")
 
     def is_running(self) -> bool:
         return self._running
 
-    # -------------------------------------------------
-    # Server Loop
-    # -------------------------------------------------
-
     def _server_loop(self) -> None:
-        """
-        Main accept loop.
-        """
-
         while self._running:
             try:
                 if self.sock is None:
                     break
-
                 client_socket, client_address = self.sock.accept()
-
                 self.total_connections += 1
                 self.last_client = f"{client_address[0]}:{client_address[1]}"
-
                 print(f"[TCP] Client connected: {self.last_client}")
-
                 client_thread = threading.Thread(
                     target=self._handle_client,
                     args=(client_socket, client_address),
                     daemon=True,
                 )
-
                 client_thread.start()
-
             except OSError:
-                # Socket closed during stop()
                 break
-
             except Exception as e:
                 self.last_error = str(e)
                 print(f"[TCP] Server loop error: {e}")
 
-    # -------------------------------------------------
-    # Client Handling
-    # -------------------------------------------------
-
-    def _handle_client(
-        self,
-        client_socket: socket.socket,
-        client_address: Tuple[str, int],
-    ) -> None:
-        """
-        Handle one TCP client connection.
-
-        Supports multiple newline-delimited commands on the same connection.
-        """
-
+    def _handle_client(self, client_socket: socket.socket, client_address: Tuple[str, int]) -> None:
         client_id = f"{client_address[0]}:{client_address[1]}"
-
         buffer = ""
-
         try:
             with client_socket:
                 client_socket.settimeout(None)
-
                 while self._running:
                     data = client_socket.recv(self.recv_buffer_size)
-
                     if not data:
                         print(f"[TCP] Client disconnected: {client_id}")
                         break
-
                     buffer += data.decode("utf-8", errors="replace")
-
                     while "\n" in buffer:
                         line, buffer = buffer.split("\n", 1)
                         line = line.strip()
-
                         if not line:
                             continue
-
                         response = self._process_raw_message(line, client_id)
-
-                        response_text = self._json_dumps(response)
-                        client_socket.sendall(response_text.encode("utf-8"))
-
+                        client_socket.sendall(self._json_dumps(response).encode("utf-8"))
         except ConnectionResetError:
             print(f"[TCP] Client reset connection: {client_id}")
-
         except Exception as e:
             self.last_error = str(e)
             print(f"[TCP] Client handler error from {client_id}: {e}")
 
-    # -------------------------------------------------
-    # Message Processing
-    # -------------------------------------------------
-
     def _process_raw_message(self, raw_message: str, client_id: str) -> Dict[str, Any]:
-        """
-        Parse raw message, execute command, return response.
-        """
-
         self.total_commands += 1
         self.last_command_time = self._now()
-
         print(f"[TCP] Received from {client_id}: {raw_message}")
-
         try:
             command_packet = self._parse_command(raw_message)
-
             if "client" not in command_packet:
                 command_packet["client"] = client_id
-
             response = self.command_handler(command_packet)
-
             if not isinstance(response, dict):
                 raise ValueError("Command handler must return dictionary response")
-
             return response
-
         except Exception as e:
             self.last_error = str(e)
-
             return {
                 "type": "response",
                 "request_id": None,
@@ -313,62 +180,21 @@ class TCPCommandServer:
             }
 
     def _parse_command(self, raw_message: str) -> Dict[str, Any]:
-        """
-        Parse command message.
-
-        Primary expected format:
-            JSON
-
-        Examples:
-            {"request_id":"REQ_001","command":"SET_TEMP","value":25.0}
-            {"request_id":"REQ_101","command":"PCS_SET_ACTIVE_POWER","value":20}
-
-        Also supports simple text commands for manual testing:
-            READ_ALL
-            READ_MODE
-            READ_TEMP
-            READ_ONOFF
-            READ_SETTINGS
-            CHILLER_ON
-            CHILLER_OFF
-            SET_TEMP 25.0
-            SET_MODE 1
-
-            PCS_READ
-            PCS_POWER_ON
-            PCS_POWER_OFF
-            PCS_SET_ACTIVE_POWER 20
-            PCS_SET_REACTIVE_POWER 0
-            PCS_RESET_FAULT
-            PCS_HEARTBEAT 1
-        """
-
         raw_message = raw_message.strip()
-
-        # First try JSON
         try:
             parsed = json.loads(raw_message)
-
             if not isinstance(parsed, dict):
                 raise ValueError("JSON command must be an object/dictionary")
-
             return parsed
-
         except json.JSONDecodeError:
             pass
 
-        # Fallback: simple text command
         parts = raw_message.split()
-
         if not parts:
             raise ValueError("Empty command")
 
         command = parts[0].strip().upper()
-
-        packet: Dict[str, Any] = {
-            "request_id": None,
-            "command": command,
-        }
+        packet: Dict[str, Any] = {"request_id": None, "command": command}
 
         commands_requiring_value = {
             "SET_TEMP",
@@ -381,9 +207,7 @@ class TCPCommandServer:
         if command in commands_requiring_value:
             if len(parts) < 2:
                 raise ValueError(f"{command} requires value")
-
             value = parts[1]
-
             if command in ["SET_TEMP", "PCS_SET_ACTIVE_POWER", "PCS_SET_REACTIVE_POWER"]:
                 packet["value"] = float(value)
             elif command in ["SET_MODE", "PCS_HEARTBEAT"]:
@@ -393,15 +217,7 @@ class TCPCommandServer:
 
         return packet
 
-    # -------------------------------------------------
-    # Status API
-    # -------------------------------------------------
-
     def get_status(self) -> Dict[str, Any]:
-        """
-        Return TCP server runtime status.
-        """
-
         return {
             "server_name": self.server_name,
             "running": self._running,
@@ -415,29 +231,10 @@ class TCPCommandServer:
         }
 
 
-# -------------------------------------------------
-# Standalone Mock Test
-# -------------------------------------------------
-# This does not require chiller or PCS hardware.
-# It allows testing PC -> i.MX93 TCP command flow.
-#
-# Run on i.MX93:
-#   python3 network/tcp_command_server.py
-#
-# Then from PC:
-#   Send TCP command to i.MX93_IP:6000
-# -------------------------------------------------
-
 def _mock_command_handler(command_packet: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Dummy command handler for testing TCP communication only.
-    This does not use Modbus or hardware.
-    """
-
     command = str(command_packet.get("command", "")).upper()
     value = command_packet.get("value")
     request_id = command_packet.get("request_id")
-
     return {
         "type": "response",
         "request_id": request_id,
@@ -454,31 +251,15 @@ def _mock_command_handler(command_packet: Dict[str, Any]) -> Dict[str, Any]:
 
 
 if __name__ == "__main__":
-    """
-    Standalone mock execution.
-
-    This starts only the TCP server with dummy command handler.
-    Useful for network testing without chiller/PCS hardware.
-    """
-
     HOST = "0.0.0.0"
     PORT = 6000
-
-    server = TCPCommandServer(
-        host=HOST,
-        port=PORT,
-        command_handler=_mock_command_handler,
-    )
-
+    server = TCPCommandServer(host=HOST, port=PORT, command_handler=_mock_command_handler)
     try:
         server.start()
-
         print("[TCP TEST] Press Ctrl+C to stop")
         while True:
             threading.Event().wait(1)
-
     except KeyboardInterrupt:
         print("\n[TCP TEST] Stopping...")
-
     finally:
         server.stop()

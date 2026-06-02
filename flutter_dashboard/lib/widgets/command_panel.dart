@@ -87,6 +87,17 @@ class _CommandPanelState extends State<CommandPanel> {
 
             const SizedBox(height: 18),
             _buildPcsPowerCommands(),
+
+            const SizedBox(height: 22),
+            const Divider(),
+            const SizedBox(height: 14),
+
+            _sectionTitle(context, 'BMS / BCU Commands'),
+            const SizedBox(height: 12),
+            _buildBmsReadCommands(),
+
+            const SizedBox(height: 18),
+            _buildBmsControlCommands(),
           ],
         ),
       ),
@@ -453,6 +464,109 @@ class _CommandPanelState extends State<CommandPanel> {
               command: 'PCS_RESET_FAULT',
             ),
             child: const Text('Reset Fault'),
+          ),
+        ),
+      ],
+    );
+  }
+
+
+  Widget _buildBmsReadCommands() {
+    return Wrap(
+      spacing: 12,
+      runSpacing: 12,
+      children: [
+        FilledButton(
+          onPressed: () => _sendCommand('READ_BMS_ALL'),
+          child: const Text('Read BMS'),
+        ),
+        FilledButton.tonal(
+          onPressed: () => _sendCommand('READ_BMS_ALARMS'),
+          child: const Text('Read BMS Alarms'),
+        ),
+        FilledButton.tonal(
+          onPressed: () => _sendCommand('READ_ALL_ASSETS'),
+          child: const Text('Read All Assets'),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBmsControlCommands() {
+    return Wrap(
+      spacing: 12,
+      runSpacing: 12,
+      children: [
+        SizedBox(
+          width: 150,
+          height: 44,
+          child: FilledButton(
+            onPressed: () => _confirmAndSend(
+              title: 'Confirm BMS Precharge Start',
+              message: 'Are you sure you want to send START_BMS_PRECHARGE command?',
+              command: 'START_BMS_PRECHARGE',
+            ),
+            child: const Text('Start Precharge'),
+          ),
+        ),
+        SizedBox(
+          width: 150,
+          height: 44,
+          child: FilledButton.tonal(
+            onPressed: () => _confirmAndSend(
+              title: 'Confirm BMS Precharge Stop',
+              message: 'Are you sure you want to send STOP_BMS_PRECHARGE command?',
+              command: 'STOP_BMS_PRECHARGE',
+            ),
+            child: const Text('Stop Precharge'),
+          ),
+        ),
+        SizedBox(
+          width: 170,
+          height: 44,
+          child: FilledButton.tonal(
+            onPressed: () => _confirmAndSend(
+              title: 'Confirm Insulation Test',
+              message: 'Are you sure you want to send START_BMS_INSULATION_TEST command?',
+              command: 'START_BMS_INSULATION_TEST',
+            ),
+            child: const Text('Insulation Test'),
+          ),
+        ),
+        SizedBox(
+          width: 110,
+          height: 44,
+          child: FilledButton.tonal(
+            onPressed: () => _sendCommand('BMS_FAN_AUTO'),
+            child: const Text('Fan Auto'),
+          ),
+        ),
+        SizedBox(
+          width: 100,
+          height: 44,
+          child: FilledButton.tonal(
+            onPressed: () => _sendCommand('BMS_FAN_ON'),
+            child: const Text('Fan ON'),
+          ),
+        ),
+        SizedBox(
+          width: 100,
+          height: 44,
+          child: FilledButton.tonal(
+            onPressed: () => _sendCommand('BMS_FAN_OFF'),
+            child: const Text('Fan OFF'),
+          ),
+        ),
+        SizedBox(
+          width: 120,
+          height: 44,
+          child: FilledButton.tonal(
+            onPressed: () => _confirmAndSend(
+              title: 'Confirm BCU Reset',
+              message: 'Are you sure you want to send RESET_BCU command?',
+              command: 'RESET_BCU',
+            ),
+            child: const Text('Reset BCU'),
           ),
         ),
       ],

@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 
 import '../config/app_config.dart';
+import '../models/bms_telemetry.dart';
 import '../models/chiller_telemetry.dart';
 import '../models/gateway_response.dart';
 import '../models/pcs_telemetry.dart';
@@ -12,6 +13,7 @@ import '../services/udp_telemetry_service.dart';
 import '../widgets/command_panel.dart';
 import '../widgets/status_indicator.dart';
 import '../widgets/telemetry_card.dart';
+import 'bms_screen.dart';
 import 'logs_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -29,10 +31,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   StreamSubscription<ChillerTelemetry>? _telemetrySubscription;
   StreamSubscription<PcsTelemetry>? _pcsTelemetrySubscription;
+  StreamSubscription<BmsTelemetry>? _bmsTelemetrySubscription;
   StreamSubscription<Map<String, dynamic>>? _rawPacketSubscription;
 
   ChillerTelemetry? _latestTelemetry;
   PcsTelemetry? _latestPcsTelemetry;
+  BmsTelemetry? _latestBmsTelemetry;
   Map<String, dynamic>? _latestRawPacket;
   GatewayResponse? _lastResponse;
 
@@ -62,6 +66,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _latestPcsTelemetry = pcsTelemetry;
         _statusMessage =
             'PCS telemetry received at ${_formatTime(pcsTelemetry.receivedAt)}';
+      });
+    });
+
+    _bmsTelemetrySubscription =
+        _udpService.bmsTelemetryStream.listen((bmsTelemetry) {
+      setState(() {
+        _latestBmsTelemetry = bmsTelemetry;
+        _statusMessage =
+            'BMS telemetry received at ${_formatTime(bmsTelemetry.receivedAt)}';
       });
     });
 
@@ -143,11 +156,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
       }
 
       if (response.isOk &&
+          (upperCommand == 'READ_BMS' ||
+              upperCommand == 'READ_BMS_ALL' ||
+              upperCommand == 'BMS_READ_ALL' ||
+              upperCommand == 'READ_BMS_ALARMS' ||
+              upperCommand == 'BMS_READ_ALARMS')) {
+        if (response.data.isNotEmpty) {
+          _latestBmsTelemetry = BmsTelemetry.fromJson(response.data);
+        }
+      }
+
+      if (response.isOk &&
           (upperCommand == 'READ_ALL_ASSETS' ||
               upperCommand == 'READ_GATEWAY_TELEMETRY')) {
         final pcs = _extractPcsFromTelemetryPacket(response.data);
         if (pcs.isNotEmpty) {
           _latestPcsTelemetry = PcsTelemetry.fromJson(pcs);
+        }
+        final bms = _extractBmsFromTelemetryPacket(response.data);
+        if (bms.isNotEmpty) {
+          _latestBmsTelemetry = BmsTelemetry.fromJson(bms);
         }
       }
     });
@@ -163,11 +191,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  void _openBmsScreen(BmsTelemetry? bms) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => BmsScreen(
+          gatewayIp: _gatewayIpController.text.trim(),
+          initialTelemetry: bms,
+        ),
+      ),
+    );
+  }
+
   @override
   void dispose() {
     _gatewayIpController.dispose();
     _telemetrySubscription?.cancel();
     _pcsTelemetrySubscription?.cancel();
+    _bmsTelemetrySubscription?.cancel();
     _rawPacketSubscription?.cancel();
     _udpService.dispose();
     super.dispose();
@@ -226,14 +266,40 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return {};
   }
 
+
+  Map<String, dynamic> _extractBmsFromTelemetryPacket(Map<String, dynamic> packet) {
+    final payload = _asMap(packet['payload']).isNotEmpty
+        ? _asMap(packet['payload'])
+        : packet;
+
+    final directBms = _asMap(payload['bms']);
+    if (directBms.isNotEmpty) return directBms;
+
+    final assets = _asMap(payload['assets']);
+    final assetsBms = _asMap(assets['bms']);
+    if (assetsBms.isNotEmpty) return assetsBms;
+
+    final data = _asMap(packet['data']);
+    final dataBms = _asMap(data['bms']);
+    if (dataBms.isNotEmpty) return dataBms;
+
+    final hasBmsKeys = data.containsKey('soc_percent') ||
+        data.containsKey('rack_voltage_v') ||
+        data['asset_id']?.toString() == AppConfig.bmsAssetId;
+    if (hasBmsKeys) return data;
+
+    return {};
+  }
+
   @override
   Widget build(BuildContext context) {
     final chiller = _latestTelemetry;
     final pcs = _latestPcsTelemetry;
+    final bms = _latestBmsTelemetry;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('EMS Dashboard - Chiller + PCS'),
+        title: const Text('EMS Dashboard - Chiller + PCS + BMS'),
         actions: [
           TextButton.icon(
             onPressed: _openLogsScreen,
@@ -265,8 +331,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 children: [
                   _buildTopConfigCard(),
                   const SizedBox(height: 16),
-                  _buildStatusRow(chiller, pcs),
+                  _buildStatusRow(chiller, pcs, bms),
                   const SizedBox(height: 16),
+                  _sectionHeader('BMS / Battery Telemetry'),
+                  const SizedBox(height: 10),
+                  _buildBmsTelemetryGrid(bms),
+                  const SizedBox(height: 12),
+                  FilledButton.icon(
+                    onPressed: () => _openBmsScreen(bms),
+                    icon: const Icon(Icons.battery_charging_full),
+                    label: const Text('Open BMS Detail Screen'),
+                  ),
+                  const SizedBox(height: 20),
                   _sectionHeader('PCS / Inverter Telemetry'),
                   const SizedBox(height: 10),
                   _buildPcsTelemetryGrid(pcs),
@@ -351,7 +427,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildStatusRow(ChillerTelemetry? chiller, PcsTelemetry? pcs) {
+  Widget _buildStatusRow(ChillerTelemetry? chiller, PcsTelemetry? pcs, BmsTelemetry? bms) {
     return Wrap(
       spacing: 12,
       runSpacing: 12,
@@ -360,6 +436,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
           label: 'Gateway UDP',
           status: _udpRunning ? 'LISTENING' : 'STOPPED',
           active: _udpRunning,
+        ),
+        StatusIndicator(
+          label: 'BMS Comm',
+          status: bms?.effectiveCommStatus,
+          active: bms?.isOnline ?? false,
+        ),
+        StatusIndicator(
+          label: 'BMS State',
+          status: bms?.bcuState,
+          active: bms != null &&
+              (bms.bcuState == null ||
+                  bms.bcuState!.toLowerCase().contains('normal')),
+        ),
+        StatusIndicator(
+          label: 'BMS Alarms',
+          status: bms == null ? '--' : '${bms.alarmCount}',
+          active: bms != null && !bms.hasAlarms,
         ),
         StatusIndicator(
           label: 'PCS Comm',
@@ -387,6 +480,105 @@ class _DashboardScreenState extends State<DashboardScreen> {
           active: chiller?.waterPump == 'RUNNING',
         ),
       ],
+    );
+  }
+
+
+  Widget _buildBmsTelemetryGrid(BmsTelemetry? b) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        int crossAxisCount = 3;
+
+        if (constraints.maxWidth < 900) {
+          crossAxisCount = 2;
+        }
+
+        if (constraints.maxWidth < 560) {
+          crossAxisCount = 1;
+        }
+
+        return GridView.count(
+          crossAxisCount: crossAxisCount,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          childAspectRatio: 2.35,
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 12,
+          children: [
+            TelemetryCard(
+              title: 'SOC',
+              value: _doubleValue(b?.socPercent),
+              unit: '%',
+              icon: Icons.battery_full,
+            ),
+            TelemetryCard(
+              title: 'SOH',
+              value: _doubleValue(b?.sohPercent),
+              unit: '%',
+              icon: Icons.health_and_safety,
+            ),
+            TelemetryCard(
+              title: 'Rack Voltage',
+              value: _doubleValue(b?.rackVoltageV),
+              unit: 'V',
+              icon: Icons.bolt,
+            ),
+            TelemetryCard(
+              title: 'Rack Current',
+              value: _doubleValue(b?.rackCurrentA),
+              unit: 'A',
+              icon: Icons.electric_meter,
+            ),
+            TelemetryCard(
+              title: 'Power',
+              value: _doubleValue(b?.powerKw, digits: 2),
+              unit: 'kW',
+              icon: Icons.power,
+            ),
+            TelemetryCard(
+              title: 'Max Cell Voltage',
+              value: _doubleValue(b?.maxCellVoltageMv, digits: 0),
+              unit: 'mV',
+              icon: Icons.arrow_upward,
+            ),
+            TelemetryCard(
+              title: 'Min Cell Voltage',
+              value: _doubleValue(b?.minCellVoltageMv, digits: 0),
+              unit: 'mV',
+              icon: Icons.arrow_downward,
+            ),
+            TelemetryCard(
+              title: 'Voltage Diff',
+              value: _doubleValue(b?.cellVoltageDiffMv, digits: 0),
+              unit: 'mV',
+              icon: Icons.compare_arrows,
+            ),
+            TelemetryCard(
+              title: 'Max Temp',
+              value: _doubleValue(b?.maxCellTempC),
+              unit: '°C',
+              icon: Icons.device_thermostat,
+            ),
+            TelemetryCard(
+              title: 'Min Temp',
+              value: _doubleValue(b?.minCellTempC),
+              unit: '°C',
+              icon: Icons.thermostat,
+            ),
+            TelemetryCard(
+              title: 'Insulation',
+              value: _doubleValue(b?.insulationResistanceKohm, digits: 0),
+              unit: 'kΩ',
+              icon: Icons.security,
+            ),
+            TelemetryCard(
+              title: 'Alarm Count',
+              value: _value(b?.alarmCount),
+              icon: Icons.warning_amber,
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -673,6 +865,31 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ];
     }
 
+    if (command == 'READ_BMS' ||
+        command == 'READ_BMS_ALL' ||
+        command == 'BMS_READ_ALL' ||
+        command == 'READ_BMS_ALARMS' ||
+        command == 'BMS_READ_ALARMS') {
+      return _buildBmsStateRows(data);
+    }
+
+    if (command.startsWith('BMS_') ||
+        command == 'START_BMS_PRECHARGE' ||
+        command == 'STOP_BMS_PRECHARGE' ||
+        command == 'START_BMS_INSULATION_TEST' ||
+        command == 'START_INSULATION_TEST' ||
+        command == 'RESET_BCU' ||
+        command == 'RESET_BMS') {
+      return [
+        _resultSectionTitle('BMS Command Result'),
+        _resultRow('Command', _value(data['command'] ?? response.command)),
+        _resultRow('Status', _value(data['status'] ?? response.status)),
+        _resultRow('Description', _value(data['description'] ?? response.message)),
+        if (data.containsKey('readback_value'))
+          _resultRow('Readback', _value(data['readback_value'])),
+      ];
+    }
+
     if (command == 'PCS_READ' || command == 'READ_PCS' || command == 'PCS_STATUS') {
       return _buildPcsStateRows(data);
     }
@@ -692,6 +909,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
 
     if (command == 'READ_ALL_ASSETS' || command == 'READ_GATEWAY_TELEMETRY') {
+      final bms = _extractBmsFromTelemetryPacket(data);
+      if (bms.isNotEmpty) {
+        return _buildBmsStateRows(bms);
+      }
+
       final pcs = _extractPcsFromTelemetryPacket(data);
       if (pcs.isNotEmpty) {
         return _buildPcsStateRows(pcs);
@@ -818,6 +1040,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ...data.entries.map(
         (entry) => _resultRow(entry.key, _value(entry.value)),
       ),
+    ];
+  }
+
+
+  List<Widget> _buildBmsStateRows(Map<String, dynamic> data) {
+    final bms = BmsTelemetry.fromJson(data);
+
+    return [
+      _resultSectionTitle('BMS State'),
+      _resultRow('Asset ID', _value(bms.assetId)),
+      _resultRow('Comm Status', bms.effectiveCommStatus),
+      _resultRow('SOC', '${_doubleValue(bms.socPercent)} %'),
+      _resultRow('SOH', '${_doubleValue(bms.sohPercent)} %'),
+      _resultRow('Rack Voltage', '${_doubleValue(bms.rackVoltageV)} V'),
+      _resultRow('Rack Current', '${_doubleValue(bms.rackCurrentA)} A'),
+      _resultRow('Power', '${_doubleValue(bms.powerKw, digits: 2)} kW'),
+      _resultRow('BCU State', _value(bms.bcuState)),
+      _resultRow('Current State', _value(bms.currentState)),
+      _resultRow('Precharge Stage', _value(bms.prechargeStage)),
+      _resultRow('Alarm Count', _value(bms.alarmCount)),
+      if (bms.activeAlarms.isNotEmpty)
+        _resultRow('Active Alarms', bms.activeAlarms.join(', ')),
     ];
   }
 
