@@ -1,0 +1,20 @@
+[Unit]
+Description=Configure EMS Gateway Ethernet Networks eth0 PC side and eth1 PCS side
+After=network.target
+Wants=network.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root/kinetics-grid-ems/ems_gateway_test_imx93
+
+# eth0 = PC / Flutter dashboard side
+ExecStart=/root/kinetics-grid-ems/ems_gateway_test_imx93/imx93_eth_setup.sh
+
+# eth1 = Real PCS Modbus TCP side
+ExecStart=/root/kinetics-grid-ems/ems_gateway_test_imx93/imx93_eth1_pcs_setup.sh
+
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+EOF
