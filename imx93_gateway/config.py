@@ -168,3 +168,28 @@ LOG_HTTP_PORT = 7000
 
 # Maximum rows returned by one log API call.
 LOG_API_MAX_ROWS = 500
+
+
+# -------------------------------------------------
+# Web Dashboard API Server Configuration
+# -------------------------------------------------
+# This server is for the Web dashboard / backend team.
+# It runs in parallel with the existing Flutter UDP/TCP flow.
+# Bind to 0.0.0.0 so it is reachable through both Ethernet and Wi-Fi,
+# once the Linux OS has configured eth0/mlan0 IP addresses.
+
+ENABLE_WEB_API_SERVER = True
+WEB_API_HOST = "0.0.0.0"
+WEB_API_PORT = 8000
+
+# For first local lab testing, keep auth disabled.
+# Later, enable this and pass X-API-Key on command APIs.
+WEB_API_ENABLE_AUTH = False
+WEB_API_KEY = "change-this-key"
+
+# Live telemetry stream interval for SSE endpoint:
+# GET /api/stream/telemetry
+WEB_API_TELEMETRY_STREAM_INTERVAL_SEC = 1.0
+
+# Keep permissive for local development. Restrict later to actual web frontend origin.
+WEB_API_CORS_ALLOW_ORIGIN = "*"

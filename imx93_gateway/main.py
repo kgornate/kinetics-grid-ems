@@ -79,6 +79,7 @@ except ImportError:
 from network.udp_telemetry_streamer import UDPTelemetryStreamer
 from network.tcp_command_server import TCPCommandServer
 from network.log_http_server import LogHTTPServer
+from network.ems_web_api_server import EMSWebAPIServer
 from services.log_query_service import LogQueryService
 
 
@@ -412,6 +413,7 @@ class EMSGatewayApplication:
     - UDP telemetry streamer
     - TCP command server
     - HTTP log API server
+    - Web dashboard REST/SSE API server
     """
 
     def __init__(self, args: argparse.Namespace):
@@ -429,6 +431,7 @@ class EMSGatewayApplication:
         self.tcp_server: Optional[TCPCommandServer] = None
         self.log_query_service: Optional[LogQueryService] = None
         self.log_http_server: Optional[LogHTTPServer] = None
+        self.web_api_server: Optional[EMSWebAPIServer] = None
 
         self.running = False
 
@@ -530,6 +533,28 @@ class EMSGatewayApplication:
             500,
         )
 
+        # Web Dashboard API configuration
+        self.enable_web_api_server = bool(
+            get_config_value("ENABLE_WEB_API_SERVER", True)
+        )
+        self.web_api_host = get_config_value("WEB_API_HOST", "0.0.0.0")
+        self.web_api_port = args.web_api_port or get_config_value(
+            "WEB_API_PORT",
+            8000,
+        )
+        self.web_api_enable_auth = bool(
+            get_config_value("WEB_API_ENABLE_AUTH", False)
+        )
+        self.web_api_key = get_config_value("WEB_API_KEY", "change-this-key")
+        self.web_api_stream_interval_sec = get_config_value(
+            "WEB_API_TELEMETRY_STREAM_INTERVAL_SEC",
+            1.0,
+        )
+        self.web_api_cors_allow_origin = get_config_value(
+            "WEB_API_CORS_ALLOW_ORIGIN",
+            "*",
+        )
+
     # -------------------------------------------------
     # Utility
     # -------------------------------------------------
@@ -592,6 +617,9 @@ class EMSGatewayApplication:
 
         if self.enable_log_http_server and not self.args.no_log_http:
             self._start_log_http_server()
+
+        if self.enable_web_api_server and not self.args.no_web_api:
+            self._start_web_api_server()
 
         self.running = True
 
@@ -770,14 +798,20 @@ class EMSGatewayApplication:
 
         self.tcp_server.start()
 
-    def _start_log_http_server(self) -> None:
-        print("[MAIN] Starting HTTP log API server...")
+    def _ensure_log_query_service(self) -> None:
+        if self.log_query_service is not None:
+            return
 
         self.log_query_service = LogQueryService(
             base_path=self.log_base_path,
             asset_id=self.asset_id,
             max_rows=self.log_api_max_rows,
         )
+
+    def _start_log_http_server(self) -> None:
+        print("[MAIN] Starting HTTP log API server...")
+
+        self._ensure_log_query_service()
 
         self.log_http_server = LogHTTPServer(
             host=self.log_http_host,
@@ -786,6 +820,28 @@ class EMSGatewayApplication:
         )
 
         self.log_http_server.start()
+
+    def _start_web_api_server(self) -> None:
+        print("[MAIN] Starting EMS Web API server...")
+
+        # The web API can use the log query service for optional timeseries APIs,
+        # even if the legacy log HTTP server is disabled.
+        self._ensure_log_query_service()
+
+        self.web_api_server = EMSWebAPIServer(
+            host=self.web_api_host,
+            port=self.web_api_port,
+            get_status_callback=self.get_status_packet,
+            get_telemetry_callback=self.get_udp_telemetry_packet,
+            execute_command_callback=self.execute_command,
+            log_query_service=self.log_query_service,
+            stream_interval_sec=self.web_api_stream_interval_sec,
+            cors_allow_origin=self.web_api_cors_allow_origin,
+            enable_auth=self.web_api_enable_auth,
+            api_key=self.web_api_key,
+        )
+
+        self.web_api_server.start()
 
     # -------------------------------------------------
     # Telemetry Aggregation
@@ -1030,7 +1086,10 @@ class EMSGatewayApplication:
                     data=self.pcs_service.get_latest_state(),
                 )
 
-            source = f"flutter_tcp_command:{command_packet.get('client', 'unknown')}"
+            source = str(
+                command_packet.get("source")
+                or f"flutter_tcp_command:{command_packet.get('client', 'unknown')}"
+            )
 
             if command == "PCS_POWER_ON":
                 result = self.pcs_service.power_on(source=source)
@@ -1164,6 +1223,14 @@ class EMSGatewayApplication:
                 "port": self.log_http_port,
                 "base_path": self.log_base_path,
             },
+            "web_api": {
+                "enabled": self.enable_web_api_server and not self.args.no_web_api,
+                "host": self.web_api_host,
+                "port": self.web_api_port,
+                "auth_enabled": self.web_api_enable_auth,
+                "stream_interval_sec": self.web_api_stream_interval_sec,
+                "running": self.web_api_server.is_running() if self.web_api_server else False,
+            },
         }
 
     # -------------------------------------------------
@@ -1182,6 +1249,12 @@ class EMSGatewayApplication:
         print("\n[MAIN] Stopping EMS Gateway...")
 
         self.running = False
+
+        if self.web_api_server is not None:
+            try:
+                self.web_api_server.stop()
+            except Exception as error:
+                print(f"[MAIN] Error while stopping EMS Web API server: {error}")
 
         if self.log_http_server is not None:
             try:
@@ -1306,6 +1379,14 @@ class EMSGatewayApplication:
         print(f"HTTP Log Port           : {self.log_http_port}")
         print(f"HTTP Log Base Path      : {self.log_base_path}")
         print(f"HTTP Log Max Rows       : {self.log_api_max_rows}")
+        print("")
+        print("EMS Web API Configuration")
+        print("----------------------------------------------------")
+        print(f"Web API Enabled         : {self.enable_web_api_server and not self.args.no_web_api}")
+        print(f"Web API Host            : {self.web_api_host}")
+        print(f"Web API Port            : {self.web_api_port}")
+        print(f"Web API Auth Enabled    : {self.web_api_enable_auth}")
+        print(f"Web API SSE Interval    : {self.web_api_stream_interval_sec} sec")
         print("====================================================\n")
 
 
@@ -1472,6 +1553,19 @@ def parse_args() -> argparse.Namespace:
         type=int,
         default=None,
         help="Override HTTP log API server port",
+    )
+
+    parser.add_argument(
+        "--no-web-api",
+        action="store_true",
+        help="Disable EMS Web API server",
+    )
+
+    parser.add_argument(
+        "--web-api-port",
+        type=int,
+        default=None,
+        help="Override EMS Web API server port",
     )
 
     return parser.parse_args()

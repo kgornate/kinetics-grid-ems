@@ -1,0 +1,14 @@
+[Unit]
+Description=Configure EMS Gateway Wi-Fi Network
+After=ems-network-setup.service network.target
+Wants=ems-network-setup.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root/kinetics-grid-ems/ems_gateway_test_imx93
+ExecStart=/root/kinetics-grid-ems/ems_gateway_test_imx93/imx93_wifi_setup.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+EOF
