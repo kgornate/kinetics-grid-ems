@@ -1,0 +1,16 @@
+[Unit]
+Description=Configure EMS Gateway Full Network eth0 eth1 and Wi-Fi
+After=connman.service network.target
+Wants=network.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root/kinetics-grid-ems/ems_gateway_test_imx93
+ExecStartPre=/bin/sleep 20
+ExecStart=/root/kinetics-grid-ems/ems_gateway_test_imx93/ems_network_all_setup.sh
+RemainAfterExit=yes
+StandardOutput=journal+console
+StandardError=journal+console
+
+[Install]
+WantedBy=multi-user.target

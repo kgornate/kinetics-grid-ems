@@ -65,6 +65,3 @@ echo ""
 echo "======================================"
 echo "eth1 PCS Ethernet setup completed"
 echo "======================================"
-EOF
-
-chmod +x imx93_eth1_pcs_setup.sh

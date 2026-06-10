@@ -37,6 +37,3 @@ echo "Full log:"
 echo "cat /var/log/ems_network_setup.log"
 echo "======================================"
 echo ""
-EOF
-
-chmod +x /etc/profile.d/ems_network_status.sh
