@@ -1,0 +1,1205 @@
+"""EMS gateway application orchestration.
+
+This module owns service startup, network server startup, telemetry collection,
+command execution, runtime status reporting, and controlled shutdown.
+The public network contracts remain compatible with the Flutter dashboard, web
+dashboard, TCP command clients, and log API clients.
+"""
+
+import argparse
+from datetime import datetime
+from pathlib import Path
+import sys
+from typing import Any, Dict, Optional
+
+CURRENT_FILE = Path(__file__).resolve()
+IMX93_GATEWAY_DIR = CURRENT_FILE.parents[2]
+if str(IMX93_GATEWAY_DIR) not in sys.path:
+    sys.path.insert(0, str(IMX93_GATEWAY_DIR))
+
+try:
+    import config as cfg
+except ImportError:
+    cfg = None
+
+from network.udp_telemetry_streamer import UDPTelemetryStreamer
+from network.tcp_command_server import TCPCommandServer
+from network.log_http_server import LogHTTPServer
+from network.ems_web_api_server import EMSWebAPIServer
+from services.log_query_service import LogQueryService
+from services.mock_gateway_service import MockGatewayService
+
+from core.asset_registry import AssetDescriptor, AssetRegistry
+from core.assets import (
+    AssetConfigRegistry,
+    AssetFactoryPlan,
+    BaseAssetAdapter,
+    BmsAssetAdapter,
+    ChillerAssetAdapter,
+    PcsAssetAdapter,
+)
+from core.protocols import ProtocolFactory
+from core.command_dispatcher import CommandDispatcher
+from core.telemetry_composer import compose_legacy_udp_packet
+from core.telemetry_pipeline import TelemetryPipeline, TelemetryPipelineConfig
+from core.runtime_config import load_runtime_config
+
+_runtime_config: Optional[Any] = None
+
+
+def get_config_value(name: str, default: Any) -> Any:
+    """Read merged runtime configuration with config.py compatibility."""
+
+    if _runtime_config is not None:
+        return _runtime_config.get(name, default)
+
+    if cfg is None:
+        return default
+
+    return getattr(cfg, name, default)
+
+
+class EMSGatewayApplication:
+    """
+    Main EMS Gateway Application.
+
+    This class owns:
+    - Chiller Modbus RTU driver/service
+    - PCS Modbus TCP service
+    - BMS/BCU Modbus TCP service
+    - UDP telemetry streamer
+    - TCP command server
+    - HTTP log API server
+    - Web dashboard REST/SSE API server
+    """
+
+    def __init__(self, args: argparse.Namespace):
+        self.args = args
+
+        # Runtime configuration. This is additive: config.py remains
+        # the default source, optional JSON/env overrides can be layered on top,
+        # and the existing CLI arguments below still have highest priority.
+        global _runtime_config
+        self.runtime_config = load_runtime_config(args, cfg)
+        _runtime_config = self.runtime_config
+
+        # Asset-list/profile configuration. This is additive and
+        # backward-compatible: ASSETS entries are converted into the same flat
+        # PCS/BMS/chiller config keys used by the current working services.
+        self.asset_config_registry = AssetConfigRegistry.from_runtime_config(self.runtime_config)
+        self.asset_factory_plan = AssetFactoryPlan(self.asset_config_registry.assets)
+
+        self.chiller_driver: Optional[Any] = None
+        self.chiller_service: Optional[Any] = None
+        self.mock_service: Optional[MockGatewayService] = None
+
+        self.pcs_service: Optional[Any] = None
+        self.bms_service: Optional[Any] = None
+        self.bms_storage_logger: Optional[Any] = None
+
+        self.udp_streamer: Optional[UDPTelemetryStreamer] = None
+        self.tcp_server: Optional[TCPCommandServer] = None
+        self.log_query_service: Optional[LogQueryService] = None
+        self.log_http_server: Optional[LogHTTPServer] = None
+        self.web_api_server: Optional[EMSWebAPIServer] = None
+
+        self.running = False
+
+        self.gateway_id = get_config_value("GATEWAY_ID", "imx93_gateway_1")
+        self.asset_id = get_config_value("ASSET_ID", "chiller_1")
+
+        # Compatibility asset registry. Existing service variables remain the
+        # source of truth for runtime behavior; the registry gives us a modular
+        # place to describe active assets for future expansion.
+        self.asset_registry = AssetRegistry(gateway_id=self.gateway_id)
+        # Asset adapters. The adapters wrap the existing services and
+        # expose a common interface for telemetry/status/commands. Existing
+        # service variables stay in place for compatibility and safe rollback.
+        self.asset_adapters: Dict[str, BaseAssetAdapter] = {}
+        # Unified command dispatcher. It is initialized after runtime
+        # configuration is loaded so it can use the final PCS/BMS asset IDs.
+        self.command_dispatcher: Optional[CommandDispatcher] = None
+        # Telemetry pipeline. It centralizes asset telemetry collection
+        # while preserving the same UDP/Web packet returned to existing clients.
+        self.telemetry_pipeline: Optional[TelemetryPipeline] = None
+
+        # Chiller configuration
+        self.chiller_enabled = bool(get_config_value("CHILLER_ENABLED", True)) and not args.no_chiller
+        self.chiller_protocol = get_config_value("CHILLER_PROTOCOL", "modbus_rtu")
+        self.chiller_profile = get_config_value("CHILLER_PROFILE", "current_chiller_modbus_rtu")
+
+        self.modbus_port = args.serial_port or get_config_value(
+            "MODBUS_PORT",
+            "/dev/ttyUSB0",
+        )
+        self.modbus_baudrate = get_config_value("MODBUS_BAUDRATE", 9600)
+        self.modbus_bytesize = get_config_value("MODBUS_BYTESIZE", 8)
+        self.modbus_parity = get_config_value("MODBUS_PARITY", "N")
+        self.modbus_stopbits = get_config_value("MODBUS_STOPBITS", 1)
+        self.modbus_timeout = get_config_value("MODBUS_TIMEOUT_SEC", 2.0)
+        self.chiller_slave_id = args.slave_id or get_config_value(
+            "CHILLER_SLAVE_ID",
+            1,
+        )
+
+        # PCS configuration
+        self.pcs_enabled = bool(get_config_value("PCS_ENABLED", False)) and not args.no_pcs
+        self.pcs_vendor = args.pcs_vendor or get_config_value("PCS_VENDOR", "njoy")
+        self.pcs_protocol = get_config_value("PCS_PROTOCOL", "modbus_tcp")
+        self.pcs_profile = get_config_value("PCS_PROFILE", self.pcs_vendor)
+        self.pcs_asset_id = get_config_value("PCS_ASSET_ID", "pcs_1")
+        self.pcs_host = args.pcs_host or get_config_value("PCS_HOST", "192.168.10.1")
+        self.pcs_port = args.pcs_port or get_config_value("PCS_PORT", 502)
+        self.pcs_unit_id = args.pcs_unit or get_config_value("PCS_UNIT_ID", 1)
+        self.pcs_timeout = get_config_value("PCS_TIMEOUT_SEC", 3.0)
+        self.pcs_retries = get_config_value("PCS_RETRIES", 2)
+        self.pcs_poll_interval_sec = args.pcs_poll_interval or get_config_value(
+            "PCS_POLL_INTERVAL_SEC",
+            5.0,
+        )
+
+        # BMS configuration
+        self.bms_enabled = bool(get_config_value("BMS_ENABLED", False)) and not args.no_bms
+        self.bms_protocol = get_config_value("BMS_PROTOCOL", "modbus_tcp")
+        self.bms_vendor = get_config_value("BMS_VENDOR", "simulator")
+        self.bms_profile = get_config_value("BMS_PROFILE", "simulator_modbus_tcp")
+        self.bms_asset_id = get_config_value("BMS_ASSET_ID", "bms_1")
+        self.bms_host = args.bms_host or get_config_value("BMS_MODBUS_HOST", "192.168.10.1")
+        self.bms_port = args.bms_port or get_config_value("BMS_MODBUS_PORT", 502)
+        self.bms_unit_id = args.bms_unit or get_config_value("BMS_UNIT_ID", 1)
+        self.bms_timeout = get_config_value("BMS_MODBUS_TIMEOUT_SEC", 2.0)
+        self.bms_address_offset = get_config_value("BMS_ADDRESS_OFFSET", 0)
+        self.bms_poll_interval_sec = args.bms_poll_interval or get_config_value(
+            "BMS_POLL_INTERVAL_SEC",
+            1.0,
+        )
+        self.bms_command_verify_delay_sec = get_config_value(
+            "BMS_COMMAND_VERIFY_DELAY_SEC",
+            0.3,
+        )
+        self.bms_communication_lost_after_sec = get_config_value(
+            "BMS_COMMUNICATION_LOST_AFTER_SEC",
+            5.0,
+        )
+
+        # Network configuration
+        self.tcp_host = get_config_value("TCP_COMMAND_HOST", "0.0.0.0")
+        self.tcp_port = args.tcp_port or get_config_value(
+            "TCP_COMMAND_PORT",
+            6000,
+        )
+
+        self.pc_telemetry_ip = args.pc_ip or get_config_value(
+            "PC_TELEMETRY_IP",
+            "192.168.10.1",
+        )
+        self.udp_telemetry_port = args.udp_port or get_config_value(
+            "UDP_TELEMETRY_PORT",
+            5005,
+        )
+
+        self.poll_interval_sec = args.poll_interval or get_config_value(
+            "CHILLER_POLL_INTERVAL_SEC",
+            1.0,
+        )
+        self.udp_interval_sec = args.udp_interval or get_config_value(
+            "UDP_TELEMETRY_INTERVAL_SEC",
+            1.0,
+        )
+
+        # Log HTTP configuration
+        self.enable_log_http_server = bool(
+            get_config_value("ENABLE_LOG_HTTP_SERVER", True)
+        )
+        self.log_http_host = get_config_value("LOG_HTTP_HOST", "0.0.0.0")
+        self.log_http_port = args.log_http_port or get_config_value(
+            "LOG_HTTP_PORT",
+            7000,
+        )
+        self.log_base_path = get_config_value(
+            "LOG_BASE_PATH",
+            "/home/root/ems_logs_test",
+        )
+        self.log_api_max_rows = get_config_value(
+            "LOG_API_MAX_ROWS",
+            500,
+        )
+
+        # Web Dashboard API configuration
+        self.enable_web_api_server = bool(
+            get_config_value("ENABLE_WEB_API_SERVER", True)
+        )
+        self.web_api_host = get_config_value("WEB_API_HOST", "0.0.0.0")
+        self.web_api_port = args.web_api_port or get_config_value(
+            "WEB_API_PORT",
+            8000,
+        )
+        self.web_api_enable_auth = bool(
+            get_config_value("WEB_API_ENABLE_AUTH", False)
+        )
+        self.web_api_key = get_config_value("WEB_API_KEY", "change-this-key")
+        self.web_api_stream_interval_sec = get_config_value(
+            "WEB_API_TELEMETRY_STREAM_INTERVAL_SEC",
+            1.0,
+        )
+        self.web_api_cors_allow_origin = get_config_value(
+            "WEB_API_CORS_ALLOW_ORIGIN",
+            "*",
+        )
+
+        self.telemetry_pipeline = TelemetryPipeline(
+            config=TelemetryPipelineConfig(
+                gateway_id=self.gateway_id,
+                chiller_asset_id=self.asset_id,
+                pcs_asset_id=self.pcs_asset_id,
+                bms_asset_id=self.bms_asset_id,
+                pcs_vendor=self.pcs_vendor,
+            ),
+            get_asset_adapter=self._get_asset_adapter,
+            get_mode=lambda: "mock" if self.args.mock else "real",
+            fallbacks={
+                # These fallback callbacks are used only for rollback safety if
+                # an adapter is unavailable. Normal Telemetry-pipeline flow reads through
+                # Asset adapters.
+                "chiller": self._get_chiller_telemetry_fallback,
+                "pcs": self._get_pcs_telemetry_fallback,
+                "bms": self._get_bms_telemetry_fallback,
+            },
+        )
+
+        self.command_dispatcher = CommandDispatcher(
+            gateway_id=self.gateway_id,
+            get_asset_adapter=self._get_asset_adapter,
+            get_status_packet=self.get_status_packet,
+            get_telemetry_packet=self.get_udp_telemetry_packet,
+            bms_asset_id=self.bms_asset_id,
+            pcs_asset_id=self.pcs_asset_id,
+            configured_bms_commands_provider=lambda: get_config_value("BMS_TCP_COMMANDS", set()),
+            legacy_asset_handlers={
+                # These fallbacks are kept only for rollback safety if an adapter
+                # is not registered. Normal flow executes through adapters.
+                "bms": self._execute_bms_command,
+                "pcs": self._execute_pcs_command,
+                "chiller": self._execute_chiller_command,
+            },
+            default_asset_key="chiller",
+        )
+
+    # -------------------------------------------------
+    # Utility
+    # -------------------------------------------------
+
+    @staticmethod
+    def _now() -> str:
+        return datetime.now().astimezone().isoformat(timespec="seconds")
+
+    def _validate_legacy_protocol_support(self, *, asset_type: str, protocol: str, enabled: bool) -> None:
+        """Fail early if an enabled asset requests a protocol not wired yet."""
+        if not enabled:
+            return
+        if ProtocolFactory.is_supported_by_legacy_service(asset_type, protocol):
+            return
+        status = ProtocolFactory.compatibility_status(asset_type=asset_type, protocol=protocol)
+        supported = ", ".join(status.get("legacy_supported_protocols") or []) or "none"
+        raise RuntimeError(
+            f"Asset type {asset_type!r} is configured for protocol {protocol!r}, "
+            f"but the current compatibility path only has active legacy "
+            f"service support for: {supported}. The config/profile model accepts "
+            f"this protocol descriptor, but the active driver/service integration "
+            f"must be added before enabling it."
+        )
+
+    def _response(
+        self,
+        request_id: Optional[Any],
+        command: str,
+        status: str,
+        message: str,
+        data: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        return {
+            "type": "response",
+            "request_id": request_id,
+            "timestamp": self._now(),
+            "status": status,
+            "command": command,
+            "message": message,
+            "data": data or {},
+        }
+
+    def _register_asset_service(
+        self,
+        *,
+        asset_key: str,
+        asset_id: str,
+        asset_type: str,
+        service: Any,
+        enabled: bool = True,
+        transport: str = "unknown",
+        vendor: Optional[str] = None,
+        host: Optional[str] = None,
+        port: Optional[int] = None,
+        unit_id: Optional[int] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> AssetDescriptor:
+        """Register a started asset and return its descriptor."""
+
+        descriptor = AssetDescriptor(
+            asset_key=asset_key,
+            asset_id=asset_id,
+            asset_type=asset_type,
+            enabled=enabled,
+            service=service,
+            transport=transport,
+            vendor=vendor,
+            host=host,
+            port=port,
+            unit_id=unit_id,
+            metadata=metadata or {},
+        )
+        self.asset_registry.register(descriptor)
+        return self.asset_registry.get(asset_key) or descriptor
+
+    def _register_asset_adapter(self, adapter: BaseAssetAdapter) -> None:
+        """Register a asset adapter without changing external contracts."""
+        key = self.asset_registry.normalize_key(adapter.asset_key)
+        self.asset_adapters[key] = adapter
+
+    def _get_asset_adapter(self, asset_key: str) -> Optional[BaseAssetAdapter]:
+        key = self.asset_registry.normalize_key(asset_key)
+        return self.asset_adapters.get(key)
+
+    def _asset_adapter_status(self) -> Dict[str, Any]:
+        status: Dict[str, Any] = {}
+        for key, adapter in self.asset_adapters.items():
+            try:
+                status[key] = adapter.get_status()
+            except Exception as error:
+                status[key] = {
+                    "asset_key": key,
+                    "adapter_class": adapter.__class__.__name__,
+                    "status_error": str(error),
+                }
+        return status
+
+    # -------------------------------------------------
+    # Startup
+    # -------------------------------------------------
+
+    def start(self) -> None:
+        self.print_startup_banner()
+
+        if self.args.mock:
+            self._start_mock_service()
+        else:
+            if self.chiller_enabled:
+                self._validate_legacy_protocol_support(
+                    asset_type="chiller",
+                    protocol=self.chiller_protocol,
+                    enabled=self.chiller_enabled,
+                )
+                self._start_real_chiller_service()
+            else:
+                print("[MAIN] Chiller service disabled")
+
+            if self.pcs_enabled:
+                self._validate_legacy_protocol_support(
+                    asset_type="pcs",
+                    protocol=self.pcs_protocol,
+                    enabled=self.pcs_enabled,
+                )
+                self._start_pcs_service()
+            else:
+                print("[MAIN] PCS service disabled")
+
+            if self.bms_enabled:
+                self._validate_legacy_protocol_support(
+                    asset_type="bms",
+                    protocol=self.bms_protocol,
+                    enabled=self.bms_enabled,
+                )
+                self._start_bms_service()
+            else:
+                print("[MAIN] BMS service disabled")
+
+            if not self.chiller_enabled and not self.pcs_enabled and not self.bms_enabled:
+                raise RuntimeError("Chiller, PCS, and BMS services are disabled. Nothing to run.")
+
+        if not self.args.no_udp:
+            self._start_udp_streamer()
+
+        if not self.args.no_tcp:
+            self._start_tcp_server()
+
+        if self.enable_log_http_server and not self.args.no_log_http:
+            self._start_log_http_server()
+
+        if self.enable_web_api_server and not self.args.no_web_api:
+            self._start_web_api_server()
+
+        self.running = True
+
+        print("\n[MAIN] EMS Gateway started successfully")
+        print("[MAIN] Press Ctrl+C to stop\n")
+
+    def _start_mock_service(self) -> None:
+        print("[MAIN] Starting MOCK gateway service. No Modbus hardware will be used.")
+
+        self.mock_service = MockGatewayService(
+            gateway_id=self.gateway_id,
+            asset_id=self.asset_id,
+        )
+
+        self.mock_service.start_polling()
+
+        descriptor = self._register_asset_service(
+            asset_key="chiller",
+            asset_id=self.asset_id,
+            asset_type="chiller",
+            service=self.mock_service,
+            enabled=True,
+            transport="mock",
+            metadata={"mode": "mock"},
+        )
+        self._register_asset_adapter(
+            ChillerAssetAdapter(descriptor=descriptor, service=self.mock_service, mode="mock")
+        )
+
+    def _start_real_chiller_service(self) -> None:
+        print("[MAIN] Starting real chiller Modbus RTU service...")
+
+        try:
+            from drivers.chiller_modbus_driver import ChillerModbusDriver
+            from services.chiller_gateway_service import ChillerGatewayService
+        except ImportError as error:
+            raise RuntimeError(
+                "Failed to import real Chiller Modbus gateway modules. "
+                "Make sure pymodbus and pyserial are installed. "
+                "Install using: pip3 install pymodbus pyserial"
+            ) from error
+
+        self.chiller_driver = ChillerModbusDriver(
+            port=self.modbus_port,
+            slave_id=self.chiller_slave_id,
+            baudrate=self.modbus_baudrate,
+            bytesize=self.modbus_bytesize,
+            parity=self.modbus_parity,
+            stopbits=self.modbus_stopbits,
+            timeout=self.modbus_timeout,
+        )
+
+        connected = self.chiller_driver.connect()
+
+        if not connected:
+            raise RuntimeError(
+                f"Failed to connect to chiller on {self.modbus_port}. "
+                f"Check USB-RS485 adapter, wiring, serial port, and slave ID."
+            )
+
+        self.chiller_service = ChillerGatewayService(
+            driver=self.chiller_driver,
+            gateway_id=self.gateway_id,
+            asset_id=self.asset_id,
+            poll_interval_sec=self.poll_interval_sec,
+        )
+
+        self.chiller_service.start_polling()
+
+        descriptor = self._register_asset_service(
+            asset_key="chiller",
+            asset_id=self.asset_id,
+            asset_type="chiller",
+            service=self.chiller_service,
+            enabled=self.chiller_enabled,
+            transport=self.chiller_protocol,
+            vendor=get_config_value("CHILLER_VENDOR", "current"),
+            port=None,
+            unit_id=self.chiller_slave_id,
+            metadata={
+                "serial_port": self.modbus_port,
+                "profile": self.chiller_profile,
+                "baudrate": self.modbus_baudrate,
+                "serial_format": f"{self.modbus_bytesize}{self.modbus_parity}{self.modbus_stopbits}",
+            },
+        )
+        self._register_asset_adapter(
+            ChillerAssetAdapter(descriptor=descriptor, service=self.chiller_service, mode="real")
+        )
+
+    def _start_pcs_service(self) -> None:
+        print("[MAIN] Starting PCS/Inverter Modbus TCP service...")
+
+        try:
+            from services.pcs_gateway_service import PcsGatewayService
+        except ImportError as error:
+            raise RuntimeError(
+                "Failed to import PCS gateway service. "
+                "Make sure drivers/pcs_modbus_tcp_driver.py, "
+                "drivers/pcs_profiles/njoy_125kw_profile.py, "
+                "models/pcs_state.py, and services/pcs_gateway_service.py exist."
+            ) from error
+
+        self.pcs_service = PcsGatewayService(
+            asset_id=self.pcs_asset_id,
+            vendor=self.pcs_vendor,
+            host=self.pcs_host,
+            port=self.pcs_port,
+            unit_id=self.pcs_unit_id,
+            poll_interval_sec=self.pcs_poll_interval_sec,
+            timeout=self.pcs_timeout,
+            retries=self.pcs_retries,
+            gateway_id=self.gateway_id,
+            enable_storage_logging=get_config_value("ENABLE_STORAGE_LOGGING", True),
+            log_base_path=self.log_base_path,
+            log_telemetry_interval_sec=get_config_value(
+                "PCS_LOG_TELEMETRY_INTERVAL_SEC",
+                get_config_value("LOG_TELEMETRY_INTERVAL_SEC", 5.0),
+            ),
+        )
+
+        # Start background polling. If ModSim/PCS is temporarily unavailable,
+        # the PCS service will mark itself offline and keep retrying on future polls.
+        self.pcs_service.start()
+
+        descriptor = self._register_asset_service(
+            asset_key="pcs",
+            asset_id=self.pcs_asset_id,
+            asset_type="pcs",
+            service=self.pcs_service,
+            enabled=self.pcs_enabled,
+            transport=self.pcs_protocol,
+            vendor=self.pcs_vendor,
+            host=self.pcs_host,
+            port=self.pcs_port,
+            unit_id=self.pcs_unit_id,
+            metadata={"profile": self.pcs_profile},
+        )
+        self._register_asset_adapter(
+            PcsAssetAdapter(descriptor=descriptor, service=self.pcs_service, vendor=self.pcs_vendor)
+        )
+
+        print(
+            f"[MAIN] PCS service started | "
+            f"vendor={self.pcs_vendor}, host={self.pcs_host}, "
+            f"port={self.pcs_port}, unit={self.pcs_unit_id}"
+        )
+
+    def _start_bms_service(self) -> None:
+        print("[MAIN] Starting BMS/BCU Modbus TCP service...")
+
+        try:
+            from services.bms_gateway_service import BmsGatewayService, BmsServiceConfig
+            from services.storage_logger import StorageLogger
+        except ImportError as error:
+            raise RuntimeError(
+                "Failed to import BMS gateway modules. "
+                "Make sure drivers/bms_register_map.py, drivers/bms_modbus_tcp_driver.py, "
+                "models/bms_state.py, and services/bms_gateway_service.py exist."
+            ) from error
+
+        enable_storage_logging = bool(get_config_value("ENABLE_STORAGE_LOGGING", True)) and bool(
+            get_config_value("BMS_ENABLE_STORAGE_LOGGING", True)
+        )
+
+        self.bms_storage_logger = None
+        if enable_storage_logging:
+            self.bms_storage_logger = StorageLogger(
+                base_path=self.log_base_path,
+                gateway_id=self.gateway_id,
+                asset_id=self.bms_asset_id,
+                asset_type="bms",
+            )
+            self.bms_storage_logger.initialize()
+
+        self.bms_service = BmsGatewayService(
+            config=BmsServiceConfig(
+                gateway_id=self.gateway_id,
+                asset_id=self.bms_asset_id,
+                host=self.bms_host,
+                port=self.bms_port,
+                unit_id=self.bms_unit_id,
+                timeout=self.bms_timeout,
+                address_offset=self.bms_address_offset,
+                poll_interval_sec=self.bms_poll_interval_sec,
+                command_verify_delay_sec=self.bms_command_verify_delay_sec,
+                communication_lost_after_sec=self.bms_communication_lost_after_sec,
+                enable_storage_logging=enable_storage_logging,
+                telemetry_log_interval_sec=get_config_value(
+                    "BMS_TELEMETRY_LOG_INTERVAL_SEC",
+                    get_config_value("BMS_LOG_TELEMETRY_INTERVAL_SEC", get_config_value("LOG_TELEMETRY_INTERVAL_SEC", 5.0)),
+                ),
+                print_status=True,
+            ),
+            storage_logger=self.bms_storage_logger,
+        )
+
+        # Start background polling. If ModSim/BCU is temporarily unavailable,
+        # the BMS service will mark itself offline and keep retrying.
+        self.bms_service.start()
+
+        descriptor = self._register_asset_service(
+            asset_key="bms",
+            asset_id=self.bms_asset_id,
+            asset_type="bms",
+            service=self.bms_service,
+            enabled=self.bms_enabled,
+            transport=self.bms_protocol,
+            vendor=self.bms_vendor,
+            host=self.bms_host,
+            port=self.bms_port,
+            unit_id=self.bms_unit_id,
+            metadata={"address_offset": self.bms_address_offset, "profile": self.bms_profile},
+        )
+        self._register_asset_adapter(
+            BmsAssetAdapter(descriptor=descriptor, service=self.bms_service)
+        )
+
+        print(
+            f"[MAIN] BMS service started | "
+            f"host={self.bms_host}, port={self.bms_port}, unit={self.bms_unit_id}"
+        )
+
+    def _start_udp_streamer(self) -> None:
+        print("[MAIN] Starting UDP telemetry streamer...")
+
+        self.udp_streamer = UDPTelemetryStreamer(
+            pc_ip=self.pc_telemetry_ip,
+            pc_port=self.udp_telemetry_port,
+            get_telemetry_callback=self.get_udp_telemetry_packet,
+            interval_sec=self.udp_interval_sec,
+        )
+
+        self.udp_streamer.start()
+
+    def _start_tcp_server(self) -> None:
+        print("[MAIN] Starting TCP command server...")
+
+        self.tcp_server = TCPCommandServer(
+            host=self.tcp_host,
+            port=self.tcp_port,
+            command_handler=self.execute_command,
+        )
+
+        self.tcp_server.start()
+
+    def _ensure_log_query_service(self) -> None:
+        if self.log_query_service is not None:
+            return
+
+        self.log_query_service = LogQueryService(
+            base_path=self.log_base_path,
+            asset_id=self.asset_id,
+            max_rows=self.log_api_max_rows,
+        )
+
+    def _start_log_http_server(self) -> None:
+        print("[MAIN] Starting HTTP log API server...")
+
+        self._ensure_log_query_service()
+
+        self.log_http_server = LogHTTPServer(
+            host=self.log_http_host,
+            port=self.log_http_port,
+            log_query_service=self.log_query_service,
+        )
+
+        self.log_http_server.start()
+
+    def _start_web_api_server(self) -> None:
+        print("[MAIN] Starting EMS Web API server...")
+
+        # The web API can use the log query service for optional timeseries APIs,
+        # even if the legacy log HTTP server is disabled.
+        self._ensure_log_query_service()
+
+        self.web_api_server = EMSWebAPIServer(
+            host=self.web_api_host,
+            port=self.web_api_port,
+            get_status_callback=self.get_status_packet,
+            get_telemetry_callback=self.get_udp_telemetry_packet,
+            execute_command_callback=self.execute_command,
+            log_query_service=self.log_query_service,
+            stream_interval_sec=self.web_api_stream_interval_sec,
+            cors_allow_origin=self.web_api_cors_allow_origin,
+            enable_auth=self.web_api_enable_auth,
+            api_key=self.web_api_key,
+        )
+
+        self.web_api_server.start()
+
+    # -------------------------------------------------
+    # Telemetry Aggregation
+    # -------------------------------------------------
+
+    def get_udp_telemetry_packet(self) -> Dict[str, Any]:
+        """
+        Return one combined EMS telemetry packet.
+
+        Telemetry collection and packet composition are delegated to
+        core.telemetry_pipeline.TelemetryPipeline. The returned packet remains
+        backward-compatible with the existing Flutter UDP parser and the web
+        dashboard API callback.
+        """
+
+        if self.telemetry_pipeline is None:
+            # Defensive fallback for partially constructed test instances.
+            return compose_legacy_udp_packet(
+                gateway_id=self.gateway_id,
+                mode="mock" if self.args.mock else "real",
+                chiller_asset_id=self.asset_id,
+                pcs_asset_id=self.pcs_asset_id,
+                bms_asset_id=self.bms_asset_id,
+                chiller_packet=self._get_chiller_telemetry_fallback(),
+                pcs_packet=self._get_pcs_telemetry_fallback(),
+                bms_packet=self._get_bms_telemetry_fallback(),
+                timestamp=self._now(),
+            )
+
+        return self.telemetry_pipeline.get_legacy_udp_packet()
+
+    def _get_chiller_telemetry_fallback(self) -> Optional[Dict[str, Any]]:
+        """Legacy chiller telemetry fallback used only if adapter is unavailable."""
+        if self.args.mock and self.mock_service is not None:
+            return self.mock_service.get_telemetry_packet()
+        if self.chiller_service is not None:
+            return self.chiller_service.get_telemetry_packet()
+        return None
+
+    def _get_pcs_telemetry_fallback(self) -> Optional[Dict[str, Any]]:
+        """Legacy PCS telemetry fallback used only if adapter is unavailable."""
+        if self.pcs_service is not None:
+            return self.pcs_service.get_latest_state()
+        return None
+
+    def _get_bms_telemetry_fallback(self) -> Optional[Dict[str, Any]]:
+        """Legacy BMS telemetry fallback used only if adapter is unavailable."""
+        if self.bms_service is not None:
+            return self.bms_service.get_telemetry_payload()
+        return None
+
+    # -------------------------------------------------
+    # Command Routing
+    # -------------------------------------------------
+
+    def execute_command(self, command_packet: Dict[str, Any]) -> Dict[str, Any]:
+        """Dispatch one TCP/Web command through the command dispatcher."""
+
+        if self.command_dispatcher is None:
+            return self._response(
+                request_id=command_packet.get("request_id") if isinstance(command_packet, dict) else None,
+                command=str(command_packet.get("command", "")).strip().upper() if isinstance(command_packet, dict) else "",
+                status="error",
+                message="Command dispatcher is not initialized",
+            )
+
+        return self.command_dispatcher.dispatch(command_packet)
+
+    def _execute_chiller_command(self, command_packet: Dict[str, Any]) -> Dict[str, Any]:
+        """Legacy chiller fallback used only if the adapter is unavailable."""
+        request_id = command_packet.get("request_id")
+        command = str(command_packet.get("command", "")).strip().upper()
+
+        if self.args.mock and self.mock_service is not None:
+            return self.mock_service.execute_command(command_packet)
+
+        if self.chiller_service is not None:
+            return self.chiller_service.execute_command(command_packet)
+
+        return self._response(
+            request_id=request_id,
+            command=command,
+            status="error",
+            message=f"No service available to handle command: {command}",
+        )
+
+    def _execute_bms_command(self, command_packet: Dict[str, Any]) -> Dict[str, Any]:
+        request_id = command_packet.get("request_id")
+        command = str(command_packet.get("command", "")).strip().upper()
+
+        if self.bms_service is None:
+            return self._response(
+                request_id=request_id,
+                command=command,
+                status="error",
+                message="BMS service is not running",
+            )
+
+        try:
+            result = self.bms_service.execute_command(command)
+            return self._bms_command_response(request_id, command, result)
+        except Exception as error:
+            return self._response(
+                request_id=request_id,
+                command=command,
+                status="error",
+                message=str(error),
+            )
+
+    def _bms_command_response(
+        self,
+        request_id: Optional[Any],
+        command: str,
+        result: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        bms_status = str(result.get("status", "")).lower()
+        response_status = "ok" if bms_status in {"success", "ok"} else "error"
+
+        return self._response(
+            request_id=request_id,
+            command=command,
+            status=response_status,
+            message=result.get("message", result.get("description", "BMS command executed")),
+            data=result,
+        )
+
+    def _execute_pcs_command(self, command_packet: Dict[str, Any]) -> Dict[str, Any]:
+        request_id = command_packet.get("request_id")
+        command = str(command_packet.get("command", "")).strip().upper()
+        value = command_packet.get("value")
+
+        if self.pcs_service is None:
+            return self._response(
+                request_id=request_id,
+                command=command,
+                status="error",
+                message="PCS service is not running",
+            )
+
+        try:
+            if command in ["PCS_READ", "READ_PCS", "PCS_STATUS"]:
+                return self._response(
+                    request_id=request_id,
+                    command=command,
+                    status="ok",
+                    message="PCS state read successfully",
+                    data=self.pcs_service.get_latest_state(),
+                )
+
+            source = str(
+                command_packet.get("source")
+                or f"flutter_tcp_command:{command_packet.get('client', 'unknown')}"
+            )
+
+            if command == "PCS_POWER_ON":
+                result = self.pcs_service.power_on(source=source)
+                return self._pcs_command_response(request_id, command, result)
+
+            if command == "PCS_POWER_OFF":
+                result = self.pcs_service.power_off(source=source)
+                return self._pcs_command_response(request_id, command, result)
+
+            if command in ["PCS_STANDBY", "PCS_DEVICE_STANDBY"]:
+                result = self.pcs_service.standby(source=source)
+                return self._pcs_command_response(request_id, command, result)
+
+            if command == "PCS_SET_ACTIVE_POWER":
+                if value is None:
+                    value = command_packet.get("kw", command_packet.get("active_power_kw"))
+
+                if value is None:
+                    return self._response(
+                        request_id=request_id,
+                        command=command,
+                        status="error",
+                        message="PCS_SET_ACTIVE_POWER requires value / kw / active_power_kw",
+                    )
+
+                result = self.pcs_service.set_active_power_kw(float(value), source=source)
+                return self._pcs_command_response(request_id, command, result)
+
+            if command == "PCS_SET_REACTIVE_POWER":
+                if value is None:
+                    value = command_packet.get("kvar", command_packet.get("reactive_power_kvar"))
+
+                if value is None:
+                    return self._response(
+                        request_id=request_id,
+                        command=command,
+                        status="error",
+                        message="PCS_SET_REACTIVE_POWER requires value / kvar / reactive_power_kvar",
+                    )
+
+                result = self.pcs_service.set_reactive_power_kvar(float(value), source=source)
+                return self._pcs_command_response(request_id, command, result)
+
+            if command == "PCS_RESET_FAULT":
+                result = self.pcs_service.reset_fault(source=source)
+                return self._pcs_command_response(request_id, command, result)
+
+            if command == "PCS_HEARTBEAT":
+                result = self.pcs_service.heartbeat(value=value, source=source)
+                return self._pcs_command_response(request_id, command, result)
+
+            return self._response(
+                request_id=request_id,
+                command=command,
+                status="error",
+                message=f"Unsupported PCS command: {command}",
+            )
+
+        except Exception as error:
+            return self._response(
+                request_id=request_id,
+                command=command,
+                status="error",
+                message=str(error),
+            )
+
+    def _pcs_command_response(
+        self,
+        request_id: Optional[Any],
+        command: str,
+        result: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        pcs_status = str(result.get("status", "")).lower()
+
+        ok_statuses = {"success", "ok"}
+
+        response_status = "ok" if pcs_status in ok_statuses else "error"
+
+        return self._response(
+            request_id=request_id,
+            command=command,
+            status=response_status,
+            message=result.get("description", "PCS command executed"),
+            data=result,
+        )
+
+    # -------------------------------------------------
+    # Status Packet
+    # -------------------------------------------------
+
+    def get_status_packet(self) -> Dict[str, Any]:
+        return {
+            "gateway_id": self.gateway_id,
+            "timestamp": self._now(),
+            "mode": "mock" if self.args.mock else "real",
+            "chiller": {
+                "enabled": self.chiller_enabled,
+                "running": self.chiller_service is not None or self.mock_service is not None,
+                "asset_id": self.asset_id,
+                "protocol": self.chiller_protocol,
+                "profile": self.chiller_profile,
+            },
+            "pcs": {
+                "enabled": self.pcs_enabled,
+                "running": self.pcs_service is not None,
+                "asset_id": self.pcs_asset_id,
+                "vendor": self.pcs_vendor,
+                "protocol": self.pcs_protocol,
+                "profile": self.pcs_profile,
+                "host": self.pcs_host,
+                "port": self.pcs_port,
+                "unit_id": self.pcs_unit_id,
+                "state": self.pcs_service.get_latest_state() if self.pcs_service else None,
+            },
+            "bms": {
+                "enabled": self.bms_enabled,
+                "running": self.bms_service is not None,
+                "asset_id": self.bms_asset_id,
+                "vendor": self.bms_vendor,
+                "protocol": self.bms_protocol,
+                "profile": self.bms_profile,
+                "host": self.bms_host,
+                "port": self.bms_port,
+                "unit_id": self.bms_unit_id,
+                "state": self.bms_service.get_latest_state_dict() if self.bms_service else None,
+            },
+            "network": {
+                "tcp_host": self.tcp_host,
+                "tcp_port": self.tcp_port,
+                "udp_pc_ip": self.pc_telemetry_ip,
+                "udp_port": self.udp_telemetry_port,
+            },
+            "udp_streamer": self.udp_streamer.get_status() if self.udp_streamer else None,
+            "tcp_server": self.tcp_server.get_status() if self.tcp_server else None,
+            "log_http": {
+                "enabled": self.enable_log_http_server and not self.args.no_log_http,
+                "host": self.log_http_host,
+                "port": self.log_http_port,
+                "base_path": self.log_base_path,
+            },
+            "web_api": {
+                "enabled": self.enable_web_api_server and not self.args.no_web_api,
+                "host": self.web_api_host,
+                "port": self.web_api_port,
+                "auth_enabled": self.web_api_enable_auth,
+                "stream_interval_sec": self.web_api_stream_interval_sec,
+                "running": self.web_api_server.is_running() if self.web_api_server else False,
+            },
+            # Additive modularity data. Existing status keys above are
+            # retained exactly for compatibility with current clients.
+            "asset_registry": self.asset_registry.summary(),
+            "asset_adapters": self._asset_adapter_status(),
+            "command_dispatcher": self.command_dispatcher.get_status() if self.command_dispatcher else None,
+            "telemetry_pipeline": self.telemetry_pipeline.get_status() if self.telemetry_pipeline else None,
+            "runtime_config": self.runtime_config.get_status(),
+            "configured_assets": self.asset_config_registry.to_status(),
+            "asset_factory_plan": self.asset_factory_plan.to_status(),
+        }
+
+    # -------------------------------------------------
+    # Runtime Loop
+    # -------------------------------------------------
+
+    def run_forever(self) -> None:
+        while self.running:
+            time.sleep(1)
+
+    # -------------------------------------------------
+    # Shutdown
+    # -------------------------------------------------
+
+    def stop(self) -> None:
+        print("\n[MAIN] Stopping EMS Gateway...")
+
+        self.running = False
+
+        if self.web_api_server is not None:
+            try:
+                self.web_api_server.stop()
+            except Exception as error:
+                print(f"[MAIN] Error while stopping EMS Web API server: {error}")
+
+        if self.log_http_server is not None:
+            try:
+                self.log_http_server.stop()
+            except Exception as error:
+                print(f"[MAIN] Error while stopping HTTP log server: {error}")
+
+        if self.tcp_server is not None:
+            try:
+                self.tcp_server.stop()
+            except Exception as error:
+                print(f"[MAIN] Error while stopping TCP server: {error}")
+
+        if self.udp_streamer is not None:
+            try:
+                self.udp_streamer.stop()
+            except Exception as error:
+                print(f"[MAIN] Error while stopping UDP streamer: {error}")
+
+        if self.bms_service is not None:
+            try:
+                self.bms_service.stop()
+            except Exception as error:
+                print(f"[MAIN] Error while stopping BMS service: {error}")
+
+        if self.pcs_service is not None:
+            try:
+                self.pcs_service.stop()
+            except Exception as error:
+                print(f"[MAIN] Error while stopping PCS service: {error}")
+
+        if self.mock_service is not None:
+            try:
+                self.mock_service.stop_polling()
+            except Exception as error:
+                print(f"[MAIN] Error while stopping mock service: {error}")
+
+        if self.chiller_service is not None:
+            try:
+                self.chiller_service.stop_polling()
+            except Exception as error:
+                print(f"[MAIN] Error while stopping chiller service: {error}")
+
+        if self.chiller_driver is not None:
+            try:
+                self.chiller_driver.close()
+            except Exception as error:
+                print(f"[MAIN] Error while closing chiller Modbus driver: {error}")
+
+        print("[MAIN] EMS Gateway stopped")
+
+    # -------------------------------------------------
+    # Banner
+    # -------------------------------------------------
+
+    def print_startup_banner(self) -> None:
+        if self.args.mock:
+            mode_text = "MOCK"
+        else:
+            active_assets = []
+            if self.chiller_enabled:
+                active_assets.append("CHILLER")
+            if self.pcs_enabled:
+                active_assets.append("PCS")
+            if self.bms_enabled:
+                active_assets.append("BMS")
+            mode_text = "REAL " + "+".join(active_assets) if active_assets else "REAL NONE"
+
+        print("\n====================================================")
+        print("          i.MX93 EMS Gateway Backend")
+        print("====================================================")
+        print(f"Gateway ID              : {self.gateway_id}")
+        print(f"Mode                    : {mode_text}")
+        print(f"Config File             : {self.runtime_config.config_file or 'config.py/defaults'}")
+        print(f"Config Sources          : {', '.join(self.runtime_config.get_status()['active_sources'])}")
+        print(f"Configured Assets       : {self.asset_config_registry.to_status()['asset_count']}")
+        print("")
+        print("Chiller / Modbus RTU Configuration")
+        print("----------------------------------------------------")
+        print(f"Chiller Enabled         : {self.chiller_enabled and not self.args.mock}")
+        print(f"Chiller Asset ID        : {self.asset_id}")
+        print(f"Chiller Protocol        : {self.chiller_protocol}")
+        print(f"Chiller Profile         : {self.chiller_profile}")
+        print(f"Serial Port             : {self.modbus_port}")
+        print(f"Slave ID                : {self.chiller_slave_id}")
+        print(f"Baudrate                : {self.modbus_baudrate}")
+        print(f"Serial Format           : {self.modbus_bytesize}{self.modbus_parity}{self.modbus_stopbits}")
+        print(f"Timeout                 : {self.modbus_timeout} sec")
+        print(f"Polling Interval        : {self.poll_interval_sec} sec")
+        print("")
+        print("PCS / Modbus TCP Configuration")
+        print("----------------------------------------------------")
+        print(f"PCS Enabled             : {self.pcs_enabled and not self.args.mock}")
+        print(f"PCS Asset ID            : {self.pcs_asset_id}")
+        print(f"PCS Vendor              : {self.pcs_vendor}")
+        print(f"PCS Protocol            : {self.pcs_protocol}")
+        print(f"PCS Profile             : {self.pcs_profile}")
+        print(f"PCS Host                : {self.pcs_host}")
+        print(f"PCS Port                : {self.pcs_port}")
+        print(f"PCS Unit ID             : {self.pcs_unit_id}")
+        print(f"PCS Timeout             : {self.pcs_timeout} sec")
+        print(f"PCS Retries             : {self.pcs_retries}")
+        print(f"PCS Poll Interval       : {self.pcs_poll_interval_sec} sec")
+        print("")
+        print("BMS / Modbus TCP Configuration")
+        print("----------------------------------------------------")
+        print(f"BMS Enabled             : {self.bms_enabled and not self.args.mock}")
+        print(f"BMS Asset ID            : {self.bms_asset_id}")
+        print(f"BMS Vendor              : {self.bms_vendor}")
+        print(f"BMS Protocol            : {self.bms_protocol}")
+        print(f"BMS Profile             : {self.bms_profile}")
+        print(f"BMS Host                : {self.bms_host}")
+        print(f"BMS Port                : {self.bms_port}")
+        print(f"BMS Unit ID             : {self.bms_unit_id}")
+        print(f"BMS Timeout             : {self.bms_timeout} sec")
+        print(f"BMS Poll Interval       : {self.bms_poll_interval_sec} sec")
+        print("")
+        print("Ethernet / Network Configuration")
+        print("----------------------------------------------------")
+        print(f"TCP Command Host        : {self.tcp_host}")
+        print(f"TCP Command Port        : {self.tcp_port}")
+        print(f"UDP Telemetry PC IP     : {self.pc_telemetry_ip}")
+        print(f"UDP Telemetry Port      : {self.udp_telemetry_port}")
+        print(f"UDP Telemetry Interval  : {self.udp_interval_sec} sec")
+        print(f"UDP Disabled            : {self.args.no_udp}")
+        print(f"TCP Disabled            : {self.args.no_tcp}")
+        print("")
+        print("HTTP Log API Configuration")
+        print("----------------------------------------------------")
+        print(f"HTTP Log Enabled        : {self.enable_log_http_server and not self.args.no_log_http}")
+        print(f"HTTP Log Host           : {self.log_http_host}")
+        print(f"HTTP Log Port           : {self.log_http_port}")
+        print(f"HTTP Log Base Path      : {self.log_base_path}")
+        print(f"HTTP Log Max Rows       : {self.log_api_max_rows}")
+        print("")
+        print("EMS Web API Configuration")
+        print("----------------------------------------------------")
+        print(f"Web API Enabled         : {self.enable_web_api_server and not self.args.no_web_api}")
+        print(f"Web API Host            : {self.web_api_host}")
+        print(f"Web API Port            : {self.web_api_port}")
+        print(f"Web API Auth Enabled    : {self.web_api_enable_auth}")
+        print(f"Web API SSE Interval    : {self.web_api_stream_interval_sec} sec")
+        print("====================================================\n")

@@ -303,7 +303,7 @@ def read_telemetry(driver: PcsModbusTcpDriver) -> Dict[str, Any]:
     """
     Read foundation-level Njoy/Enjoy PCS telemetry.
 
-    For the first phase, we read a few small blocks instead of one huge block.
+    Read a few small blocks instead of one huge block.
     This is easier to debug with ModSim.
     """
 

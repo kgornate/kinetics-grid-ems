@@ -1,0 +1,52 @@
+{
+  "note": "Documentation-only example. Do not use this file to start the gateway until the matching protocol drivers/services are implemented.",
+  "assets": [
+    {
+      "asset_key": "bms_rtu_demo",
+      "asset_id": "bms_2",
+      "asset_type": "bms",
+      "enabled": false,
+      "vendor": "future_vendor_a",
+      "protocol": "modbus_rtu",
+      "profile": "future_vendor_a_bms_rtu",
+      "connection": {
+        "serial_port": "/dev/ttyUSB1",
+        "baudrate": 9600,
+        "bytesize": 8,
+        "parity": "N",
+        "stopbits": 1,
+        "slave_id": 2
+      }
+    },
+    {
+      "asset_key": "bms_can_demo",
+      "asset_id": "bms_3",
+      "asset_type": "bms",
+      "enabled": false,
+      "vendor": "future_vendor_b",
+      "protocol": "can",
+      "profile": "future_vendor_b_bms_can",
+      "connection": {
+        "interface": "can0",
+        "bitrate": 500000
+      }
+    },
+    {
+      "asset_key": "meter_1",
+      "asset_id": "meter_1",
+      "asset_type": "energy_meter",
+      "enabled": false,
+      "vendor": "kew",
+      "protocol": "modbus_rtu",
+      "profile": "kew_meter_modbus_rtu_v1",
+      "connection": {
+        "serial_port": "/dev/ttyUSB2",
+        "baudrate": 9600,
+        "bytesize": 8,
+        "parity": "N",
+        "stopbits": 1,
+        "slave_id": 1
+      }
+    }
+  ]
+}

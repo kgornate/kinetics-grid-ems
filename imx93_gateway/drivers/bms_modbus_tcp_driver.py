@@ -4,8 +4,8 @@ BMS / BCU Modbus TCP Driver - Kinetics Grid EMS Gateway
 Purpose:
 - Production reusable driver for the BMS/BCU asset.
 - Used by bms_gateway_service.py.
-- Reads Phase-1 BMS telemetry/status/alarm registers from a Modbus TCP BCU/ModSim server.
-- Writes Phase-1 BMS control commands.
+- Reads BMS telemetry/status/alarm registers from a Modbus TCP BCU/ModSim server.
+- Writes BMS control commands.
 
 Architecture rule:
 - This driver does NOT duplicate register addresses, scaling, bitfields, or control values.
@@ -227,19 +227,19 @@ class BmsModbusTcpDriver:
     # Decoded read APIs
     # ------------------------------------------------------------------
     def read_measurements(self) -> Dict[str, Any]:
-        """Read and decode Rack Measure Phase-1 block."""
-        block = READ_BLOCKS["rack_measure_phase1"]
+        """Read and decode Rack Measure block."""
+        block = READ_BLOCKS["rack_measure_core"]
         raw = self.read_holding_registers(block["start"], block["count"])
-        return decode_block(raw, "rack_measure_phase1")
+        return decode_block(raw, "rack_measure_core")
 
     def read_status(self) -> Dict[str, Any]:
-        """Read and decode Rack Signal Phase-1 block.
+        """Read and decode Rack Signal block.
 
         This includes both alarm bitfields and system status registers.
         """
-        block = READ_BLOCKS["rack_signal_phase1"]
+        block = READ_BLOCKS["rack_signal_core"]
         raw = self.read_holding_registers(block["start"], block["count"])
-        return decode_block(raw, "rack_signal_phase1")
+        return decode_block(raw, "rack_signal_core")
 
     def read_alarms(self) -> Dict[str, Any]:
         """Read BMS status block and return flattened active alarms."""

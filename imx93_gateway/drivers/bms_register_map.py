@@ -1,10 +1,10 @@
 """
-BMS / BCU Modbus TCP Register Map - Phase 1 MVP
+BMS / BCU Modbus TCP Register Map
 Kinetics Grid EMS Gateway
 
 Source workbook:
-Kinetics_Grid_EMS_BCU_BMS_Register_Analysis_and_Phase_Plan.xlsx
-Sheet used: Phase1 MVP Registers + Bitfield Details
+Kinetics Grid EMS BCU/BMS register analysis workbook
+Sheet used: MVP Registers + Bitfield Details
 
 Address convention:
 - All addresses below are protocol/register offsets in hexadecimal form.
@@ -50,19 +50,19 @@ class RegisterDef:
 
 
 # -----------------------------------------------------------------------------
-# Phase-1 read blocks
+# Core read blocks
 # These are contiguous blocks from the workbook and should be efficient for polling.
 # -----------------------------------------------------------------------------
 READ_BLOCKS: Dict[str, Dict[str, int]] = {
     # Rack Signal: alarm + status block, 0x0010 to 0x001F inclusive
-    "rack_signal_phase1": {"start": 0x0010, "count": 0x001F - 0x0010 + 1},
+    "rack_signal_core": {"start": 0x0010, "count": 0x001F - 0x0010 + 1},
     # Rack Measure: core measurement block, 0x0210 to 0x0239 inclusive
-    "rack_measure_phase1": {"start": 0x0210, "count": 0x0239 - 0x0210 + 1},
+    "rack_measure_core": {"start": 0x0210, "count": 0x0239 - 0x0210 + 1},
 }
 
 
 # -----------------------------------------------------------------------------
-# Phase-1 Rack Signal registers: alarms + status
+# Rack Signal registers: alarms + status
 # -----------------------------------------------------------------------------
 RACK_SIGNAL_REGISTERS: Dict[str, RegisterDef] = {
     "functional_safety_warn": RegisterDef(
@@ -165,7 +165,7 @@ RACK_SIGNAL_REGISTERS: Dict[str, RegisterDef] = {
 
 
 # -----------------------------------------------------------------------------
-# Phase-1 Rack Measure registers: telemetry, health, safety
+# Rack Measure registers: telemetry, health, safety
 # -----------------------------------------------------------------------------
 RACK_MEASURE_REGISTERS: Dict[str, RegisterDef] = {
     "max_cell_vol": RegisterDef("max_cell_vol", 0x0210, "Maximum Cell Voltage", "C2 Battery Electrical Measurements", "Cell Voltage Statistics", unit="mV"),
@@ -218,7 +218,7 @@ RACK_MEASURE_REGISTERS: Dict[str, RegisterDef] = {
 
 
 # -----------------------------------------------------------------------------
-# Phase-1 control registers
+# Control registers
 # -----------------------------------------------------------------------------
 CONTROL_REGISTERS: Dict[str, RegisterDef] = {
     "start_insulation_sampling": RegisterDef(
@@ -292,7 +292,7 @@ RECEIVE_CFG_STATE_MAP = {
 
 
 # -----------------------------------------------------------------------------
-# Bitfield definitions from Phase-1 Bitfield Details
+# Bitfield definitions
 # Only active bits should be reported as alarms/status flags by the driver.
 # -----------------------------------------------------------------------------
 BITFIELDS: Dict[str, Dict[int, str]] = {
@@ -456,7 +456,7 @@ CORE_TELEMETRY_KEYS = [
     "negative_ir",
 ]
 
-ALL_PHASE1_REGISTERS: Dict[str, RegisterDef] = {
+ALL_CORE_REGISTERS: Dict[str, RegisterDef] = {
     **RACK_SIGNAL_REGISTERS,
     **RACK_MEASURE_REGISTERS,
     **CONTROL_REGISTERS,
@@ -519,9 +519,9 @@ def decode_block(register_values: List[int], block_name: str) -> Dict[str, Any]:
     start = READ_BLOCKS[block_name]["start"]
     decoded: Dict[str, Any] = {}
 
-    if block_name == "rack_signal_phase1":
+    if block_name == "rack_signal_core":
         reg_defs = RACK_SIGNAL_REGISTERS
-    elif block_name == "rack_measure_phase1":
+    elif block_name == "rack_measure_core":
         reg_defs = RACK_MEASURE_REGISTERS
     else:
         reg_defs = {}
@@ -546,7 +546,7 @@ def decode_block(register_values: List[int], block_name: str) -> Dict[str, Any]:
 
 
 def build_core_telemetry(measurements: Mapping[str, Any], status: Mapping[str, Any]) -> Dict[str, Any]:
-    """Build EMS-friendly Phase-1 telemetry payload from decoded blocks."""
+    """Build EMS-friendly telemetry payload from decoded blocks."""
     voltage = measurements.get("total_vol")
     current = measurements.get("total_cur")
     power_kw = None
@@ -604,7 +604,7 @@ __all__ = [
     "BMS_ASSET_ID", "BMS_DEFAULT_HOST", "BMS_DEFAULT_PORT", "BMS_DEFAULT_UNIT_ID",
     "RegisterDef", "READ_BLOCKS", "RACK_SIGNAL_REGISTERS", "RACK_MEASURE_REGISTERS",
     "CONTROL_REGISTERS", "CONTROL_VALUES", "BITFIELDS", "ALARM_REGISTER_KEYS",
-    "STATUS_REGISTER_KEYS", "CORE_TELEMETRY_KEYS", "ALL_PHASE1_REGISTERS",
+    "STATUS_REGISTER_KEYS", "CORE_TELEMETRY_KEYS", "ALL_CORE_REGISTERS",
     "decode_s16", "encode_s16", "apply_scale", "decode_bitfield", "decode_status_value",
     "decode_block", "build_core_telemetry", "collect_active_alarms",
 ]

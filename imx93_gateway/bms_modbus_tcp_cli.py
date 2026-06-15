@@ -190,14 +190,14 @@ class BmsCliClient:
             raise RuntimeError(f"Modbus write error response for address 0x{address:04X}: {wr}")
 
     def read_measurements(self) -> Dict[str, Any]:
-        block = READ_BLOCKS["rack_measure_phase1"]
+        block = READ_BLOCKS["rack_measure_core"]
         regs = self.read_holding_registers(block["start"], block["count"])
-        return decode_block(regs, "rack_measure_phase1")
+        return decode_block(regs, "rack_measure_core")
 
     def read_status_block(self) -> Dict[str, Any]:
-        block = READ_BLOCKS["rack_signal_phase1"]
+        block = READ_BLOCKS["rack_signal_core"]
         regs = self.read_holding_registers(block["start"], block["count"])
-        return decode_block(regs, "rack_signal_phase1")
+        return decode_block(regs, "rack_signal_core")
 
     def read_core_payload(self) -> Dict[str, Any]:
         measurements = self.read_measurements()
@@ -359,10 +359,10 @@ def parse_args() -> argparse.Namespace:
     )
 
     actions = parser.add_mutually_exclusive_group(required=True)
-    actions.add_argument("--read-core", action="store_true", help="Read Phase-1 EMS-friendly telemetry/status/alarm payload")
+    actions.add_argument("--read-core", action="store_true", help="Read EMS-friendly telemetry/status/alarm payload")
     actions.add_argument("--read-measurements", action="store_true", help="Read and print decoded rack measurement block")
     actions.add_argument("--read-status", action="store_true", help="Read and print decoded rack signal/status block")
-    actions.add_argument("--read-alarms", action="store_true", help="Read Phase-1 alarm/status bitfields")
+    actions.add_argument("--read-alarms", action="store_true", help="Read alarm/status bitfields")
     actions.add_argument("--read-all", action="store_true", help="Read core payload, measurements, status and alarms")
     actions.add_argument("--start-insulation", action="store_true", help="Write start insulation sampling command")
     actions.add_argument("--start-precharge", action="store_true", help="Write start precharge command")

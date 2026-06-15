@@ -1,0 +1,18 @@
+{
+  "GATEWAY_ID": "imx93_gateway_1",
+  "ASSET_ID": "chiller_1",
+  "CHILLER_ENABLED": true,
+  "PCS_ENABLED": false,
+  "BMS_ENABLED": false,
+  "PC_TELEMETRY_IP": "127.0.0.1",
+  "UDP_TELEMETRY_PORT": 5005,
+  "TCP_COMMAND_HOST": "0.0.0.0",
+  "TCP_COMMAND_PORT": 6000,
+  "ENABLE_LOG_HTTP_SERVER": true,
+  "LOG_HTTP_HOST": "0.0.0.0",
+  "LOG_HTTP_PORT": 7000,
+  "ENABLE_WEB_API_SERVER": true,
+  "WEB_API_HOST": "0.0.0.0",
+  "WEB_API_PORT": 8000,
+  "WEB_API_ENABLE_AUTH": false
+}

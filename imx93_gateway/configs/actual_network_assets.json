@@ -1,0 +1,81 @@
+{
+  "gateway": {
+    "gateway_id": "imx93_gateway_1"
+  },
+  "network": {
+    "pc_telemetry_ip": "192.168.10.1",
+    "udp_telemetry_port": 5005,
+    "tcp_command_host": "0.0.0.0",
+    "tcp_command_port": 6000
+  },
+  "log_http": {
+    "enabled": true,
+    "host": "0.0.0.0",
+    "port": 7000,
+    "max_rows": 500
+  },
+  "logging": {
+    "base_path": "/home/root/ems_logs_test"
+  },
+  "web_api": {
+    "enabled": true,
+    "host": "0.0.0.0",
+    "port": 8000,
+    "enable_auth": false,
+    "cors_allow_origin": "*"
+  },
+  "assets": [
+    {
+      "asset_key": "chiller",
+      "asset_id": "chiller_1",
+      "asset_type": "chiller",
+      "enabled": true,
+      "vendor": "current",
+      "protocol": "modbus_rtu",
+      "profile": "current_chiller_modbus_rtu",
+      "connection": {
+        "serial_port": "/dev/ttyUSB0",
+        "baudrate": 9600,
+        "bytesize": 8,
+        "parity": "N",
+        "stopbits": 1,
+        "slave_id": 1
+      },
+      "poll_interval_sec": 1.0,
+      "timeout_sec": 2.0
+    },
+    {
+      "asset_key": "pcs",
+      "asset_id": "pcs_1",
+      "asset_type": "pcs",
+      "enabled": true,
+      "vendor": "njoy",
+      "protocol": "modbus_tcp",
+      "profile": "njoy_125kw",
+      "connection": {
+        "host": "192.168.1.200",
+        "port": 502,
+        "unit_id": 1
+      },
+      "poll_interval_sec": 5.0,
+      "timeout_sec": 3.0,
+      "retries": 2
+    },
+    {
+      "asset_key": "bms",
+      "asset_id": "bms_1",
+      "asset_type": "bms",
+      "enabled": true,
+      "vendor": "simulator",
+      "protocol": "modbus_tcp",
+      "profile": "simulator_modbus_tcp",
+      "connection": {
+        "host": "192.168.10.1",
+        "port": 502,
+        "unit_id": 1
+      },
+      "poll_interval_sec": 1.0,
+      "timeout_sec": 2.0
+    }
+  ]
+}
