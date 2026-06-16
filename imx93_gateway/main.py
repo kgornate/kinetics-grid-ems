@@ -1,10 +1,8 @@
 """Entry point for the i.MX93 EMS gateway backend."""
 
-import time
 from pathlib import Path
 import signal
 import sys
-import traceback
 
 CURRENT_FILE = Path(__file__).resolve()
 IMX93_GATEWAY_DIR = CURRENT_FILE.parent
@@ -39,7 +37,6 @@ def main() -> None:
         app.stop()
     except Exception as error:
         print(f"[MAIN] Fatal error: {error}")
-        traceback.print_exc()
         app.stop()
         sys.exit(1)
 

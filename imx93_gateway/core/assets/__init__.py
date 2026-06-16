@@ -6,6 +6,7 @@ from .pcs_asset import PcsAssetAdapter
 from .bms_asset import BmsAssetAdapter
 from .asset_profile import AssetConfigRegistry, AssetProfileDefinition
 from .asset_factory import AssetFactoryPlan
+from .runtime_catalog import RuntimeAssetCatalog, RuntimeAssetRecord
 
 __all__ = [
     "BaseAssetAdapter",
@@ -15,4 +16,6 @@ __all__ = [
     "AssetConfigRegistry",
     "AssetProfileDefinition",
     "AssetFactoryPlan",
+    "RuntimeAssetCatalog",
+    "RuntimeAssetRecord",
 ]

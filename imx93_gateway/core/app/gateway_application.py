@@ -5,12 +5,12 @@ command execution, runtime status reporting, and controlled shutdown.
 The public network contracts remain compatible with the Flutter dashboard, web
 dashboard, TCP command clients, and log API clients.
 """
-import time
 
 import argparse
 from datetime import datetime
 from pathlib import Path
 import sys
+import time
 from typing import Any, Dict, Optional
 
 CURRENT_FILE = Path(__file__).resolve()
@@ -590,7 +590,7 @@ class EMSGatewayApplication:
 
         try:
             from services.bms_gateway_service import BmsGatewayService, BmsServiceConfig
-            from services.storage_logger import StorageLogger
+            from core.storage.storage_manager import StorageManager
         except ImportError as error:
             raise RuntimeError(
                 "Failed to import BMS gateway modules. "
@@ -604,7 +604,7 @@ class EMSGatewayApplication:
 
         self.bms_storage_logger = None
         if enable_storage_logging:
-            self.bms_storage_logger = StorageLogger(
+            self.bms_storage_logger = StorageManager(
                 base_path=self.log_base_path,
                 gateway_id=self.gateway_id,
                 asset_id=self.bms_asset_id,

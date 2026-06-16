@@ -8,7 +8,7 @@ Purpose:
 - Polls PCS telemetry.
 - Handles PCS control commands.
 - Performs basic readback verification.
-- Logs PCS telemetry, command events, and errors to eMMC/SD using StorageLogger.
+- Logs PCS telemetry, command events, and errors through StorageManager.
 
 Current vendor support:
 - njoy / enjoy 125kW PCS
@@ -44,7 +44,7 @@ from drivers.pcs_modbus_tcp_driver import PcsModbusTcpDriver
 from drivers.pcs_profiles import njoy_125kw_profile as njoy
 from drivers.pcs_profiles import inpower_125kw_profile as inpower
 from models.pcs_state import PcsState
-from services.storage_logger import StorageLogger
+from core.storage import StorageManager
 
 
 def get_config_value(name: str, default: Any) -> Any:
@@ -125,7 +125,7 @@ class PcsGatewayService:
             )
         )
 
-        self.storage_logger: Optional[StorageLogger] = None
+        self.storage_logger: Optional[StorageManager] = None
         self.last_storage_log_time = 0.0
         self._storage_logger_lock = threading.Lock()
         self._last_comm_status_for_event: Optional[str] = None
@@ -165,7 +165,7 @@ class PcsGatewayService:
             return
 
         try:
-            self.storage_logger = StorageLogger(
+            self.storage_logger = StorageManager(
                 base_path=self.log_base_path,
                 gateway_id=self.gateway_id,
                 asset_id=self.asset_id,
@@ -175,7 +175,7 @@ class PcsGatewayService:
             init_ok = self.storage_logger.initialize()
 
             if init_ok:
-                print("[PCS STORAGE] PCS storage logger initialized successfully")
+                print("[PCS STORAGE] PCS storage manager initialized successfully")
                 print(f"[PCS STORAGE] Log base path: {self.log_base_path}")
                 print(
                     f"[PCS STORAGE] Telemetry log interval: "
@@ -183,17 +183,17 @@ class PcsGatewayService:
                 )
 
                 self._log_storage_event(
-                    event_type="PCS_STORAGE_LOGGER_STARTED",
+                    event_type="PCS_STORAGE_MANAGER_STARTED",
                     command="logger_start",
                     source="pcs_gateway_service.py",
                     status="success",
-                    description="Storage logger initialized for PCS telemetry and command logging",
+                    description="Storage manager initialized for PCS telemetry and command logging",
                 )
             else:
-                print("[PCS STORAGE] PCS storage logger initialization failed")
+                print("[PCS STORAGE] PCS storage manager initialization failed")
 
         except Exception as error:
-            print(f"[PCS STORAGE] PCS storage logger initialization exception: {error}")
+            print(f"[PCS STORAGE] PCS storage manager initialization exception: {error}")
             self.storage_logger = None
 
     def _log_storage_event(

@@ -18,6 +18,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Dict
 from urllib.parse import parse_qs, urlparse
 
+from core.storage.query import LogFilter
+
 
 class LogHTTPServer:
     def __init__(
@@ -173,6 +175,7 @@ class LogHTTPServer:
                                 "endpoints": [
                                     "/api/health",
                                     "/api/storage/status?asset_id=chiller_1",
+                                    "/api/storage/health?asset_id=chiller_1",
                                     "/api/storage/status?asset_id=pcs_1",
                                     "/api/logs/assets",
                                     "/api/logs/files?asset_id=pcs_1",
@@ -206,6 +209,12 @@ class LogHTTPServer:
                         )
                         return
 
+                    if path == "/api/storage/health":
+                        self._send_json(
+                            log_query_service.get_storage_health(asset_id=asset_id)
+                        )
+                        return
+
                     if path == "/api/logs/files":
                         self._send_json(
                             log_query_service.list_telemetry_files(asset_id=asset_id)
@@ -213,69 +222,37 @@ class LogHTTPServer:
                         return
 
                     if path == "/api/logs/telemetry":
-                        date = self._q(query, "date")
-                        limit = self._q(query, "limit", 100)
-
-                        if date is None:
+                        if self._q(query, "date") is None:
                             self._error("Missing required query parameter: date")
                             return
 
-                        self._send_json(
-                            log_query_service.get_telemetry_logs(
-                                asset_id=asset_id,
-                                date=date,
-                                limit=limit,
-                                start_time=self._q(query, "start_time"),
-                                end_time=self._q(query, "end_time"),
-                                fields=self._q(query, "fields"),
-                                modbus_status=self._q(query, "modbus_status"),
-                                logger_status=self._q(query, "logger_status"),
-                                vendor=self._q(query, "vendor"),
-                                comm_status=self._q(query, "comm_status"),
-                                operating_status=self._q(query, "operating_status"),
-                                fault_status=self._q(query, "fault_status"),
-                                search=self._q(query, "search"),
-                            )
+                        log_filter = LogFilter.from_http_query(
+                            log_type="telemetry",
+                            query=query,
+                            asset_id=asset_id,
+                            max_rows=getattr(log_query_service, "max_rows", 500),
                         )
+                        self._send_json(log_query_service.query_logs(log_filter))
                         return
 
                     if path == "/api/logs/events":
-                        limit = self._q(query, "limit", 100)
-
-                        self._send_json(
-                            log_query_service.get_event_logs(
-                                asset_id=asset_id,
-                                limit=limit,
-                                date=self._q(query, "date"),
-                                start_time=self._q(query, "start_time"),
-                                end_time=self._q(query, "end_time"),
-                                event_type=self._q(query, "event_type"),
-                                status=self._q(query, "status"),
-                                source=self._q(query, "source"),
-                                vendor=self._q(query, "vendor"),
-                                command=self._q(query, "command"),
-                                search=self._q(query, "search"),
-                                fields=self._q(query, "fields"),
-                            )
+                        log_filter = LogFilter.from_http_query(
+                            log_type="events",
+                            query=query,
+                            asset_id=asset_id,
+                            max_rows=getattr(log_query_service, "max_rows", 500),
                         )
+                        self._send_json(log_query_service.query_logs(log_filter))
                         return
 
                     if path == "/api/logs/errors":
-                        limit = self._q(query, "limit", 100)
-
-                        self._send_json(
-                            log_query_service.get_error_logs(
-                                asset_id=asset_id,
-                                limit=limit,
-                                date=self._q(query, "date"),
-                                start_time=self._q(query, "start_time"),
-                                end_time=self._q(query, "end_time"),
-                                error_type=self._q(query, "error_type"),
-                                error_source=self._q(query, "error_source"),
-                                search=self._q(query, "search"),
-                                fields=self._q(query, "fields"),
-                            )
+                        log_filter = LogFilter.from_http_query(
+                            log_type="errors",
+                            query=query,
+                            asset_id=asset_id,
+                            max_rows=getattr(log_query_service, "max_rows", 500),
                         )
+                        self._send_json(log_query_service.query_logs(log_filter))
                         return
 
                     if path == "/api/logs/metadata":

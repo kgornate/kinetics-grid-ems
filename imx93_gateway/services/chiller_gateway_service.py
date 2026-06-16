@@ -7,7 +7,7 @@ Purpose:
 - Provide UDP telemetry packets.
 - Execute TCP commands from PC / Flutter dashboard.
 - Prevent Modbus collision between polling thread and command thread.
-- Log real chiller telemetry, events, and errors to eMMC/SD using StorageLogger.
+- Log real chiller telemetry, events, and errors through StorageManager.
 - Log command events with both old_value and new_value.
 """
 
@@ -43,9 +43,9 @@ except ImportError:
 
 
 try:
-    from services.storage_logger import StorageLogger
+    from core.storage import StorageManager
 except ImportError:
-    from imx93_gateway.services.storage_logger import StorageLogger
+    from imx93_gateway.core.storage import StorageManager
 
 
 def get_config_value(name: str, default: Any) -> Any:
@@ -120,7 +120,7 @@ class ChillerGatewayService:
             get_config_value("LOG_TELEMETRY_INTERVAL_SEC", 5.0)
         )
 
-        self.storage_logger: Optional[StorageLogger] = None
+        self.storage_logger: Optional[StorageManager] = None
         self.last_storage_log_time = 0.0
         self._storage_logger_lock = threading.Lock()
 
@@ -201,7 +201,7 @@ class ChillerGatewayService:
             return
 
         try:
-            self.storage_logger = StorageLogger(
+            self.storage_logger = StorageManager(
                 base_path=self.log_base_path,
                 gateway_id=self.gateway_id,
                 asset_id=self.asset_id,
@@ -210,7 +210,7 @@ class ChillerGatewayService:
             init_ok = self.storage_logger.initialize()
 
             if init_ok:
-                print("[STORAGE] Storage logger initialized successfully")
+                print("[STORAGE] Storage manager initialized successfully")
                 print(f"[STORAGE] Log base path: {self.log_base_path}")
                 print(
                     f"[STORAGE] Telemetry log interval: "
@@ -218,18 +218,18 @@ class ChillerGatewayService:
                 )
 
                 self._log_storage_event(
-                    event_type="STORAGE_LOGGER_STARTED",
+                    event_type="STORAGE_MANAGER_STARTED",
                     source="chiller_gateway_service.py",
                     status="success",
                     description=(
-                        "Storage logger initialized for real chiller telemetry logging"
+                        "Storage manager initialized for real chiller telemetry logging"
                     ),
                 )
             else:
-                print("[STORAGE] Storage logger initialization failed")
+                print("[STORAGE] Storage manager initialization failed")
 
         except Exception as error:
-            print(f"[STORAGE] Storage logger initialization exception: {error}")
+            print(f"[STORAGE] Storage manager initialization exception: {error}")
             self.storage_logger = None
 
     def _log_storage_event(
@@ -365,7 +365,7 @@ class ChillerGatewayService:
 
     def convert_telemetry_for_logging(self, telemetry: Any) -> Dict[str, Any]:
         """
-        Converts real chiller telemetry into StorageLogger dictionary format.
+        Converts real chiller telemetry into the CSV logging dictionary format.
 
         Supports:
         - dict-based telemetry

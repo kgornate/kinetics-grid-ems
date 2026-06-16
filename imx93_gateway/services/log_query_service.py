@@ -17,12 +17,15 @@ import shutil
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from core.storage.query import CSVLogQueryBackend, LogFilter
+
 
 class LogQueryService:
     def __init__(self, base_path: str, asset_id: str = "chiller_1", max_rows: int = 500):
         self.base_path = Path(base_path)
         self.asset_id = asset_id
         self.max_rows = int(max_rows)
+        self.query_backend = CSVLogQueryBackend()
 
     def _resolve_asset_id(self, asset_id: Optional[Any] = None) -> str:
         value = str(asset_id or self.asset_id).strip()
@@ -175,51 +178,60 @@ class LogQueryService:
         fields: Optional[Any] = None,
         exact_filters: Optional[Dict[str, Any]] = None,
         search: Optional[Any] = None,
+        log_type: str = "generic",
+        asset_id: Optional[Any] = None,
+        offset: Optional[Any] = 0,
+        order: Optional[Any] = "asc",
     ) -> Dict[str, Any]:
-        limit_value = self._sanitize_limit(limit)
-        selected_fields = self._parse_fields(fields)
-        if not file_path.exists():
-            return {
-                "status": "error",
-                "message": f"Log file not found: {file_path.name}",
-                "file": str(file_path),
-                "rows_count": 0,
-                "rows": [],
-            }
-        try:
-            with open(file_path, mode="r", encoding="utf-8", newline="") as file:
-                reader = csv.DictReader(file)
-                all_rows = list(reader)
-            filtered_rows = self._filter_rows(
-                rows=all_rows,
-                date=date,
-                start_time=start_time,
-                end_time=end_time,
-                exact_filters=exact_filters,
-                search=search,
-            )
-            tail_rows = filtered_rows[-limit_value:] if limit_value else filtered_rows
-            tail_rows = self._apply_field_selection(tail_rows, selected_fields)
-            return {
-                "status": "ok",
-                "file": str(file_path),
-                "file_name": file_path.name,
-                "total_rows": len(all_rows),
-                "filtered_rows": len(filtered_rows),
-                "rows_count": len(tail_rows),
-                "limit": limit_value,
-                "filters": {
-                    "date": date,
-                    "start_time": start_time,
-                    "end_time": end_time,
-                    "fields": selected_fields,
-                    "exact_filters": exact_filters or {},
-                    "search": search,
-                },
-                "rows": tail_rows,
-            }
-        except Exception as error:
-            return {"status": "error", "message": str(error), "file": str(file_path), "rows_count": 0, "rows": []}
+        """Compatibility wrapper around the structured CSV query backend."""
+        log_filter = LogFilter(
+            log_type=log_type,
+            asset_id=str(asset_id).strip() if asset_id else None,
+            date=LogFilter.validate_date(date),
+            start_time=LogFilter.normalize_time(start_time),
+            end_time=LogFilter.normalize_time(end_time),
+            fields=LogFilter.parse_fields(fields),
+            exact_filters=exact_filters or {},
+            search=str(search).strip() if search is not None else None,
+            limit=LogFilter.sanitize_limit(limit, maximum=self.max_rows),
+            offset=LogFilter.sanitize_offset(offset),
+            order=str(order or "asc").strip().lower() if str(order or "asc").strip().lower() in {"asc", "desc"} else "asc",
+        )
+        return self.query_backend.query(file_path=file_path, log_filter=log_filter)
+
+    def query_logs(self, log_filter: LogFilter) -> Dict[str, Any]:
+        """Query logs using a structured filter model."""
+        resolved_asset_id = self._resolve_asset_id(log_filter.asset_id)
+        if log_filter.log_type == "telemetry":
+            if not log_filter.date:
+                raise ValueError("date parameter is required for telemetry logs")
+            file_path = self.telemetry_file_for_date(log_filter.date, asset_id=resolved_asset_id)
+        elif log_filter.log_type == "events":
+            file_path = self.events_file(resolved_asset_id)
+        elif log_filter.log_type == "errors":
+            file_path = self.errors_file(resolved_asset_id)
+        else:
+            raise ValueError(f"Unsupported log_type: {log_filter.log_type}")
+
+        effective_filter = LogFilter(
+            log_type=log_filter.log_type,
+            asset_id=resolved_asset_id,
+            date=log_filter.date,
+            start_time=log_filter.start_time,
+            end_time=log_filter.end_time,
+            fields=log_filter.fields,
+            exact_filters=log_filter.exact_filters,
+            search=log_filter.search,
+            limit=LogFilter.sanitize_limit(log_filter.limit, maximum=self.max_rows),
+            offset=LogFilter.sanitize_offset(log_filter.offset),
+            order=log_filter.order if log_filter.order in {"asc", "desc"} else "asc",
+        )
+        response = self.query_backend.query(file_path=file_path, log_filter=effective_filter)
+        response["log_type"] = log_filter.log_type
+        response["asset_id"] = resolved_asset_id
+        if log_filter.date:
+            response["date"] = log_filter.date
+        return response
 
     @staticmethod
     def _file_size(path: Path) -> int:
@@ -304,6 +316,62 @@ class LogQueryService:
             "metadata_bytes": self._file_size(self.metadata_file()),
         }
 
+
+    def get_storage_health(self, asset_id: Optional[Any] = None) -> Dict[str, Any]:
+        """Return operator/diagnostic health for storage and log files."""
+        status = self.get_storage_status(asset_id=asset_id)
+        disk_total = int(status.get("disk_total_bytes") or 0)
+        disk_used = int(status.get("disk_used_bytes") or 0)
+        disk_free = int(status.get("disk_free_bytes") or 0)
+        disk_used_percent = round((disk_used / disk_total) * 100, 2) if disk_total else None
+
+        telemetry_exists = bool(status.get("telemetry_dir_exists"))
+        events_exists = bool(status.get("events_file_exists"))
+        errors_exists = bool(status.get("errors_file_exists"))
+        metadata_exists = bool(status.get("metadata_file_exists"))
+        exists = bool(status.get("exists"))
+
+        if not exists:
+            health = "degraded"
+            message = "Storage base path does not exist yet"
+        elif disk_free <= 0 and disk_total:
+            health = "critical"
+            message = "No free disk space available"
+        elif disk_used_percent is not None and disk_used_percent >= 95:
+            health = "critical"
+            message = "Disk usage is above 95 percent"
+        elif disk_used_percent is not None and disk_used_percent >= 85:
+            health = "degraded"
+            message = "Disk usage is above 85 percent"
+        elif not telemetry_exists:
+            health = "degraded"
+            message = "Telemetry directory is not available for this asset yet"
+        else:
+            health = "healthy"
+            message = "Storage is available"
+
+        return {
+            "status": health,
+            "message": message,
+            "asset_id": status.get("asset_id"),
+            "base_path": status.get("base_path"),
+            "exists": exists,
+            "telemetry_dir_exists": telemetry_exists,
+            "events_file_exists": events_exists,
+            "errors_file_exists": errors_exists,
+            "metadata_file_exists": metadata_exists,
+            "telemetry_files_count": status.get("telemetry_files_count", 0),
+            "latest_telemetry_file": status.get("latest_telemetry_file"),
+            "disk_total_bytes": disk_total,
+            "disk_used_bytes": disk_used,
+            "disk_free_bytes": disk_free,
+            "disk_used_percent": disk_used_percent,
+            "log_total_bytes": status.get("log_total_bytes", 0),
+            "telemetry_log_bytes": status.get("telemetry_log_bytes", 0),
+            "event_log_bytes": status.get("event_log_bytes", 0),
+            "error_log_bytes": status.get("error_log_bytes", 0),
+        }
+
     def list_telemetry_files(self, asset_id: Optional[Any] = None) -> Dict[str, Any]:
         resolved_asset_id = self._resolve_asset_id(asset_id)
         directory = self.telemetry_dir(resolved_asset_id)
@@ -350,6 +418,8 @@ class LogQueryService:
                 "current_state": current_state,
             },
             search=search,
+            log_type="telemetry",
+            asset_id=resolved_asset_id,
         )
         response["log_type"] = "telemetry"
         response["asset_id"] = resolved_asset_id
@@ -381,6 +451,8 @@ class LogQueryService:
             fields=fields,
             exact_filters={"event_type": event_type, "status": status, "source": source, "vendor": vendor, "command": command},
             search=search,
+            log_type="events",
+            asset_id=resolved_asset_id,
         )
         response["log_type"] = "events"
         response["asset_id"] = resolved_asset_id
@@ -408,6 +480,8 @@ class LogQueryService:
             fields=fields,
             exact_filters={"error_type": error_type, "error_source": error_source},
             search=search,
+            log_type="errors",
+            asset_id=resolved_asset_id,
         )
         response["log_type"] = "errors"
         response["asset_id"] = resolved_asset_id

@@ -23,6 +23,10 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Callable, Dict, List, Optional, Tuple
 from urllib.parse import parse_qs, urlparse
 
+from core.operator_telemetry_view import make_operator_response
+from core.assets import RuntimeAssetCatalog
+from core.health import HealthMonitor
+
 
 JsonDict = Dict[str, Any]
 
@@ -215,24 +219,19 @@ class EMSWebAPIServer:
             # ----------------------------------------------------------
             @staticmethod
             def _normalize_asset_key(asset_id: str) -> str:
-                asset = str(asset_id or "").strip().lower()
-                if asset in {"bms", "bms_1"}:
-                    return "bms"
-                if asset in {"pcs", "pcs_1", "inverter", "inverter_1"}:
-                    return "pcs"
-                if asset in {"chiller", "chiller_1"}:
-                    return "chiller"
-                return asset
+                return RuntimeAssetCatalog.normalize_asset_key(asset_id)
 
-            @staticmethod
-            def _asset_id_from_key(asset_key: str, status_packet: Optional[JsonDict] = None) -> str:
-                status_packet = status_packet or {}
-                if asset_key == "bms":
-                    return str(status_packet.get("bms", {}).get("asset_id") or "bms_1")
-                if asset_key == "pcs":
-                    return str(status_packet.get("pcs", {}).get("asset_id") or "pcs_1")
-                if asset_key == "chiller":
-                    return str(status_packet.get("chiller", {}).get("asset_id") or "chiller_1")
+            def _runtime_catalog(self, telemetry: Optional[JsonDict] = None, status_packet: Optional[JsonDict] = None) -> RuntimeAssetCatalog:
+                status_packet = status_packet or self._safe_gateway_status()
+                telemetry = telemetry or self._safe_telemetry()
+                return RuntimeAssetCatalog.from_packets(status_packet=status_packet, telemetry_packet=telemetry)
+
+            def _asset_id_from_key(self, asset_key: str, status_packet: Optional[JsonDict] = None) -> str:
+                status_packet = status_packet or self._safe_gateway_status()
+                catalog = RuntimeAssetCatalog.from_packets(status_packet=status_packet, telemetry_packet={})
+                record = catalog.find(asset_key)
+                if record is not None:
+                    return record.asset_id
                 return asset_key
 
             def _safe_gateway_status(self) -> JsonDict:
@@ -253,92 +252,38 @@ class EMSWebAPIServer:
                 except Exception as error:
                     return {"status": "error", "message": str(error), "timestamp": self._now()}
 
+            def _storage_health_for_asset(self, asset_id: str) -> Optional[JsonDict]:
+                if parent.log_query_service is None:
+                    return None
+                try:
+                    result = parent.log_query_service.get_storage_health(asset_id=asset_id)
+                    return result if isinstance(result, dict) else None
+                except Exception as error:
+                    return {"status": "degraded", "error": str(error), "asset_id": asset_id}
+
+            def _health_monitor(self) -> HealthMonitor:
+                return HealthMonitor(
+                    status_packet=self._safe_gateway_status(),
+                    telemetry_packet=self._safe_telemetry(),
+                    storage_health_provider=self._storage_health_for_asset,
+                )
+
             def _extract_asset_packet(self, asset_id: str, telemetry: Optional[JsonDict] = None) -> Tuple[str, Optional[JsonDict]]:
-                asset_key = self._normalize_asset_key(asset_id)
                 telemetry = telemetry or self._safe_telemetry()
-                assets = telemetry.get("assets", {}) if isinstance(telemetry, dict) else {}
-
-                if isinstance(assets, dict):
-                    direct = assets.get(asset_key) or assets.get(asset_id)
-                    if isinstance(direct, dict):
-                        return asset_key, direct
-
-                # Backward-compatible top-level packets from current main.py
-                if asset_key == "bms" and isinstance(telemetry.get("bms"), dict):
-                    return asset_key, telemetry.get("bms")
-                if asset_key == "pcs" and isinstance(telemetry.get("pcs"), dict):
-                    return asset_key, telemetry.get("pcs")
-                if asset_key == "chiller":
-                    if str(telemetry.get("asset_id", "")).lower() in {"chiller_1", "chiller"}:
-                        return asset_key, telemetry
-                    if isinstance(assets, dict) and isinstance(assets.get("chiller"), dict):
-                        return asset_key, assets.get("chiller")
-
-                return asset_key, None
+                return RuntimeAssetCatalog.extract_asset_packet(asset_id, telemetry)
 
             @staticmethod
             def _is_asset_online(asset_key: str, asset_packet: Optional[JsonDict], status_packet: Optional[JsonDict]) -> bool:
-                if not asset_packet:
-                    return False
-
-                status_texts: List[str] = []
-                for key in ["status", "communication_status", "comm_status", "modbus_status"]:
-                    value = asset_packet.get(key)
-                    if value is not None:
-                        status_texts.append(str(value).lower())
-                data = asset_packet.get("data")
-                if isinstance(data, dict):
-                    for key in ["communication_status", "comm_status", "modbus_status"]:
-                        value = data.get(key)
-                        if value is not None:
-                            status_texts.append(str(value).lower())
-
-                if any(text in {"offline", "error", "lost", "failed"} for text in status_texts):
-                    return False
-                if any(text in {"online", "ok", "connected", "success"} for text in status_texts):
-                    return True
-
-                if status_packet and isinstance(status_packet.get(asset_key), dict):
-                    return bool(status_packet[asset_key].get("running"))
-
-                return True
+                return RuntimeAssetCatalog.is_asset_online(asset_key, asset_packet, status_packet)
 
             def _build_asset_list(self) -> JsonDict:
                 status_packet = self._safe_gateway_status()
                 telemetry = self._safe_telemetry()
-
-                asset_defs = [
-                    ("bms", "bms", "modbus_tcp"),
-                    ("pcs", "pcs", "modbus_tcp"),
-                    ("chiller", "chiller", "modbus_rtu"),
-                ]
-                assets: List[JsonDict] = []
-
-                for asset_key, asset_type, protocol in asset_defs:
-                    section = status_packet.get(asset_key, {}) if isinstance(status_packet.get(asset_key), dict) else {}
-                    asset_id = self._asset_id_from_key(asset_key, status_packet)
-                    _, asset_packet = self._extract_asset_packet(asset_id, telemetry)
-                    enabled = bool(section.get("enabled", asset_packet is not None))
-                    running = bool(section.get("running", asset_packet is not None))
-                    assets.append(
-                        {
-                            "asset_id": asset_id,
-                            "asset_key": asset_key,
-                            "asset_type": asset_type,
-                            "protocol": protocol,
-                            "enabled": enabled,
-                            "running": running,
-                            "online": self._is_asset_online(asset_key, asset_packet, status_packet),
-                        }
-                    )
-
-                return {
-                    "status": "ok",
-                    "gateway_id": status_packet.get("gateway_id"),
-                    "timestamp": self._now(),
-                    "assets_count": len(assets),
-                    "assets": assets,
-                }
+                catalog = self._runtime_catalog(telemetry=telemetry, status_packet=status_packet)
+                return catalog.to_response(
+                    gateway_id=status_packet.get("gateway_id"),
+                    timestamp=self._now(),
+                )
 
             @staticmethod
             def _flatten_keys(value: Any, prefix: str = "") -> List[str]:
@@ -355,7 +300,7 @@ class EMSWebAPIServer:
                             keys.append(child_prefix)
                 return sorted(set(keys))
 
-            def _telemetry_keys_response(self, asset_id: str) -> JsonDict:
+            def _telemetry_keys_response(self, asset_id: str, view: str = "") -> JsonDict:
                 asset_key, packet = self._extract_asset_packet(asset_id)
                 status_packet = self._safe_gateway_status()
                 resolved_asset_id = self._asset_id_from_key(asset_key, status_packet)
@@ -370,6 +315,10 @@ class EMSWebAPIServer:
                     }
 
                 data = packet.get("data", packet)
+                if str(view or "").strip().lower() == "operator":
+                    data = make_operator_response(data if isinstance(data, dict) else {"value": data})
+                    if isinstance(data, dict):
+                        data.pop("view", None)
                 keys = self._flatten_keys(data)
 
                 groups: JsonDict = {"all": keys}
@@ -533,12 +482,22 @@ class EMSWebAPIServer:
                                 "timestamp": self._now(),
                                 "endpoints": [
                                     "/api/gateway/health",
+                                    "/api/health",
+                                    "/api/health/gateway",
+                                    "/api/health/assets",
+                                    "/api/health/assets/{asset_id}",
+                                    "/api/diagnostics",
+                                    "/api/diagnostics/assets/{asset_id}",
                                     "/api/gateway/status",
                                     "/api/gateway/network",
                                     "/api/assets",
                                     "/api/assets/{asset_id}",
                                     "/api/telemetry/latest",
+                                    "/api/telemetry/operator",
+                                    "/api/telemetry/latest?view=operator",
                                     "/api/assets/{asset_id}/telemetry/latest",
+                                    "/api/assets/{asset_id}/telemetry/operator",
+                                    "/api/assets/{asset_id}/telemetry/latest?view=operator",
                                     "/api/assets/{asset_id}/telemetry/keys",
                                     "/api/assets/{asset_id}/telemetry/timeseries?keys=key1,key2&date=YYYY-MM-DD&limit=100",
                                     "/api/stream/telemetry",
@@ -549,7 +508,7 @@ class EMSWebAPIServer:
                         )
                         return
 
-                    if path in {"/api/health", "/api/gateway/health"}:
+                    if path == "/api/gateway/health":
                         self._send_json(
                             {
                                 "status": "ok",
@@ -560,6 +519,22 @@ class EMSWebAPIServer:
                                 "port": parent.port,
                             }
                         )
+                        return
+
+                    if path == "/api/health":
+                        self._send_json(self._health_monitor().build_overall_health())
+                        return
+
+                    if path == "/api/health/gateway":
+                        self._send_json(self._health_monitor().build_gateway_health())
+                        return
+
+                    if path == "/api/health/assets":
+                        self._send_json(self._health_monitor().build_assets_health())
+                        return
+
+                    if path == "/api/diagnostics":
+                        self._send_json(self._health_monitor().build_diagnostics())
                         return
 
                     if path == "/api/gateway/status":
@@ -591,16 +566,30 @@ class EMSWebAPIServer:
                         self._send_json(self._build_asset_list())
                         return
 
-                    if path == "/api/telemetry/latest":
+                    if path in {"/api/telemetry/latest", "/api/telemetry/operator"}:
                         telemetry = self._safe_telemetry()
+                        view = str(self._q(query, "view", "") or "").strip().lower()
+                        if path == "/api/telemetry/operator" or view == "operator":
+                            telemetry = make_operator_response(telemetry)
                         self._send_json(telemetry)
                         return
 
                     if path == "/api/stream/telemetry":
-                        self._handle_sse_stream()
+                        self._handle_sse_stream(query)
                         return
 
                     parts = [part for part in path.split("/") if part]
+
+                    # /api/health/assets/{asset_id}
+                    if len(parts) == 4 and parts[0] == "api" and parts[1] == "health" and parts[2] == "assets":
+                        self._send_json(self._health_monitor().build_asset_health(parts[3]))
+                        return
+
+                    # /api/diagnostics/assets/{asset_id}
+                    if len(parts) == 4 and parts[0] == "api" and parts[1] == "diagnostics" and parts[2] == "assets":
+                        self._send_json(self._health_monitor().build_diagnostics(parts[3]))
+                        return
+
                     # /api/assets/{asset_id}
                     # /api/assets/{asset_id}/telemetry/latest
                     # /api/assets/{asset_id}/telemetry/keys
@@ -609,35 +598,40 @@ class EMSWebAPIServer:
                         asset_id = parts[2]
 
                         if len(parts) == 3:
-                            assets_response = self._build_asset_list()
-                            for asset in assets_response.get("assets", []):
-                                if str(asset.get("asset_id", "")).lower() == asset_id.lower() or str(asset.get("asset_key", "")).lower() == asset_id.lower():
-                                    self._send_json({"status": "ok", "asset": asset, "timestamp": self._now()})
-                                    return
+                            catalog = self._runtime_catalog()
+                            record = catalog.find(asset_id)
+                            if record is not None:
+                                self._send_json({"status": "ok", "asset": record.to_dict(), "timestamp": self._now()})
+                                return
                             self._error(f"Asset not found: {asset_id}", status_code=404, error_code="INVALID_ASSET")
                             return
 
-                        if len(parts) == 5 and parts[3] == "telemetry" and parts[4] == "latest":
+                        if len(parts) == 5 and parts[3] == "telemetry" and parts[4] in {"latest", "operator"}:
                             telemetry = self._safe_telemetry()
                             asset_key, packet = self._extract_asset_packet(asset_id, telemetry)
                             if packet is None:
                                 self._error(f"No telemetry available for asset: {asset_id}", status_code=404, error_code="ASSET_TELEMETRY_NOT_FOUND")
                                 return
                             status_packet = self._safe_gateway_status()
-                            self._send_json(
-                                {
-                                    "status": "ok",
-                                    "asset_id": self._asset_id_from_key(asset_key, status_packet),
-                                    "asset_type": asset_key,
-                                    "timestamp": telemetry.get("timestamp", self._now()),
-                                    "online": self._is_asset_online(asset_key, packet, status_packet),
-                                    "telemetry": packet,
-                                }
-                            )
+                            record = self._runtime_catalog(telemetry=telemetry, status_packet=status_packet).find(asset_id)
+                            response = {
+                                "status": "ok",
+                                "asset_id": record.asset_id if record else self._asset_id_from_key(asset_key, status_packet),
+                                "asset_type": record.asset_type if record else asset_key,
+                                "asset_key": record.asset_key if record else asset_key,
+                                "timestamp": telemetry.get("timestamp", self._now()),
+                                "online": record.online if record else self._is_asset_online(asset_key, packet, status_packet),
+                                "runtime_mode": record.runtime_mode if record else None,
+                                "telemetry": packet,
+                            }
+                            view = str(self._q(query, "view", "") or "").strip().lower()
+                            if parts[4] == "operator" or view == "operator":
+                                response = make_operator_response(response)
+                            self._send_json(response)
                             return
 
                         if len(parts) == 5 and parts[3] == "telemetry" and parts[4] == "keys":
-                            self._send_json(self._telemetry_keys_response(asset_id))
+                            self._send_json(self._telemetry_keys_response(asset_id, self._q(query, "view", "")))
                             return
 
                         if len(parts) == 5 and parts[3] == "telemetry" and parts[4] == "timeseries":
@@ -711,7 +705,7 @@ class EMSWebAPIServer:
                 except Exception as error:
                     self._error(str(error), status_code=500, error_code="INTERNAL_ERROR")
 
-            def _handle_sse_stream(self) -> None:
+            def _handle_sse_stream(self, query: Optional[Dict[str, Any]] = None) -> None:
                 self.send_response(200)
                 self.send_header("Content-Type", "text/event-stream; charset=utf-8")
                 self.send_header("Connection", "keep-alive")
@@ -724,8 +718,11 @@ class EMSWebAPIServer:
                     self.wfile.write(b": EMS telemetry stream connected\n\n")
                     self.wfile.flush()
 
+                    view = str(self._q(query or {}, "view", "") or "").strip().lower()
                     while parent._running:
                         telemetry = self._safe_telemetry()
+                        if view == "operator":
+                            telemetry = make_operator_response(telemetry)
                         payload = json.dumps(telemetry, default=str)
                         event_text = f"event: telemetry\ndata: {payload}\n\n".encode("utf-8")
                         self.wfile.write(event_text)

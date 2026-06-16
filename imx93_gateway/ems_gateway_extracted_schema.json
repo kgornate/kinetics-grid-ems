@@ -1,0 +1,3737 @@
+{
+  "endpoints": [
+    {
+      "group": "EMS Web API",
+      "port": 8000,
+      "endpoint": "/api/assets",
+      "source": "network/ems_web_api_server.py"
+    },
+    {
+      "group": "EMS Web API",
+      "port": 8000,
+      "endpoint": "/api/assets/{asset_id}",
+      "source": "network/ems_web_api_server.py"
+    },
+    {
+      "group": "EMS Web API",
+      "port": 8000,
+      "endpoint": "/api/assets/{asset_id}/commands",
+      "source": "network/ems_web_api_server.py"
+    },
+    {
+      "group": "EMS Web API",
+      "port": 8000,
+      "endpoint": "/api/assets/{asset_id}/telemetry/keys",
+      "source": "network/ems_web_api_server.py"
+    },
+    {
+      "group": "EMS Web API",
+      "port": 8000,
+      "endpoint": "/api/assets/{asset_id}/telemetry/latest",
+      "source": "network/ems_web_api_server.py"
+    },
+    {
+      "group": "EMS Web API",
+      "port": 8000,
+      "endpoint": "/api/assets/{asset_id}/telemetry/latest?view=operator",
+      "source": "network/ems_web_api_server.py"
+    },
+    {
+      "group": "EMS Web API",
+      "port": 8000,
+      "endpoint": "/api/assets/{asset_id}/telemetry/operator",
+      "source": "network/ems_web_api_server.py"
+    },
+    {
+      "group": "EMS Web API",
+      "port": 8000,
+      "endpoint": "/api/assets/{asset_id}/telemetry/timeseries?keys=key1,key2&date=YYYY-MM-DD&limit=100",
+      "source": "network/ems_web_api_server.py"
+    },
+    {
+      "group": "EMS Web API",
+      "port": 8000,
+      "endpoint": "/api/commands",
+      "source": "network/ems_web_api_server.py"
+    },
+    {
+      "group": "EMS Web API",
+      "port": 8000,
+      "endpoint": "/api/diagnostics",
+      "source": "network/ems_web_api_server.py"
+    },
+    {
+      "group": "EMS Web API",
+      "port": 8000,
+      "endpoint": "/api/diagnostics/assets/{asset_id}",
+      "source": "network/ems_web_api_server.py"
+    },
+    {
+      "group": "EMS Web API",
+      "port": 8000,
+      "endpoint": "/api/gateway/health",
+      "source": "network/ems_web_api_server.py"
+    },
+    {
+      "group": "EMS Web API",
+      "port": 8000,
+      "endpoint": "/api/gateway/network",
+      "source": "network/ems_web_api_server.py"
+    },
+    {
+      "group": "EMS Web API",
+      "port": 8000,
+      "endpoint": "/api/gateway/status",
+      "source": "network/ems_web_api_server.py"
+    },
+    {
+      "group": "EMS Web API",
+      "port": 8000,
+      "endpoint": "/api/health",
+      "source": "network/ems_web_api_server.py"
+    },
+    {
+      "group": "EMS Web API",
+      "port": 8000,
+      "endpoint": "/api/health/assets",
+      "source": "network/ems_web_api_server.py"
+    },
+    {
+      "group": "EMS Web API",
+      "port": 8000,
+      "endpoint": "/api/health/assets/{asset_id}",
+      "source": "network/ems_web_api_server.py"
+    },
+    {
+      "group": "EMS Web API",
+      "port": 8000,
+      "endpoint": "/api/health/gateway",
+      "source": "network/ems_web_api_server.py"
+    },
+    {
+      "group": "EMS Web API",
+      "port": 8000,
+      "endpoint": "/api/stream/telemetry",
+      "source": "network/ems_web_api_server.py"
+    },
+    {
+      "group": "EMS Web API",
+      "port": 8000,
+      "endpoint": "/api/telemetry/latest",
+      "source": "network/ems_web_api_server.py"
+    },
+    {
+      "group": "EMS Web API",
+      "port": 8000,
+      "endpoint": "/api/telemetry/latest?view=operator",
+      "source": "network/ems_web_api_server.py"
+    },
+    {
+      "group": "EMS Web API",
+      "port": 8000,
+      "endpoint": "/api/telemetry/operator",
+      "source": "network/ems_web_api_server.py"
+    },
+    {
+      "group": "Log HTTP API",
+      "port": 7000,
+      "endpoint": "/api/health",
+      "source": "network/log_http_server.py"
+    },
+    {
+      "group": "Log HTTP API",
+      "port": 7000,
+      "endpoint": "/api/logs/assets",
+      "source": "network/log_http_server.py"
+    },
+    {
+      "group": "Log HTTP API",
+      "port": 7000,
+      "endpoint": "/api/logs/download/telemetry",
+      "source": "network/log_http_server.py"
+    },
+    {
+      "group": "Log HTTP API",
+      "port": 7000,
+      "endpoint": "/api/logs/download/telemetry?asset_id=pcs_1&date=YYYY-MM-DD",
+      "source": "network/log_http_server.py"
+    },
+    {
+      "group": "Log HTTP API",
+      "port": 7000,
+      "endpoint": "/api/logs/errors",
+      "source": "network/log_http_server.py"
+    },
+    {
+      "group": "Log HTTP API",
+      "port": 7000,
+      "endpoint": "/api/logs/errors?asset_id=pcs_1&limit=100",
+      "source": "network/log_http_server.py"
+    },
+    {
+      "group": "Log HTTP API",
+      "port": 7000,
+      "endpoint": "/api/logs/events",
+      "source": "network/log_http_server.py"
+    },
+    {
+      "group": "Log HTTP API",
+      "port": 7000,
+      "endpoint": "/api/logs/events?asset_id=pcs_1&event_type=PCS_ACTIVE_POWER_WRITE&status=success&limit=100",
+      "source": "network/log_http_server.py"
+    },
+    {
+      "group": "Log HTTP API",
+      "port": 7000,
+      "endpoint": "/api/logs/files",
+      "source": "network/log_http_server.py"
+    },
+    {
+      "group": "Log HTTP API",
+      "port": 7000,
+      "endpoint": "/api/logs/files?asset_id=pcs_1",
+      "source": "network/log_http_server.py"
+    },
+    {
+      "group": "Log HTTP API",
+      "port": 7000,
+      "endpoint": "/api/logs/metadata",
+      "source": "network/log_http_server.py"
+    },
+    {
+      "group": "Log HTTP API",
+      "port": 7000,
+      "endpoint": "/api/logs/telemetry",
+      "source": "network/log_http_server.py"
+    },
+    {
+      "group": "Log HTTP API",
+      "port": 7000,
+      "endpoint": "/api/logs/telemetry?asset_id=pcs_1&date=YYYY-MM-DD&limit=100",
+      "source": "network/log_http_server.py"
+    },
+    {
+      "group": "Log HTTP API",
+      "port": 7000,
+      "endpoint": "/api/storage/health",
+      "source": "network/log_http_server.py"
+    },
+    {
+      "group": "Log HTTP API",
+      "port": 7000,
+      "endpoint": "/api/storage/health?asset_id=chiller_1",
+      "source": "network/log_http_server.py"
+    },
+    {
+      "group": "Log HTTP API",
+      "port": 7000,
+      "endpoint": "/api/storage/status",
+      "source": "network/log_http_server.py"
+    },
+    {
+      "group": "Log HTTP API",
+      "port": 7000,
+      "endpoint": "/api/storage/status?asset_id=chiller_1",
+      "source": "network/log_http_server.py"
+    },
+    {
+      "group": "Log HTTP API",
+      "port": 7000,
+      "endpoint": "/api/storage/status?asset_id=pcs_1",
+      "source": "network/log_http_server.py"
+    }
+  ],
+  "dataclasses": {
+    "CliConfig": [
+      {
+        "field": "host",
+        "type": "str",
+        "source": "bms_modbus_tcp_cli.py"
+      },
+      {
+        "field": "port",
+        "type": "int",
+        "source": "bms_modbus_tcp_cli.py"
+      },
+      {
+        "field": "unit_id",
+        "type": "int",
+        "source": "bms_modbus_tcp_cli.py"
+      },
+      {
+        "field": "timeout",
+        "type": "float",
+        "source": "bms_modbus_tcp_cli.py"
+      },
+      {
+        "field": "address_offset",
+        "type": "int",
+        "source": "bms_modbus_tcp_cli.py"
+      }
+    ],
+    "AssetDescriptor": [
+      {
+        "field": "asset_key",
+        "type": "str",
+        "source": "core/asset_registry.py"
+      },
+      {
+        "field": "asset_id",
+        "type": "str",
+        "source": "core/asset_registry.py"
+      },
+      {
+        "field": "asset_type",
+        "type": "str",
+        "source": "core/asset_registry.py"
+      },
+      {
+        "field": "enabled",
+        "type": "bool",
+        "source": "core/asset_registry.py"
+      },
+      {
+        "field": "service",
+        "type": "Optional[Any]",
+        "source": "core/asset_registry.py"
+      },
+      {
+        "field": "transport",
+        "type": "str",
+        "source": "core/asset_registry.py"
+      },
+      {
+        "field": "vendor",
+        "type": "Optional[str]",
+        "source": "core/asset_registry.py"
+      },
+      {
+        "field": "host",
+        "type": "Optional[str]",
+        "source": "core/asset_registry.py"
+      },
+      {
+        "field": "port",
+        "type": "Optional[int]",
+        "source": "core/asset_registry.py"
+      },
+      {
+        "field": "unit_id",
+        "type": "Optional[int]",
+        "source": "core/asset_registry.py"
+      },
+      {
+        "field": "metadata",
+        "type": "JsonDict",
+        "source": "core/asset_registry.py"
+      },
+      {
+        "field": "registered_at",
+        "type": "str",
+        "source": "core/asset_registry.py"
+      }
+    ],
+    "AssetProfileDefinition": [
+      {
+        "field": "asset_key",
+        "type": "str",
+        "source": "core/assets/asset_profile.py"
+      },
+      {
+        "field": "asset_id",
+        "type": "str",
+        "source": "core/assets/asset_profile.py"
+      },
+      {
+        "field": "asset_type",
+        "type": "str",
+        "source": "core/assets/asset_profile.py"
+      },
+      {
+        "field": "enabled",
+        "type": "bool",
+        "source": "core/assets/asset_profile.py"
+      },
+      {
+        "field": "vendor",
+        "type": "Optional[str]",
+        "source": "core/assets/asset_profile.py"
+      },
+      {
+        "field": "protocol",
+        "type": "str",
+        "source": "core/assets/asset_profile.py"
+      },
+      {
+        "field": "profile",
+        "type": "Optional[str]",
+        "source": "core/assets/asset_profile.py"
+      },
+      {
+        "field": "connection",
+        "type": "JsonDict",
+        "source": "core/assets/asset_profile.py"
+      },
+      {
+        "field": "poll_interval_sec",
+        "type": "Optional[float]",
+        "source": "core/assets/asset_profile.py"
+      },
+      {
+        "field": "timeout_sec",
+        "type": "Optional[float]",
+        "source": "core/assets/asset_profile.py"
+      },
+      {
+        "field": "retries",
+        "type": "Optional[int]",
+        "source": "core/assets/asset_profile.py"
+      },
+      {
+        "field": "metadata",
+        "type": "JsonDict",
+        "source": "core/assets/asset_profile.py"
+      }
+    ],
+    "RuntimeAssetRecord": [
+      {
+        "field": "asset_id",
+        "type": "str",
+        "source": "core/assets/runtime_catalog.py"
+      },
+      {
+        "field": "asset_key",
+        "type": "str",
+        "source": "core/assets/runtime_catalog.py"
+      },
+      {
+        "field": "asset_type",
+        "type": "str",
+        "source": "core/assets/runtime_catalog.py"
+      },
+      {
+        "field": "enabled",
+        "type": "bool",
+        "source": "core/assets/runtime_catalog.py"
+      },
+      {
+        "field": "running",
+        "type": "bool",
+        "source": "core/assets/runtime_catalog.py"
+      },
+      {
+        "field": "online",
+        "type": "bool",
+        "source": "core/assets/runtime_catalog.py"
+      },
+      {
+        "field": "protocol",
+        "type": "Optional[str]",
+        "source": "core/assets/runtime_catalog.py"
+      },
+      {
+        "field": "profile",
+        "type": "Optional[str]",
+        "source": "core/assets/runtime_catalog.py"
+      },
+      {
+        "field": "vendor",
+        "type": "Optional[str]",
+        "source": "core/assets/runtime_catalog.py"
+      },
+      {
+        "field": "configured",
+        "type": "bool",
+        "source": "core/assets/runtime_catalog.py"
+      },
+      {
+        "field": "telemetry_available",
+        "type": "bool",
+        "source": "core/assets/runtime_catalog.py"
+      },
+      {
+        "field": "runtime_mode",
+        "type": "str",
+        "source": "core/assets/runtime_catalog.py"
+      },
+      {
+        "field": "compatibility",
+        "type": "JsonDict",
+        "source": "core/assets/runtime_catalog.py"
+      },
+      {
+        "field": "connection",
+        "type": "JsonDict",
+        "source": "core/assets/runtime_catalog.py"
+      },
+      {
+        "field": "metadata",
+        "type": "JsonDict",
+        "source": "core/assets/runtime_catalog.py"
+      }
+    ],
+    "ProtocolDescriptor": [
+      {
+        "field": "protocol",
+        "type": "str",
+        "source": "core/protocols/base_transport.py"
+      },
+      {
+        "field": "connection",
+        "type": "JsonDict",
+        "source": "core/protocols/base_transport.py"
+      },
+      {
+        "field": "profile",
+        "type": "Optional[str]",
+        "source": "core/protocols/base_transport.py"
+      },
+      {
+        "field": "vendor",
+        "type": "Optional[str]",
+        "source": "core/protocols/base_transport.py"
+      }
+    ],
+    "RuntimeConfig": [
+      {
+        "field": "values",
+        "type": "JsonDict",
+        "source": "core/runtime_config.py"
+      },
+      {
+        "field": "source_map",
+        "type": "Dict[str, str]",
+        "source": "core/runtime_config.py"
+      },
+      {
+        "field": "config_file",
+        "type": "Optional[str]",
+        "source": "core/runtime_config.py"
+      },
+      {
+        "field": "env_prefix",
+        "type": "str",
+        "source": "core/runtime_config.py"
+      }
+    ],
+    "LogFilter": [
+      {
+        "field": "log_type",
+        "type": "str",
+        "source": "core/storage/query/filter_model.py"
+      },
+      {
+        "field": "asset_id",
+        "type": "Optional[str]",
+        "source": "core/storage/query/filter_model.py"
+      },
+      {
+        "field": "date",
+        "type": "Optional[str]",
+        "source": "core/storage/query/filter_model.py"
+      },
+      {
+        "field": "start_time",
+        "type": "Optional[str]",
+        "source": "core/storage/query/filter_model.py"
+      },
+      {
+        "field": "end_time",
+        "type": "Optional[str]",
+        "source": "core/storage/query/filter_model.py"
+      },
+      {
+        "field": "fields",
+        "type": "Optional[List[str]]",
+        "source": "core/storage/query/filter_model.py"
+      },
+      {
+        "field": "exact_filters",
+        "type": "JsonDict",
+        "source": "core/storage/query/filter_model.py"
+      },
+      {
+        "field": "search",
+        "type": "Optional[str]",
+        "source": "core/storage/query/filter_model.py"
+      },
+      {
+        "field": "limit",
+        "type": "int",
+        "source": "core/storage/query/filter_model.py"
+      },
+      {
+        "field": "offset",
+        "type": "int",
+        "source": "core/storage/query/filter_model.py"
+      },
+      {
+        "field": "order",
+        "type": "str",
+        "source": "core/storage/query/filter_model.py"
+      }
+    ],
+    "LogQueryResult": [
+      {
+        "field": "status",
+        "type": "str",
+        "source": "core/storage/query/result_model.py"
+      },
+      {
+        "field": "rows",
+        "type": "List[JsonDict]",
+        "source": "core/storage/query/result_model.py"
+      },
+      {
+        "field": "file",
+        "type": "str",
+        "source": "core/storage/query/result_model.py"
+      },
+      {
+        "field": "file_name",
+        "type": "str",
+        "source": "core/storage/query/result_model.py"
+      },
+      {
+        "field": "message",
+        "type": "str",
+        "source": "core/storage/query/result_model.py"
+      },
+      {
+        "field": "total_rows",
+        "type": "int",
+        "source": "core/storage/query/result_model.py"
+      },
+      {
+        "field": "filtered_rows",
+        "type": "int",
+        "source": "core/storage/query/result_model.py"
+      },
+      {
+        "field": "rows_count",
+        "type": "int",
+        "source": "core/storage/query/result_model.py"
+      },
+      {
+        "field": "limit",
+        "type": "int",
+        "source": "core/storage/query/result_model.py"
+      },
+      {
+        "field": "offset",
+        "type": "int",
+        "source": "core/storage/query/result_model.py"
+      },
+      {
+        "field": "filters",
+        "type": "JsonDict",
+        "source": "core/storage/query/result_model.py"
+      }
+    ],
+    "TelemetryPipelineConfig": [
+      {
+        "field": "gateway_id",
+        "type": "str",
+        "source": "core/telemetry_pipeline.py"
+      },
+      {
+        "field": "chiller_asset_id",
+        "type": "str",
+        "source": "core/telemetry_pipeline.py"
+      },
+      {
+        "field": "pcs_asset_id",
+        "type": "str",
+        "source": "core/telemetry_pipeline.py"
+      },
+      {
+        "field": "bms_asset_id",
+        "type": "str",
+        "source": "core/telemetry_pipeline.py"
+      },
+      {
+        "field": "pcs_vendor",
+        "type": "str",
+        "source": "core/telemetry_pipeline.py"
+      }
+    ],
+    "BmsDriverConfig": [
+      {
+        "field": "host",
+        "type": "str",
+        "source": "drivers/bms_modbus_tcp_driver.py"
+      },
+      {
+        "field": "port",
+        "type": "int",
+        "source": "drivers/bms_modbus_tcp_driver.py"
+      },
+      {
+        "field": "unit_id",
+        "type": "int",
+        "source": "drivers/bms_modbus_tcp_driver.py"
+      },
+      {
+        "field": "timeout",
+        "type": "float",
+        "source": "drivers/bms_modbus_tcp_driver.py"
+      },
+      {
+        "field": "address_offset",
+        "type": "int",
+        "source": "drivers/bms_modbus_tcp_driver.py"
+      },
+      {
+        "field": "reconnect_delay_sec",
+        "type": "float",
+        "source": "drivers/bms_modbus_tcp_driver.py"
+      }
+    ],
+    "RegisterDef": [
+      {
+        "field": "key",
+        "type": "str",
+        "source": "drivers/bms_register_map.py"
+      },
+      {
+        "field": "address",
+        "type": "int",
+        "source": "drivers/bms_register_map.py"
+      },
+      {
+        "field": "name",
+        "type": "str",
+        "source": "drivers/bms_register_map.py"
+      },
+      {
+        "field": "category",
+        "type": "str",
+        "source": "drivers/bms_register_map.py"
+      },
+      {
+        "field": "subcategory",
+        "type": "str",
+        "source": "drivers/bms_register_map.py"
+      },
+      {
+        "field": "access",
+        "type": "str",
+        "source": "drivers/bms_register_map.py"
+      },
+      {
+        "field": "data_format",
+        "type": "str",
+        "source": "drivers/bms_register_map.py"
+      },
+      {
+        "field": "scale",
+        "type": "Optional[float]",
+        "source": "drivers/bms_register_map.py"
+      },
+      {
+        "field": "unit",
+        "type": "Optional[str]",
+        "source": "drivers/bms_register_map.py"
+      },
+      {
+        "field": "description",
+        "type": "str",
+        "source": "drivers/bms_register_map.py"
+      }
+    ],
+    "BmsState": [
+      {
+        "field": "gateway_id",
+        "type": "str",
+        "source": "models/bms_state.py"
+      },
+      {
+        "field": "asset_id",
+        "type": "str",
+        "source": "models/bms_state.py"
+      },
+      {
+        "field": "timestamp",
+        "type": "str",
+        "source": "models/bms_state.py"
+      },
+      {
+        "field": "communication_status",
+        "type": "str",
+        "source": "models/bms_state.py"
+      },
+      {
+        "field": "last_error",
+        "type": "Optional[str]",
+        "source": "models/bms_state.py"
+      },
+      {
+        "field": "last_success_ts",
+        "type": "Optional[float]",
+        "source": "models/bms_state.py"
+      },
+      {
+        "field": "soc_percent",
+        "type": "Optional[float]",
+        "source": "models/bms_state.py"
+      },
+      {
+        "field": "soh_percent",
+        "type": "Optional[float]",
+        "source": "models/bms_state.py"
+      },
+      {
+        "field": "rack_inner_soc_percent",
+        "type": "Optional[float]",
+        "source": "models/bms_state.py"
+      },
+      {
+        "field": "rack_voltage_v",
+        "type": "Optional[float]",
+        "source": "models/bms_state.py"
+      },
+      {
+        "field": "rack_current_a",
+        "type": "Optional[float]",
+        "source": "models/bms_state.py"
+      },
+      {
+        "field": "power_kw",
+        "type": "Optional[float]",
+        "source": "models/bms_state.py"
+      },
+      {
+        "field": "max_allowed_charge_current_a",
+        "type": "Optional[float]",
+        "source": "models/bms_state.py"
+      },
+      {
+        "field": "max_allowed_discharge_current_a",
+        "type": "Optional[float]",
+        "source": "models/bms_state.py"
+      },
+      {
+        "field": "max_cell_voltage_mv",
+        "type": "Optional[float]",
+        "source": "models/bms_state.py"
+      },
+      {
+        "field": "min_cell_voltage_mv",
+        "type": "Optional[float]",
+        "source": "models/bms_state.py"
+      },
+      {
+        "field": "avg_cell_voltage_mv",
+        "type": "Optional[float]",
+        "source": "models/bms_state.py"
+      },
+      {
+        "field": "cell_voltage_diff_mv",
+        "type": "Optional[float]",
+        "source": "models/bms_state.py"
+      },
+      {
+        "field": "max_cell_temp_c",
+        "type": "Optional[float]",
+        "source": "models/bms_state.py"
+      },
+      {
+        "field": "min_cell_temp_c",
+        "type": "Optional[float]",
+        "source": "models/bms_state.py"
+      },
+      {
+        "field": "avg_temp_c",
+        "type": "Optional[float]",
+        "source": "models/bms_state.py"
+      },
+      {
+        "field": "max_temp_diff_c",
+        "type": "Optional[float]",
+        "source": "models/bms_state.py"
+      },
+      {
+        "field": "insulation_resistance_kohm",
+        "type": "Optional[float]",
+        "source": "models/bms_state.py"
+      },
+      {
+        "field": "positive_insulation_resistance_kohm",
+        "type": "Optional[float]",
+        "source": "models/bms_state.py"
+      },
+      {
+        "field": "negative_insulation_resistance_kohm",
+        "type": "Optional[float]",
+        "source": "models/bms_state.py"
+      },
+      {
+        "field": "precharge_stage",
+        "type": "Optional[str]",
+        "source": "models/bms_state.py"
+      },
+      {
+        "field": "bcu_state",
+        "type": "Optional[str]",
+        "source": "models/bms_state.py"
+      },
+      {
+        "field": "current_state",
+        "type": "Optional[str]",
+        "source": "models/bms_state.py"
+      },
+      {
+        "field": "heartbeat",
+        "type": "Optional[int]",
+        "source": "models/bms_state.py"
+      },
+      {
+        "field": "contactor_active_flags",
+        "type": "List[str]",
+        "source": "models/bms_state.py"
+      },
+      {
+        "field": "positive_contactor_closed",
+        "type": "bool",
+        "source": "models/bms_state.py"
+      },
+      {
+        "field": "precharge_contactor_closed",
+        "type": "bool",
+        "source": "models/bms_state.py"
+      },
+      {
+        "field": "negative_contactor_closed",
+        "type": "bool",
+        "source": "models/bms_state.py"
+      },
+      {
+        "field": "active_alarms",
+        "type": "List[str]",
+        "source": "models/bms_state.py"
+      },
+      {
+        "field": "alarm_count",
+        "type": "int",
+        "source": "models/bms_state.py"
+      },
+      {
+        "field": "raw",
+        "type": "Dict[str, Any]",
+        "source": "models/bms_state.py"
+      }
+    ],
+    "ChillerState": [
+      {
+        "field": "water_pump",
+        "type": "Optional[str]",
+        "source": "models/chiller_state.py"
+      },
+      {
+        "field": "compressor1",
+        "type": "Optional[str]",
+        "source": "models/chiller_state.py"
+      },
+      {
+        "field": "compressor2",
+        "type": "Optional[str]",
+        "source": "models/chiller_state.py"
+      },
+      {
+        "field": "electric_heater",
+        "type": "Optional[str]",
+        "source": "models/chiller_state.py"
+      },
+      {
+        "field": "condensate_fan",
+        "type": "Optional[str]",
+        "source": "models/chiller_state.py"
+      },
+      {
+        "field": "makeup_pump",
+        "type": "Optional[str]",
+        "source": "models/chiller_state.py"
+      },
+      {
+        "field": "outlet_water_temp",
+        "type": "Optional[float]",
+        "source": "models/chiller_state.py"
+      },
+      {
+        "field": "return_water_temp",
+        "type": "Optional[float]",
+        "source": "models/chiller_state.py"
+      },
+      {
+        "field": "outlet_water_pressure",
+        "type": "Optional[float]",
+        "source": "models/chiller_state.py"
+      },
+      {
+        "field": "return_water_pressure",
+        "type": "Optional[float]",
+        "source": "models/chiller_state.py"
+      },
+      {
+        "field": "ambient_temp",
+        "type": "Optional[float]",
+        "source": "models/chiller_state.py"
+      },
+      {
+        "field": "fault_code",
+        "type": "Optional[int]",
+        "source": "models/chiller_state.py"
+      },
+      {
+        "field": "control_mode",
+        "type": "Optional[int]",
+        "source": "models/chiller_state.py"
+      },
+      {
+        "field": "set_temperature",
+        "type": "Optional[float]",
+        "source": "models/chiller_state.py"
+      },
+      {
+        "field": "communication_status",
+        "type": "str",
+        "source": "models/chiller_state.py"
+      },
+      {
+        "field": "last_update_time",
+        "type": "Optional[str]",
+        "source": "models/chiller_state.py"
+      }
+    ],
+    "PcsState": [
+      {
+        "field": "asset_id",
+        "type": "str",
+        "source": "models/pcs_state.py"
+      },
+      {
+        "field": "vendor",
+        "type": "str",
+        "source": "models/pcs_state.py"
+      },
+      {
+        "field": "comm_status",
+        "type": "str",
+        "source": "models/pcs_state.py"
+      },
+      {
+        "field": "last_update_ts",
+        "type": "str",
+        "source": "models/pcs_state.py"
+      },
+      {
+        "field": "error",
+        "type": "str",
+        "source": "models/pcs_state.py"
+      },
+      {
+        "field": "ab_voltage_v",
+        "type": "Optional[float]",
+        "source": "models/pcs_state.py"
+      },
+      {
+        "field": "bc_voltage_v",
+        "type": "Optional[float]",
+        "source": "models/pcs_state.py"
+      },
+      {
+        "field": "ca_voltage_v",
+        "type": "Optional[float]",
+        "source": "models/pcs_state.py"
+      },
+      {
+        "field": "phase_a_voltage_v",
+        "type": "Optional[float]",
+        "source": "models/pcs_state.py"
+      },
+      {
+        "field": "phase_b_voltage_v",
+        "type": "Optional[float]",
+        "source": "models/pcs_state.py"
+      },
+      {
+        "field": "phase_c_voltage_v",
+        "type": "Optional[float]",
+        "source": "models/pcs_state.py"
+      },
+      {
+        "field": "phase_a_current_a",
+        "type": "Optional[float]",
+        "source": "models/pcs_state.py"
+      },
+      {
+        "field": "phase_b_current_a",
+        "type": "Optional[float]",
+        "source": "models/pcs_state.py"
+      },
+      {
+        "field": "phase_c_current_a",
+        "type": "Optional[float]",
+        "source": "models/pcs_state.py"
+      },
+      {
+        "field": "frequency_hz",
+        "type": "Optional[float]",
+        "source": "models/pcs_state.py"
+      },
+      {
+        "field": "active_power_kw",
+        "type": "Optional[float]",
+        "source": "models/pcs_state.py"
+      },
+      {
+        "field": "reactive_power_kvar",
+        "type": "Optional[float]",
+        "source": "models/pcs_state.py"
+      },
+      {
+        "field": "apparent_power_kva",
+        "type": "Optional[float]",
+        "source": "models/pcs_state.py"
+      },
+      {
+        "field": "power_factor",
+        "type": "Optional[float]",
+        "source": "models/pcs_state.py"
+      },
+      {
+        "field": "bus_voltage_v",
+        "type": "Optional[float]",
+        "source": "models/pcs_state.py"
+      },
+      {
+        "field": "battery_voltage_v",
+        "type": "Optional[float]",
+        "source": "models/pcs_state.py"
+      },
+      {
+        "field": "battery_current_a",
+        "type": "Optional[float]",
+        "source": "models/pcs_state.py"
+      },
+      {
+        "field": "dc_power_kw",
+        "type": "Optional[float]",
+        "source": "models/pcs_state.py"
+      },
+      {
+        "field": "dc_total_current_a",
+        "type": "Optional[float]",
+        "source": "models/pcs_state.py"
+      },
+      {
+        "field": "operating_status_raw",
+        "type": "Optional[int]",
+        "source": "models/pcs_state.py"
+      },
+      {
+        "field": "operating_status",
+        "type": "str",
+        "source": "models/pcs_state.py"
+      },
+      {
+        "field": "grid_offgrid_status_raw",
+        "type": "Optional[int]",
+        "source": "models/pcs_state.py"
+      },
+      {
+        "field": "grid_offgrid_status",
+        "type": "str",
+        "source": "models/pcs_state.py"
+      },
+      {
+        "field": "fault_status",
+        "type": "bool",
+        "source": "models/pcs_state.py"
+      },
+      {
+        "field": "hardware_fault_word_1_raw",
+        "type": "Optional[int]",
+        "source": "models/pcs_state.py"
+      },
+      {
+        "field": "hardware_fault_word_2_raw",
+        "type": "Optional[int]",
+        "source": "models/pcs_state.py"
+      },
+      {
+        "field": "grid_fault_word_raw",
+        "type": "Optional[int]",
+        "source": "models/pcs_state.py"
+      },
+      {
+        "field": "bus_fault_word_raw",
+        "type": "Optional[int]",
+        "source": "models/pcs_state.py"
+      },
+      {
+        "field": "ac_capacitor_fault_word_raw",
+        "type": "Optional[int]",
+        "source": "models/pcs_state.py"
+      },
+      {
+        "field": "system_fault_word_raw",
+        "type": "Optional[int]",
+        "source": "models/pcs_state.py"
+      },
+      {
+        "field": "switch_fault_word_raw",
+        "type": "Optional[int]",
+        "source": "models/pcs_state.py"
+      },
+      {
+        "field": "other_fault_word_raw",
+        "type": "Optional[int]",
+        "source": "models/pcs_state.py"
+      },
+      {
+        "field": "fault_words_raw",
+        "type": "Dict[str, Any]",
+        "source": "models/pcs_state.py"
+      },
+      {
+        "field": "fault_categories",
+        "type": "Dict[str, Any]",
+        "source": "models/pcs_state.py"
+      },
+      {
+        "field": "active_faults",
+        "type": "List[str]",
+        "source": "models/pcs_state.py"
+      },
+      {
+        "field": "fault_count",
+        "type": "int",
+        "source": "models/pcs_state.py"
+      },
+      {
+        "field": "detailed_fault_status",
+        "type": "bool",
+        "source": "models/pcs_state.py"
+      },
+      {
+        "field": "fault_words_read_error",
+        "type": "str",
+        "source": "models/pcs_state.py"
+      },
+      {
+        "field": "igbt_temperature_c",
+        "type": "Optional[float]",
+        "source": "models/pcs_state.py"
+      },
+      {
+        "field": "ambient_temperature_c",
+        "type": "Optional[float]",
+        "source": "models/pcs_state.py"
+      },
+      {
+        "field": "inductance_temperature_c",
+        "type": "Optional[float]",
+        "source": "models/pcs_state.py"
+      },
+      {
+        "field": "raw_telemetry",
+        "type": "Dict[str, Any]",
+        "source": "models/pcs_state.py"
+      }
+    ],
+    "BmsServiceConfig": [
+      {
+        "field": "gateway_id",
+        "type": "str",
+        "source": "services/bms_gateway_service.py"
+      },
+      {
+        "field": "asset_id",
+        "type": "str",
+        "source": "services/bms_gateway_service.py"
+      },
+      {
+        "field": "host",
+        "type": "str",
+        "source": "services/bms_gateway_service.py"
+      },
+      {
+        "field": "port",
+        "type": "int",
+        "source": "services/bms_gateway_service.py"
+      },
+      {
+        "field": "unit_id",
+        "type": "int",
+        "source": "services/bms_gateway_service.py"
+      },
+      {
+        "field": "timeout",
+        "type": "float",
+        "source": "services/bms_gateway_service.py"
+      },
+      {
+        "field": "address_offset",
+        "type": "int",
+        "source": "services/bms_gateway_service.py"
+      },
+      {
+        "field": "poll_interval_sec",
+        "type": "float",
+        "source": "services/bms_gateway_service.py"
+      },
+      {
+        "field": "command_verify_delay_sec",
+        "type": "float",
+        "source": "services/bms_gateway_service.py"
+      },
+      {
+        "field": "communication_lost_after_sec",
+        "type": "float",
+        "source": "services/bms_gateway_service.py"
+      },
+      {
+        "field": "enable_storage_logging",
+        "type": "bool",
+        "source": "services/bms_gateway_service.py"
+      },
+      {
+        "field": "telemetry_log_interval_sec",
+        "type": "float",
+        "source": "services/bms_gateway_service.py"
+      },
+      {
+        "field": "print_status",
+        "type": "bool",
+        "source": "services/bms_gateway_service.py"
+      }
+    ]
+  },
+  "dict_keys": {
+    "network/ems_web_api_server.py": [
+      {
+        "function": "get_status",
+        "keys": [
+          "server_name",
+          "running",
+          "host",
+          "port",
+          "stream_interval_sec",
+          "auth_enabled"
+        ]
+      },
+      {
+        "function": "_make_handler/_error",
+        "keys": [
+          "status",
+          "error_code",
+          "message",
+          "timestamp"
+        ]
+      },
+      {
+        "function": "_make_handler/_safe_gateway_status",
+        "keys": [
+          "status",
+          "message"
+        ]
+      },
+      {
+        "function": "_make_handler/_safe_gateway_status",
+        "keys": [
+          "status",
+          "message",
+          "timestamp"
+        ]
+      },
+      {
+        "function": "_make_handler/_safe_telemetry",
+        "keys": [
+          "status",
+          "message"
+        ]
+      },
+      {
+        "function": "_make_handler/_safe_telemetry",
+        "keys": [
+          "status",
+          "message",
+          "timestamp"
+        ]
+      },
+      {
+        "function": "_make_handler/_storage_health_for_asset",
+        "keys": [
+          "status",
+          "error",
+          "asset_id"
+        ]
+      },
+      {
+        "function": "_make_handler/_telemetry_keys_response",
+        "keys": [
+          "status",
+          "asset_id",
+          "message",
+          "keys",
+          "groups"
+        ]
+      },
+      {
+        "function": "_make_handler/_telemetry_keys_response",
+        "keys": [
+          "value"
+        ]
+      },
+      {
+        "function": "_make_handler/_telemetry_keys_response",
+        "keys": [
+          "all"
+        ]
+      },
+      {
+        "function": "_make_handler/_telemetry_keys_response",
+        "keys": [
+          "stack_level",
+          "voltage_current_power",
+          "temperature",
+          "alarms_status",
+          "all"
+        ]
+      },
+      {
+        "function": "_make_handler/_telemetry_keys_response",
+        "keys": [
+          "dc_side",
+          "ac_side",
+          "power_energy",
+          "status_faults",
+          "all"
+        ]
+      },
+      {
+        "function": "_make_handler/_telemetry_keys_response",
+        "keys": [
+          "temperature",
+          "pressure",
+          "control",
+          "status_faults",
+          "all"
+        ]
+      },
+      {
+        "function": "_make_handler/_telemetry_keys_response",
+        "keys": [
+          "status",
+          "asset_id",
+          "asset_type",
+          "keys_count",
+          "keys",
+          "groups",
+          "timestamp"
+        ]
+      },
+      {
+        "function": "_make_handler/_timeseries_response",
+        "keys": [
+          "status",
+          "error_code",
+          "message",
+          "asset_id"
+        ]
+      },
+      {
+        "function": "_make_handler/_timeseries_response",
+        "keys": [
+          "status",
+          "error_code",
+          "message",
+          "asset_id"
+        ]
+      },
+      {
+        "function": "_make_handler/_timeseries_response",
+        "keys": [
+          "ts",
+          "value"
+        ]
+      },
+      {
+        "function": "_make_handler/_timeseries_response",
+        "keys": [
+          "status",
+          "asset_id",
+          "date",
+          "startTs",
+          "endTs",
+          "keys",
+          "data",
+          "rows_count",
+          "source",
+          "raw_log_response"
+        ]
+      },
+      {
+        "function": "_make_handler/_timeseries_response",
+        "keys": [
+          "file",
+          "total_rows",
+          "filtered_rows",
+          "limit"
+        ]
+      },
+      {
+        "function": "_make_handler/do_GET",
+        "keys": [
+          "status",
+          "server",
+          "message",
+          "timestamp",
+          "endpoints"
+        ]
+      },
+      {
+        "function": "_make_handler/do_GET",
+        "keys": [
+          "status",
+          "server",
+          "message",
+          "timestamp",
+          "host",
+          "port"
+        ]
+      },
+      {
+        "function": "_make_handler/do_GET",
+        "keys": [
+          "status",
+          "timestamp",
+          "gateway",
+          "web_api_server"
+        ]
+      },
+      {
+        "function": "_make_handler/do_GET",
+        "keys": [
+          "status",
+          "timestamp",
+          "network",
+          "web_api_server",
+          "note"
+        ]
+      },
+      {
+        "function": "_make_handler/do_GET",
+        "keys": [
+          "status",
+          "asset",
+          "timestamp"
+        ]
+      },
+      {
+        "function": "_make_handler/do_GET",
+        "keys": [
+          "status",
+          "asset_id",
+          "asset_type",
+          "asset_key",
+          "timestamp",
+          "online",
+          "runtime_mode",
+          "telemetry"
+        ]
+      },
+      {
+        "function": "_make_handler/do_POST",
+        "keys": [
+          "status",
+          "message",
+          "data"
+        ]
+      },
+      {
+        "function": "_make_handler/do_POST",
+        "keys": [
+          "status",
+          "timestamp",
+          "asset_id",
+          "command",
+          "request_id",
+          "result"
+        ]
+      },
+      {
+        "function": "_make_handler/_handle_sse_stream",
+        "keys": [
+          "status",
+          "message",
+          "timestamp"
+        ]
+      }
+    ],
+    "network/log_http_server.py": [
+      {
+        "function": "get_status",
+        "keys": [
+          "server_name",
+          "running",
+          "host",
+          "port"
+        ]
+      },
+      {
+        "function": "_make_handler/_error",
+        "keys": [
+          "status",
+          "message",
+          "timestamp"
+        ]
+      },
+      {
+        "function": "_make_handler/do_GET",
+        "keys": [
+          "status",
+          "server",
+          "message",
+          "endpoints"
+        ]
+      },
+      {
+        "function": "_make_handler/do_GET",
+        "keys": [
+          "status",
+          "server",
+          "timestamp"
+        ]
+      }
+    ],
+    "core/health/health_monitor.py": [
+      {
+        "function": "build_gateway_health",
+        "keys": [
+          "status",
+          "gateway_id",
+          "timestamp",
+          "mode",
+          "summary",
+          "services",
+          "recommended_action"
+        ]
+      },
+      {
+        "function": "build_gateway_health",
+        "keys": [
+          "web_api",
+          "log_http",
+          "udp_streamer",
+          "tcp_server"
+        ]
+      },
+      {
+        "function": "build_assets_health",
+        "keys": [
+          "total",
+          "healthy",
+          "degraded",
+          "offline",
+          "disabled",
+          "unknown"
+        ]
+      },
+      {
+        "function": "build_assets_health",
+        "keys": [
+          "status",
+          "timestamp",
+          "summary",
+          "assets"
+        ]
+      },
+      {
+        "function": "build_asset_health",
+        "keys": [
+          "status",
+          "asset_id",
+          "asset_key",
+          "asset_type",
+          "enabled",
+          "running",
+          "online",
+          "runtime_mode",
+          "protocol",
+          "profile",
+          "vendor",
+          "connection",
+          "last_successful_poll",
+          "last_error",
+          "consecutive_failures",
+          "reason",
+          "recommended_action",
+          "storage",
+          "timestamp"
+        ]
+      },
+      {
+        "function": "build_diagnostics",
+        "keys": [
+          "status",
+          "timestamp",
+          "asset_id",
+          "diagnostics",
+          "health"
+        ]
+      },
+      {
+        "function": "build_diagnostics",
+        "keys": [
+          "status",
+          "timestamp",
+          "gateway",
+          "diagnostics"
+        ]
+      },
+      {
+        "function": "build_overall_health",
+        "keys": [
+          "status",
+          "timestamp",
+          "gateway_id",
+          "gateway",
+          "assets",
+          "summary"
+        ]
+      },
+      {
+        "function": "_service_health",
+        "keys": [
+          "status",
+          "enabled",
+          "running",
+          "details"
+        ]
+      },
+      {
+        "function": "_safe_storage_health",
+        "keys": [
+          "status",
+          "error"
+        ]
+      },
+      {
+        "function": "_diagnostics_from_health",
+        "keys": [
+          "healthy",
+          "disabled",
+          "unknown",
+          "degraded",
+          "offline"
+        ]
+      },
+      {
+        "function": "_diagnostics_from_health",
+        "keys": [
+          "severity",
+          "status",
+          "reason",
+          "last_error",
+          "recommended_action",
+          "connection",
+          "storage_status"
+        ]
+      }
+    ],
+    "core/assets/runtime_catalog.py": [
+      {
+        "function": "",
+        "keys": [
+          "chiller",
+          "chiller_1",
+          "pcs",
+          "pcs_1",
+          "inverter",
+          "inverter_1",
+          "bms",
+          "bms_1",
+          "bcu",
+          "bcu_1"
+        ]
+      },
+      {
+        "function": "",
+        "keys": [
+          "chiller",
+          "pcs",
+          "bms"
+        ]
+      },
+      {
+        "function": "to_dict",
+        "keys": [
+          "asset_id",
+          "asset_key",
+          "asset_type",
+          "enabled",
+          "running",
+          "online",
+          "protocol",
+          "profile",
+          "vendor",
+          "configured",
+          "telemetry_available",
+          "runtime_mode",
+          "compatibility",
+          "connection",
+          "metadata"
+        ]
+      },
+      {
+        "function": "to_response",
+        "keys": [
+          "status",
+          "gateway_id",
+          "timestamp",
+          "assets_count",
+          "assets",
+          "summary"
+        ]
+      },
+      {
+        "function": "summary",
+        "keys": [
+          "total",
+          "enabled",
+          "running",
+          "online",
+          "configured_only",
+          "configured_future",
+          "disabled"
+        ]
+      }
+    ],
+    "core/storage/query/filter_model.py": [
+      {
+        "function": "from_http_query",
+        "keys": [
+          "telemetry",
+          "events",
+          "errors"
+        ]
+      },
+      {
+        "function": "to_response_dict",
+        "keys": [
+          "log_type",
+          "asset_id",
+          "date",
+          "start_time",
+          "end_time",
+          "fields",
+          "exact_filters",
+          "search",
+          "limit",
+          "offset",
+          "order"
+        ]
+      }
+    ],
+    "core/storage/query/result_model.py": [
+      {
+        "function": "to_dict",
+        "keys": [
+          "status",
+          "file",
+          "file_name",
+          "total_rows",
+          "filtered_rows",
+          "rows_count",
+          "limit",
+          "offset",
+          "filters",
+          "rows"
+        ]
+      }
+    ],
+    "services/storage_logger.py": [
+      {
+        "function": "get_status",
+        "keys": [
+          "logger_status",
+          "base_path",
+          "asset_id",
+          "asset_type",
+          "gateway_id",
+          "sequence_no",
+          "telemetry_file",
+          "event_file",
+          "error_file"
+        ]
+      }
+    ],
+    "models/bms_state.py": [
+      {
+        "function": "to_telemetry_dict",
+        "keys": [
+          "gateway_id",
+          "asset_id",
+          "timestamp",
+          "communication_status",
+          "soc_percent",
+          "soh_percent",
+          "rack_inner_soc_percent",
+          "rack_voltage_v",
+          "rack_current_a",
+          "power_kw",
+          "max_allowed_charge_current_a",
+          "max_allowed_discharge_current_a",
+          "max_cell_voltage_mv",
+          "min_cell_voltage_mv",
+          "avg_cell_voltage_mv",
+          "cell_voltage_diff_mv",
+          "max_cell_temp_c",
+          "min_cell_temp_c",
+          "avg_temp_c",
+          "insulation_resistance_kohm",
+          "precharge_stage",
+          "bcu_state",
+          "current_state",
+          "positive_contactor_closed",
+          "precharge_contactor_closed",
+          "negative_contactor_closed",
+          "active_alarms",
+          "alarm_count",
+          "last_error"
+        ]
+      },
+      {
+        "function": "to_event_context",
+        "keys": [
+          "asset_id",
+          "timestamp",
+          "communication_status",
+          "soc_percent",
+          "rack_voltage_v",
+          "rack_current_a",
+          "precharge_stage",
+          "bcu_state",
+          "current_state",
+          "alarm_count"
+        ]
+      }
+    ]
+  },
+  "storage_headers": {
+    "chiller_telemetry_header": [
+      "timestamp",
+      "sequence_no",
+      "gateway_id",
+      "asset_id",
+      "system_on_off",
+      "control_mode",
+      "set_temperature",
+      "outlet_water_temp",
+      "return_water_temp",
+      "outlet_water_pressure",
+      "return_water_pressure",
+      "ambient_temp",
+      "water_pump_status",
+      "compressor_1_status",
+      "compressor_2_status",
+      "electric_heater_status",
+      "condensate_fan_status",
+      "modbus_status",
+      "logger_status"
+    ],
+    "pcs_telemetry_header": [
+      "timestamp",
+      "sequence_no",
+      "gateway_id",
+      "asset_id",
+      "vendor",
+      "comm_status",
+      "active_power_kw",
+      "reactive_power_kvar",
+      "apparent_power_kva",
+      "power_factor",
+      "frequency_hz",
+      "battery_voltage_v",
+      "battery_current_a",
+      "dc_power_kw",
+      "dc_total_current_a",
+      "bus_voltage_v",
+      "ab_voltage_v",
+      "bc_voltage_v",
+      "ca_voltage_v",
+      "phase_a_voltage_v",
+      "phase_b_voltage_v",
+      "phase_c_voltage_v",
+      "phase_a_current_a",
+      "phase_b_current_a",
+      "phase_c_current_a",
+      "operating_status",
+      "operating_status_raw",
+      "grid_offgrid_status",
+      "grid_offgrid_status_raw",
+      "fault_status",
+      "detailed_fault_status",
+      "fault_count",
+      "hardware_fault_word_1_raw",
+      "hardware_fault_word_2_raw",
+      "grid_fault_word_raw",
+      "bus_fault_word_raw",
+      "ac_capacitor_fault_word_raw",
+      "system_fault_word_raw",
+      "switch_fault_word_raw",
+      "other_fault_word_raw",
+      "active_faults",
+      "fault_words_read_error",
+      "igbt_temperature_c",
+      "ambient_temperature_c",
+      "inductance_temperature_c",
+      "error",
+      "logger_status"
+    ],
+    "bms_telemetry_header": [
+      "timestamp",
+      "sequence_no",
+      "gateway_id",
+      "asset_id",
+      "communication_status",
+      "soc_percent",
+      "soh_percent",
+      "rack_inner_soc_percent",
+      "rack_voltage_v",
+      "rack_current_a",
+      "power_kw",
+      "max_allowed_charge_current_a",
+      "max_allowed_discharge_current_a",
+      "max_cell_voltage_mv",
+      "min_cell_voltage_mv",
+      "avg_cell_voltage_mv",
+      "cell_voltage_diff_mv",
+      "max_cell_temp_c",
+      "min_cell_temp_c",
+      "avg_temp_c",
+      "insulation_resistance_kohm",
+      "positive_insulation_resistance_kohm",
+      "negative_insulation_resistance_kohm",
+      "precharge_stage",
+      "bcu_state",
+      "current_state",
+      "positive_contactor_closed",
+      "precharge_contactor_closed",
+      "negative_contactor_closed",
+      "alarm_count",
+      "active_alarms",
+      "contactor_active_flags",
+      "last_error",
+      "logger_status"
+    ],
+    "chiller_event_header": [
+      "timestamp",
+      "gateway_id",
+      "asset_id",
+      "event_type",
+      "old_value",
+      "new_value",
+      "source",
+      "status",
+      "description"
+    ],
+    "pcs_event_header": [
+      "timestamp",
+      "gateway_id",
+      "asset_id",
+      "vendor",
+      "event_type",
+      "command",
+      "old_value",
+      "new_value",
+      "readback_value",
+      "source",
+      "status",
+      "description",
+      "error"
+    ],
+    "bms_event_header": [
+      "timestamp",
+      "gateway_id",
+      "asset_id",
+      "event_type",
+      "command",
+      "status",
+      "description",
+      "message",
+      "communication_status",
+      "soc_percent",
+      "rack_voltage_v",
+      "rack_current_a",
+      "precharge_stage",
+      "bcu_state",
+      "current_state",
+      "alarm_count",
+      "alarm",
+      "error"
+    ],
+    "error_header": [
+      "timestamp",
+      "gateway_id",
+      "asset_id",
+      "error_type",
+      "error_source",
+      "description"
+    ]
+  },
+  "bms_registers": [
+    {
+      "key": "functional_safety_warn",
+      "address": "0x0010",
+      "name": "Functional Safety Warning",
+      "category": "C6 Battery Alarms & Faults",
+      "subcategory": "Functional Safety Faults",
+      "access": "R",
+      "format": "u16",
+      "scale": null,
+      "unit": null,
+      "description": "Bitfield register for first-level functional safety faults."
+    },
+    {
+      "key": "bcu_external_fault_alarm",
+      "address": "0x0011",
+      "name": "BCU External Fault Alarm",
+      "category": "C6 Battery Alarms & Faults",
+      "subcategory": "Critical Faults",
+      "access": "R",
+      "format": "u16",
+      "scale": null,
+      "unit": null,
+      "description": "Bitfield register for BCU/BMU external critical faults."
+    },
+    {
+      "key": "extern_critical_alarm",
+      "address": "0x0012",
+      "name": "External Critical Alarm 1",
+      "category": "C6 Battery Alarms & Faults",
+      "subcategory": "Critical Faults",
+      "access": "R",
+      "format": "u16",
+      "scale": null,
+      "unit": null,
+      "description": "Bitfield register for first-level voltage/current/temperature/insulation faults."
+    },
+    {
+      "key": "extern_alarm",
+      "address": "0x0013",
+      "name": "External Alarm 1",
+      "category": "C6 Battery Alarms & Faults",
+      "subcategory": "Second-Level Alarms",
+      "access": "R",
+      "format": "u16",
+      "scale": null,
+      "unit": null,
+      "description": "Bitfield register for second-level voltage/current/temperature/insulation alarms."
+    },
+    {
+      "key": "extern_warn",
+      "address": "0x0014",
+      "name": "External Warning 1",
+      "category": "C6 Battery Alarms & Faults",
+      "subcategory": "Third-Level Warnings",
+      "access": "R",
+      "format": "u16",
+      "scale": null,
+      "unit": null,
+      "description": "Bitfield register for third-level warnings."
+    },
+    {
+      "key": "extern_critical_alarm2",
+      "address": "0x0015",
+      "name": "External Critical Alarm 2",
+      "category": "C6 Battery Alarms & Faults",
+      "subcategory": "Critical Faults",
+      "access": "R",
+      "format": "u16",
+      "scale": null,
+      "unit": null,
+      "description": "Bitfield register for additional first-level rack/module faults."
+    },
+    {
+      "key": "extern_alarm2",
+      "address": "0x0016",
+      "name": "External Alarm 2",
+      "category": "C6 Battery Alarms & Faults",
+      "subcategory": "Second-Level Alarms",
+      "access": "R",
+      "format": "u16",
+      "scale": null,
+      "unit": null,
+      "description": "Bitfield register for additional second-level rack/module alarms."
+    },
+    {
+      "key": "extern_warn2",
+      "address": "0x0017",
+      "name": "External Warning 2",
+      "category": "C6 Battery Alarms & Faults",
+      "subcategory": "Third-Level Warnings",
+      "access": "R",
+      "format": "u16",
+      "scale": null,
+      "unit": null,
+      "description": "Bitfield register for additional third-level rack/module warnings."
+    },
+    {
+      "key": "pre_power_stage",
+      "address": "0x0018",
+      "name": "Pre-Power / Precharge Stage",
+      "category": "C1 Battery System Status",
+      "subcategory": "Precharge Status",
+      "access": "R",
+      "format": "u16",
+      "scale": null,
+      "unit": null,
+      "description": "0=Idle, 1/2=Precharging, 3=Precharge success, 4=Precharge failed."
+    },
+    {
+      "key": "bcu_state",
+      "address": "0x0019",
+      "name": "BCU System State",
+      "category": "C1 Battery System Status",
+      "subcategory": "System Operating Status",
+      "access": "R",
+      "format": "u16",
+      "scale": null,
+      "unit": null,
+      "description": "0=Normal/Idle, 1=Charge forbidden, 2=Discharge forbidden, 3=Standby, 4=Stop/Shutdown."
+    },
+    {
+      "key": "heart_beat_num",
+      "address": "0x001A",
+      "name": "Heartbeat Number",
+      "category": "C1 Battery System Status",
+      "subcategory": "Communication Heartbeat",
+      "access": "R",
+      "format": "u16",
+      "scale": null,
+      "unit": null,
+      "description": "Heartbeat frame/counter, expected to increment periodically."
+    },
+    {
+      "key": "receive_cfg_state",
+      "address": "0x001B",
+      "name": "Receive Configuration State",
+      "category": "C6 Battery Alarms & Faults",
+      "subcategory": "Vendor Extension",
+      "access": "R",
+      "format": "u16",
+      "scale": null,
+      "unit": null,
+      "description": "0=BMU/slave registration failed, 1=BMU/slave registration success."
+    },
+    {
+      "key": "pre_chg_fail_reason",
+      "address": "0x001C",
+      "name": "Precharge Failure Reason",
+      "category": "C6 Battery Alarms & Faults",
+      "subcategory": "Vendor Extension",
+      "access": "R",
+      "format": "u16",
+      "scale": null,
+      "unit": null,
+      "description": "Reserved/vendor-specific precharge failure reason."
+    },
+    {
+      "key": "current_state",
+      "address": "0x001D",
+      "name": "Charge / Discharge State",
+      "category": "C1 Battery System Status",
+      "subcategory": "Charge / Discharge State",
+      "access": "R",
+      "format": "u16",
+      "scale": null,
+      "unit": null,
+      "description": "0=Idle, 1=Discharge, 2=Charge."
+    },
+    {
+      "key": "full_or_empty_flag",
+      "address": "0x001E",
+      "name": "Full or Empty Flag",
+      "category": "C1 Battery System Status",
+      "subcategory": "System Operating Status",
+      "access": "R",
+      "format": "u16",
+      "scale": null,
+      "unit": null,
+      "description": "0=Full, 1=Empty, as per workbook. Field validation recommended."
+    },
+    {
+      "key": "bcu_contactor_state",
+      "address": "0x001F",
+      "name": "BCU Contactor State",
+      "category": "C1 Battery System Status",
+      "subcategory": "Contactor / Operating Status",
+      "access": "R",
+      "format": "u16",
+      "scale": null,
+      "unit": null,
+      "description": "Bitfield: positive relay, precharge relay, negative relay, disconnector feedback."
+    },
+    {
+      "key": "max_cell_vol",
+      "address": "0x0210",
+      "name": "Maximum Cell Voltage",
+      "category": "C2 Battery Electrical Measurements",
+      "subcategory": "Cell Voltage Statistics",
+      "access": "R",
+      "format": "u16",
+      "scale": null,
+      "unit": "mV",
+      "description": ""
+    },
+    {
+      "key": "max_cell_vol_num",
+      "address": "0x0211",
+      "name": "Maximum Cell Voltage Number",
+      "category": "C2 Battery Electrical Measurements",
+      "subcategory": "Cell Voltage Statistics",
+      "access": "R",
+      "format": "u16",
+      "scale": null,
+      "unit": null,
+      "description": ""
+    },
+    {
+      "key": "max_vol_bmu_num",
+      "address": "0x0212",
+      "name": "Maximum Voltage BMU Number",
+      "category": "C2 Battery Electrical Measurements",
+      "subcategory": "Cell Voltage Statistics",
+      "access": "R",
+      "format": "u16",
+      "scale": null,
+      "unit": null,
+      "description": ""
+    },
+    {
+      "key": "bmu_max_vol_num",
+      "address": "0x0213",
+      "name": "BMU Maximum Voltage Cell Number",
+      "category": "C2 Battery Electrical Measurements",
+      "subcategory": "Cell Voltage Statistics",
+      "access": "R",
+      "format": "u16",
+      "scale": null,
+      "unit": null,
+      "description": ""
+    },
+    {
+      "key": "min_cell_vol",
+      "address": "0x0214",
+      "name": "Minimum Cell Voltage",
+      "category": "C2 Battery Electrical Measurements",
+      "subcategory": "Cell Voltage Statistics",
+      "access": "R",
+      "format": "u16",
+      "scale": null,
+      "unit": "mV",
+      "description": ""
+    },
+    {
+      "key": "min_cell_vol_num",
+      "address": "0x0215",
+      "name": "Minimum Cell Voltage Number",
+      "category": "C2 Battery Electrical Measurements",
+      "subcategory": "Cell Voltage Statistics",
+      "access": "R",
+      "format": "u16",
+      "scale": null,
+      "unit": null,
+      "description": ""
+    },
+    {
+      "key": "min_vol_bmu_num",
+      "address": "0x0216",
+      "name": "Minimum Voltage BMU Number",
+      "category": "C2 Battery Electrical Measurements",
+      "subcategory": "Cell Voltage Statistics",
+      "access": "R",
+      "format": "u16",
+      "scale": null,
+      "unit": null,
+      "description": ""
+    },
+    {
+      "key": "bmu_min_vol_num",
+      "address": "0x0217",
+      "name": "BMU Minimum Voltage Cell Number",
+      "category": "C2 Battery Electrical Measurements",
+      "subcategory": "Cell Voltage Statistics",
+      "access": "R",
+      "format": "u16",
+      "scale": null,
+      "unit": null,
+      "description": ""
+    },
+    {
+      "key": "max_cell_vol_diff",
+      "address": "0x0218",
+      "name": "Maximum Cell Voltage Difference",
+      "category": "C2 Battery Electrical Measurements",
+      "subcategory": "Cell Voltage Statistics",
+      "access": "R",
+      "format": "u16",
+      "scale": null,
+      "unit": "mV",
+      "description": ""
+    },
+    {
+      "key": "ave_cell_vol",
+      "address": "0x0219",
+      "name": "Average Cell Voltage",
+      "category": "C2 Battery Electrical Measurements",
+      "subcategory": "Cell Voltage Statistics",
+      "access": "R",
+      "format": "u16",
+      "scale": null,
+      "unit": "mV",
+      "description": ""
+    },
+    {
+      "key": "max_cell_temp",
+      "address": "0x021A",
+      "name": "Maximum Cell Temperature",
+      "category": "C3 Battery Thermal Measurements",
+      "subcategory": "Thermal Measurements",
+      "access": "R",
+      "format": "s16",
+      "scale": 0.1,
+      "unit": "degC",
+      "description": ""
+    },
+    {
+      "key": "max_cell_temp_num",
+      "address": "0x021B",
+      "name": "Maximum Cell Temperature Number",
+      "category": "C3 Battery Thermal Measurements",
+      "subcategory": "Thermal Measurements",
+      "access": "R",
+      "format": "u16",
+      "scale": null,
+      "unit": null,
+      "description": ""
+    },
+    {
+      "key": "max_temp_bmu_num",
+      "address": "0x021C",
+      "name": "Maximum Temperature BMU Number",
+      "category": "C3 Battery Thermal Measurements",
+      "subcategory": "Thermal Measurements",
+      "access": "R",
+      "format": "u16",
+      "scale": null,
+      "unit": null,
+      "description": ""
+    },
+    {
+      "key": "bmu_max_temp_num",
+      "address": "0x021D",
+      "name": "BMU Maximum Temperature Number",
+      "category": "C3 Battery Thermal Measurements",
+      "subcategory": "Thermal Measurements",
+      "access": "R",
+      "format": "u16",
+      "scale": null,
+      "unit": null,
+      "description": ""
+    },
+    {
+      "key": "min_cell_temp",
+      "address": "0x021E",
+      "name": "Minimum Cell Temperature",
+      "category": "C3 Battery Thermal Measurements",
+      "subcategory": "Thermal Measurements",
+      "access": "R",
+      "format": "s16",
+      "scale": 0.1,
+      "unit": "degC",
+      "description": ""
+    },
+    {
+      "key": "min_cell_temp_num",
+      "address": "0x021F",
+      "name": "Minimum Cell Temperature Number",
+      "category": "C3 Battery Thermal Measurements",
+      "subcategory": "Thermal Measurements",
+      "access": "R",
+      "format": "u16",
+      "scale": null,
+      "unit": null,
+      "description": ""
+    },
+    {
+      "key": "min_temp_bmu_num",
+      "address": "0x0220",
+      "name": "Minimum Temperature BMU Number",
+      "category": "C3 Battery Thermal Measurements",
+      "subcategory": "Thermal Measurements",
+      "access": "R",
+      "format": "u16",
+      "scale": null,
+      "unit": null,
+      "description": ""
+    },
+    {
+      "key": "bmu_min_temp_num",
+      "address": "0x0221",
+      "name": "BMU Minimum Temperature Number",
+      "category": "C3 Battery Thermal Measurements",
+      "subcategory": "Thermal Measurements",
+      "access": "R",
+      "format": "u16",
+      "scale": null,
+      "unit": null,
+      "description": ""
+    },
+    {
+      "key": "rack_ave_temp",
+      "address": "0x0222",
+      "name": "Rack Average Temperature",
+      "category": "C3 Battery Thermal Measurements",
+      "subcategory": "Thermal Measurements",
+      "access": "R",
+      "format": "s16",
+      "scale": 0.1,
+      "unit": "degC",
+      "description": ""
+    },
+    {
+      "key": "max_polarity_temp",
+      "address": "0x0223",
+      "name": "Maximum Terminal Temperature",
+      "category": "C3 Battery Thermal Measurements",
+      "subcategory": "Thermal Measurements",
+      "access": "R",
+      "format": "s16",
+      "scale": 0.1,
+      "unit": "degC",
+      "description": ""
+    },
+    {
+      "key": "max_polarity_num",
+      "address": "0x0224",
+      "name": "Maximum Terminal Number",
+      "category": "C2 Battery Electrical Measurements",
+      "subcategory": "Rack Measurements",
+      "access": "R",
+      "format": "u16",
+      "scale": null,
+      "unit": null,
+      "description": ""
+    },
+    {
+      "key": "max_allowed_chg_cur",
+      "address": "0x0225",
+      "name": "Maximum Allowed Charge Current",
+      "category": "C2 Battery Electrical Measurements",
+      "subcategory": "Charge/Discharge Limits",
+      "access": "R",
+      "format": "u16",
+      "scale": 0.1,
+      "unit": "A",
+      "description": ""
+    },
+    {
+      "key": "max_allowed_dchg_cur",
+      "address": "0x0226",
+      "name": "Maximum Allowed Discharge Current",
+      "category": "C2 Battery Electrical Measurements",
+      "subcategory": "Charge/Discharge Limits",
+      "access": "R",
+      "format": "u16",
+      "scale": 0.1,
+      "unit": "A",
+      "description": ""
+    },
+    {
+      "key": "display_soc",
+      "address": "0x0227",
+      "name": "Display SOC",
+      "category": "C4 Battery Health & Capacity",
+      "subcategory": "SOC/SOH",
+      "access": "R",
+      "format": "u16",
+      "scale": 0.1,
+      "unit": "%",
+      "description": "Workbook unit is per-mille; converted to percent by value * 0.1."
+    },
+    {
+      "key": "soh",
+      "address": "0x0228",
+      "name": "SOH",
+      "category": "C4 Battery Health & Capacity",
+      "subcategory": "SOC/SOH",
+      "access": "R",
+      "format": "u16",
+      "scale": 0.1,
+      "unit": "%",
+      "description": "Workbook unit is per-mille; converted to percent by value * 0.1."
+    },
+    {
+      "key": "max_bat_temp_diff",
+      "address": "0x0229",
+      "name": "Maximum Battery Temperature Difference",
+      "category": "C3 Battery Thermal Measurements",
+      "subcategory": "Thermal Measurements",
+      "access": "R",
+      "format": "u16",
+      "scale": 0.1,
+      "unit": "degC",
+      "description": ""
+    },
+    {
+      "key": "max_bat_temp_rise",
+      "address": "0x022A",
+      "name": "Maximum Battery Temperature Rise",
+      "category": "C3 Battery Thermal Measurements",
+      "subcategory": "Thermal Measurements",
+      "access": "R",
+      "format": "u16",
+      "scale": 0.1,
+      "unit": "degC",
+      "description": ""
+    },
+    {
+      "key": "max_bat_temp_rise_bmu_num",
+      "address": "0x022B",
+      "name": "Maximum Battery Temperature Rise BMU Number",
+      "category": "C3 Battery Thermal Measurements",
+      "subcategory": "Thermal Measurements",
+      "access": "R",
+      "format": "u16",
+      "scale": null,
+      "unit": null,
+      "description": ""
+    },
+    {
+      "key": "max_bat_temp_rise_num_in_bmu",
+      "address": "0x022C",
+      "name": "Maximum Battery Temperature Rise Number In BMU",
+      "category": "C3 Battery Thermal Measurements",
+      "subcategory": "Thermal Measurements",
+      "access": "R",
+      "format": "u16",
+      "scale": null,
+      "unit": null,
+      "description": ""
+    },
+    {
+      "key": "max_bat_temp_rise_num_in_bcu",
+      "address": "0x022D",
+      "name": "Maximum Battery Temperature Rise Number In BCU",
+      "category": "C3 Battery Thermal Measurements",
+      "subcategory": "Thermal Measurements",
+      "access": "R",
+      "format": "u16",
+      "scale": null,
+      "unit": null,
+      "description": ""
+    },
+    {
+      "key": "rack_inner_soc",
+      "address": "0x022E",
+      "name": "Rack Internal SOC",
+      "category": "C4 Battery Health & Capacity",
+      "subcategory": "SOC/SOH",
+      "access": "R",
+      "format": "u16",
+      "scale": 0.1,
+      "unit": "%",
+      "description": "Workbook unit is per-mille; converted to percent by value * 0.1."
+    },
+    {
+      "key": "pre_chg_vol",
+      "address": "0x022F",
+      "name": "Precharge Voltage",
+      "category": "C2 Battery Electrical Measurements",
+      "subcategory": "Electrical Measurements",
+      "access": "R",
+      "format": "s16",
+      "scale": 0.1,
+      "unit": "V",
+      "description": ""
+    },
+    {
+      "key": "bmu_total_vol",
+      "address": "0x0230",
+      "name": "BMU Total Voltage",
+      "category": "C2 Battery Electrical Measurements",
+      "subcategory": "Electrical Measurements",
+      "access": "R",
+      "format": "s16",
+      "scale": 0.1,
+      "unit": "V",
+      "description": ""
+    },
+    {
+      "key": "total_vol",
+      "address": "0x0231",
+      "name": "Total Rack Voltage",
+      "category": "C2 Battery Electrical Measurements",
+      "subcategory": "Electrical Measurements",
+      "access": "R",
+      "format": "s16",
+      "scale": 0.1,
+      "unit": "V",
+      "description": ""
+    },
+    {
+      "key": "total_cur",
+      "address": "0x0232",
+      "name": "Total Rack Current",
+      "category": "C2 Battery Electrical Measurements",
+      "subcategory": "Electrical Measurements",
+      "access": "R",
+      "format": "s16",
+      "scale": 0.1,
+      "unit": "A",
+      "description": ""
+    },
+    {
+      "key": "ncon_total_vol",
+      "address": "0x0233",
+      "name": "NCON Total Voltage",
+      "category": "C2 Battery Electrical Measurements",
+      "subcategory": "Electrical Measurements",
+      "access": "R",
+      "format": "s16",
+      "scale": 0.1,
+      "unit": "V",
+      "description": ""
+    },
+    {
+      "key": "shunt_current",
+      "address": "0x0234",
+      "name": "Shunt Current",
+      "category": "C2 Battery Electrical Measurements",
+      "subcategory": "Electrical Measurements",
+      "access": "R",
+      "format": "s16",
+      "scale": 0.1,
+      "unit": "A",
+      "description": ""
+    },
+    {
+      "key": "can_hall_sample_cur_ori_value",
+      "address": "0x0235",
+      "name": "CAN Hall Sample Current Original Value",
+      "category": "C2 Battery Electrical Measurements",
+      "subcategory": "Electrical Measurements",
+      "access": "R",
+      "format": "s16",
+      "scale": 0.1,
+      "unit": "A",
+      "description": ""
+    },
+    {
+      "key": "cur_vol_hall_sam_cur_ori_value",
+      "address": "0x0236",
+      "name": "Current/Voltage Hall Sample Current Original Value",
+      "category": "C2 Battery Electrical Measurements",
+      "subcategory": "Electrical Measurements",
+      "access": "R",
+      "format": "s16",
+      "scale": 0.1,
+      "unit": "A",
+      "description": ""
+    },
+    {
+      "key": "ir",
+      "address": "0x0237",
+      "name": "Insulation Resistance",
+      "category": "C5 Battery Safety & Protection",
+      "subcategory": "Insulation & Safety",
+      "access": "R",
+      "format": "u16",
+      "scale": null,
+      "unit": "kOhm",
+      "description": ""
+    },
+    {
+      "key": "positive_ir",
+      "address": "0x0238",
+      "name": "Positive Insulation Resistance",
+      "category": "C5 Battery Safety & Protection",
+      "subcategory": "Insulation & Safety",
+      "access": "R",
+      "format": "u16",
+      "scale": null,
+      "unit": "kOhm",
+      "description": ""
+    },
+    {
+      "key": "negative_ir",
+      "address": "0x0239",
+      "name": "Negative Insulation Resistance",
+      "category": "C5 Battery Safety & Protection",
+      "subcategory": "Insulation & Safety",
+      "access": "R",
+      "format": "u16",
+      "scale": null,
+      "unit": "kOhm",
+      "description": ""
+    },
+    {
+      "key": "start_insulation_sampling",
+      "address": "0x0401",
+      "name": "Start Insulation Sampling",
+      "category": "C7 Battery Control Commands",
+      "subcategory": "Insulation Test Control",
+      "access": "R/W",
+      "format": "u16",
+      "scale": null,
+      "unit": null,
+      "description": "Write 1 to start/reset insulation sampling; other value = no action."
+    },
+    {
+      "key": "start_precharge",
+      "address": "0x0402",
+      "name": "Start Precharge Operation",
+      "category": "C7 Battery Control Commands",
+      "subcategory": "Precharge Control",
+      "access": "R/W",
+      "format": "u16",
+      "scale": null,
+      "unit": null,
+      "description": "Write 0x01 to start precharge; other value = stop/open precharge path."
+    },
+    {
+      "key": "bcu_reset",
+      "address": "0x0403",
+      "name": "BCU Reset",
+      "category": "C7 Battery Control Commands",
+      "subcategory": "Commissioning / Reset Control",
+      "access": "R/W",
+      "format": "u16",
+      "scale": null,
+      "unit": null,
+      "description": "Write 0x01 to reset BCU; other value = no reset."
+    },
+    {
+      "key": "fan_switch",
+      "address": "0x0406",
+      "name": "Fan Force Control",
+      "category": "C7 Battery Control Commands",
+      "subcategory": "Fan Control",
+      "access": "R/W",
+      "format": "u16",
+      "scale": null,
+      "unit": null,
+      "description": "Write 1=Fan ON, 2=Fan OFF. 0 may be used by EMS as auto/no-force if validated."
+    }
+  ],
+  "pcs_profiles": [
+    {
+      "source": "drivers/pcs_profiles/njoy_125kw_profile.py",
+      "register_constants": [
+        {
+          "constant": "REG_OUTPUT_AB_LINE_VOLTAGE",
+          "address": "0x6020"
+        },
+        {
+          "constant": "REG_OUTPUT_BC_LINE_VOLTAGE",
+          "address": "0x6021"
+        },
+        {
+          "constant": "REG_OUTPUT_CA_LINE_VOLTAGE",
+          "address": "0x6022"
+        },
+        {
+          "constant": "REG_OUTPUT_PHASE_A_VOLTAGE",
+          "address": "0x6023"
+        },
+        {
+          "constant": "REG_OUTPUT_PHASE_B_VOLTAGE",
+          "address": "0x6024"
+        },
+        {
+          "constant": "REG_OUTPUT_PHASE_C_VOLTAGE",
+          "address": "0x6025"
+        },
+        {
+          "constant": "REG_OUTPUT_PHASE_A_CURRENT",
+          "address": "0x6026"
+        },
+        {
+          "constant": "REG_OUTPUT_PHASE_B_CURRENT",
+          "address": "0x6027"
+        },
+        {
+          "constant": "REG_OUTPUT_PHASE_C_CURRENT",
+          "address": "0x6028"
+        },
+        {
+          "constant": "REG_GRID_FREQUENCY",
+          "address": "0x602C"
+        },
+        {
+          "constant": "REG_TOTAL_AC_ACTIVE_POWER",
+          "address": "0x6039"
+        },
+        {
+          "constant": "REG_TOTAL_AC_REACTIVE_POWER",
+          "address": "0x603A"
+        },
+        {
+          "constant": "REG_TOTAL_AC_APPARENT_POWER",
+          "address": "0x603B"
+        },
+        {
+          "constant": "REG_AC_POWER_FACTOR",
+          "address": "0x603C"
+        },
+        {
+          "constant": "REG_BUS_VOLTAGE",
+          "address": "0x6050"
+        },
+        {
+          "constant": "REG_BATTERY_VOLTAGE",
+          "address": "0x6053"
+        },
+        {
+          "constant": "REG_BATTERY_CURRENT",
+          "address": "0x6054"
+        },
+        {
+          "constant": "REG_DC_POWER",
+          "address": "0x6055"
+        },
+        {
+          "constant": "REG_DC_TOTAL_CURRENT",
+          "address": "0x6056"
+        },
+        {
+          "constant": "REG_OPERATING_STATUS",
+          "address": "0x6057"
+        },
+        {
+          "constant": "REG_IGBT_TEMPERATURE",
+          "address": "0x6058"
+        },
+        {
+          "constant": "REG_AMBIENT_TEMPERATURE",
+          "address": "0x6059"
+        },
+        {
+          "constant": "REG_INDUCTANCE_TEMPERATURE",
+          "address": "0x605A"
+        },
+        {
+          "constant": "REG_CURRENT_CHARGE_DISCHARGE_MODE",
+          "address": "0x605B"
+        },
+        {
+          "constant": "REG_GRID_OFFGRID_STATUS",
+          "address": "0x605C"
+        },
+        {
+          "constant": "REG_POWER_ON_OFF_COMMAND",
+          "address": "0x0291"
+        },
+        {
+          "constant": "REG_ACTIVE_POWER_SETTING",
+          "address": "0x500E"
+        },
+        {
+          "constant": "REG_REACTIVE_POWER_SETTING",
+          "address": "0x500F"
+        },
+        {
+          "constant": "REG_FAULT_RESET_COMMAND",
+          "address": "0x5064"
+        },
+        {
+          "constant": "REG_HEARTBEAT",
+          "address": "0x508E"
+        },
+        {
+          "constant": "REG_HARDWARE_FAULT_WORD_1",
+          "address": "0x1700"
+        },
+        {
+          "constant": "REG_HARDWARE_FAULT_WORD_2",
+          "address": "0x1701"
+        },
+        {
+          "constant": "REG_GRID_FAULT_WORD",
+          "address": "0x1702"
+        },
+        {
+          "constant": "REG_BUS_FAULT_WORD",
+          "address": "0x1703"
+        },
+        {
+          "constant": "REG_AC_CAPACITOR_FAULT_WORD",
+          "address": "0x1704"
+        },
+        {
+          "constant": "REG_SYSTEM_FAULT_WORD",
+          "address": "0x1705"
+        },
+        {
+          "constant": "REG_SWITCH_FAULT_WORD",
+          "address": "0x1706"
+        },
+        {
+          "constant": "REG_OTHER_FAULT_WORD",
+          "address": "0x1707"
+        }
+      ],
+      "telemetry_keys": [
+        "vendor",
+        "ab_voltage_v",
+        "bc_voltage_v",
+        "ca_voltage_v",
+        "phase_a_voltage_v",
+        "phase_b_voltage_v",
+        "phase_c_voltage_v",
+        "phase_a_current_a",
+        "phase_b_current_a",
+        "phase_c_current_a",
+        "frequency_hz",
+        "active_power_kw",
+        "reactive_power_kvar",
+        "apparent_power_kva",
+        "power_factor",
+        "bus_voltage_v",
+        "battery_voltage_v",
+        "battery_current_a",
+        "dc_power_kw",
+        "dc_total_current_a",
+        "operating_status_raw",
+        "operating_status",
+        "grid_offgrid_status_raw",
+        "grid_offgrid_status",
+        "igbt_temperature_c",
+        "ambient_temperature_c",
+        "inductance_temperature_c"
+      ],
+      "fault_word_keys": [
+        "ac_capacitor_fault_word",
+        "bus_fault_word",
+        "grid_fault_word",
+        "hardware_fault_word_1",
+        "hardware_fault_word_2",
+        "other_fault_word",
+        "switch_fault_word",
+        "system_fault_word"
+      ]
+    },
+    {
+      "source": "drivers/pcs_profiles/inpower_125kw_profile.py",
+      "register_constants": [
+        {
+          "constant": "REG_PHASE_A_VOLTAGE",
+          "address": "201"
+        },
+        {
+          "constant": "REG_PHASE_B_VOLTAGE",
+          "address": "202"
+        },
+        {
+          "constant": "REG_PHASE_C_VOLTAGE",
+          "address": "203"
+        },
+        {
+          "constant": "REG_PHASE_A_CURRENT",
+          "address": "204"
+        },
+        {
+          "constant": "REG_PHASE_B_CURRENT",
+          "address": "205"
+        },
+        {
+          "constant": "REG_PHASE_C_CURRENT",
+          "address": "206"
+        },
+        {
+          "constant": "REG_GRID_FREQUENCY",
+          "address": "207"
+        },
+        {
+          "constant": "REG_PHASE_A_ACTIVE_POWER",
+          "address": "208"
+        },
+        {
+          "constant": "REG_PHASE_B_ACTIVE_POWER",
+          "address": "209"
+        },
+        {
+          "constant": "REG_PHASE_C_ACTIVE_POWER",
+          "address": "210"
+        },
+        {
+          "constant": "REG_TOTAL_ACTIVE_POWER",
+          "address": "211"
+        },
+        {
+          "constant": "REG_PHASE_A_REACTIVE_POWER",
+          "address": "212"
+        },
+        {
+          "constant": "REG_PHASE_B_REACTIVE_POWER",
+          "address": "213"
+        },
+        {
+          "constant": "REG_PHASE_C_REACTIVE_POWER",
+          "address": "214"
+        },
+        {
+          "constant": "REG_TOTAL_REACTIVE_POWER",
+          "address": "215"
+        },
+        {
+          "constant": "REG_PHASE_A_APPARENT_POWER",
+          "address": "216"
+        },
+        {
+          "constant": "REG_PHASE_B_APPARENT_POWER",
+          "address": "217"
+        },
+        {
+          "constant": "REG_PHASE_C_APPARENT_POWER",
+          "address": "218"
+        },
+        {
+          "constant": "REG_TOTAL_APPARENT_POWER",
+          "address": "219"
+        },
+        {
+          "constant": "REG_PHASE_A_POWER_FACTOR",
+          "address": "220"
+        },
+        {
+          "constant": "REG_PHASE_B_POWER_FACTOR",
+          "address": "221"
+        },
+        {
+          "constant": "REG_PHASE_C_POWER_FACTOR",
+          "address": "222"
+        },
+        {
+          "constant": "REG_TOTAL_POWER_FACTOR",
+          "address": "223"
+        },
+        {
+          "constant": "REG_PCS_INPUT_POWER",
+          "address": "224"
+        },
+        {
+          "constant": "REG_PCS_INPUT_VOLTAGE",
+          "address": "225"
+        },
+        {
+          "constant": "REG_PCS_INPUT_CURRENT",
+          "address": "226"
+        },
+        {
+          "constant": "REG_PCS_RADIATOR_TEMP",
+          "address": "227"
+        },
+        {
+          "constant": "REG_BMS_OPERATING_STATUS",
+          "address": "228"
+        },
+        {
+          "constant": "REG_PCS_CURRENT_STATUS",
+          "address": "229"
+        },
+        {
+          "constant": "REG_PCS_COMMUNICATION_STATUS_WORD",
+          "address": "238"
+        },
+        {
+          "constant": "REG_RUNNING_MODE",
+          "address": "301"
+        },
+        {
+          "constant": "REG_CONSTANT_VOLTAGE_SETTING",
+          "address": "302"
+        },
+        {
+          "constant": "REG_CONSTANT_CURRENT_SETTING",
+          "address": "303"
+        },
+        {
+          "constant": "REG_ACTIVE_POWER_SETTING",
+          "address": "304"
+        },
+        {
+          "constant": "REG_REACTIVE_POWER_SETTING",
+          "address": "305"
+        },
+        {
+          "constant": "REG_GRID_OFFGRID_SETTING",
+          "address": "306"
+        },
+        {
+          "constant": "REG_OFFGRID_OUTPUT_VOLTAGE",
+          "address": "307"
+        },
+        {
+          "constant": "REG_OFFGRID_OUTPUT_FREQUENCY",
+          "address": "308"
+        },
+        {
+          "constant": "REG_ACTIVE_POWER_CONTROL_MODE",
+          "address": "325"
+        },
+        {
+          "constant": "REG_REACTIVE_POWER_MODE",
+          "address": "336"
+        },
+        {
+          "constant": "REG_POWER_FACTOR_SETTING",
+          "address": "337"
+        },
+        {
+          "constant": "REG_INSULATION_DETECTION_ENABLE",
+          "address": "341"
+        },
+        {
+          "constant": "REG_LEAKAGE_CURRENT_THRESHOLD",
+          "address": "342"
+        },
+        {
+          "constant": "REG_INSULATION_RESISTANCE_THRESHOLD",
+          "address": "343"
+        },
+        {
+          "constant": "REG_PRIMARY_FREQUENCY_REGULATION_ENABLE",
+          "address": "344"
+        }
+      ],
+      "telemetry_keys": [
+        "vendor",
+        "phase_a_voltage_v",
+        "phase_b_voltage_v",
+        "phase_c_voltage_v",
+        "ab_voltage_v",
+        "bc_voltage_v",
+        "ca_voltage_v",
+        "phase_a_current_a",
+        "phase_b_current_a",
+        "phase_c_current_a",
+        "frequency_hz",
+        "phase_a_active_power_kw",
+        "phase_b_active_power_kw",
+        "phase_c_active_power_kw",
+        "active_power_kw",
+        "phase_a_reactive_power_kvar",
+        "phase_b_reactive_power_kvar",
+        "phase_c_reactive_power_kvar",
+        "reactive_power_kvar",
+        "apparent_power_kva",
+        "power_factor",
+        "dc_power_kw",
+        "bus_voltage_v",
+        "battery_voltage_v",
+        "battery_current_a",
+        "dc_total_current_a",
+        "operating_status_raw",
+        "operating_status",
+        "grid_offgrid_status_raw",
+        "grid_offgrid_status",
+        "fault_status",
+        "igbt_temperature_c",
+        "ambient_temperature_c",
+        "inductance_temperature_c",
+        "bms_operating_status",
+        "discrete_status"
+      ],
+      "fault_word_keys": []
+    }
+  ],
+  "chiller_registers": [
+    {
+      "constant": "INPUT_REG_WATER_PUMP_STATUS",
+      "address": "0"
+    },
+    {
+      "constant": "INPUT_REG_COMPRESSOR_1_STATUS",
+      "address": "1"
+    },
+    {
+      "constant": "INPUT_REG_COMPRESSOR_2_STATUS",
+      "address": "2"
+    },
+    {
+      "constant": "INPUT_REG_ELECTRIC_HEATER_STATUS",
+      "address": "3"
+    },
+    {
+      "constant": "INPUT_REG_CONDENSATE_FAN_STATUS",
+      "address": "4"
+    },
+    {
+      "constant": "INPUT_REG_OUTLET_WATER_TEMP",
+      "address": "5"
+    },
+    {
+      "constant": "INPUT_REG_RETURN_WATER_TEMP",
+      "address": "6"
+    },
+    {
+      "constant": "INPUT_REG_OUTLET_WATER_PRESSURE",
+      "address": "7"
+    },
+    {
+      "constant": "INPUT_REG_RETURN_WATER_PRESSURE",
+      "address": "8"
+    },
+    {
+      "constant": "INPUT_REG_EXTERNAL_AMBIENT_TEMP",
+      "address": "9"
+    },
+    {
+      "constant": "INPUT_REG_MAKEUP_WATER_PUMP_STATUS",
+      "address": "10"
+    },
+    {
+      "constant": "INPUT_REG_FAULT_ALARM_CODE",
+      "address": "11"
+    },
+    {
+      "constant": "INPUT_REG_START",
+      "address": "0"
+    },
+    {
+      "constant": "INPUT_REG_TELEMETRY_COUNT",
+      "address": "12"
+    },
+    {
+      "constant": "INPUT_REG_RESERVED_START",
+      "address": "12"
+    },
+    {
+      "constant": "INPUT_REG_RESERVED_END",
+      "address": "90"
+    },
+    {
+      "constant": "INPUT_REG_ALL_COUNT_0_TO_90",
+      "address": "91"
+    },
+    {
+      "constant": "HOLDING_REG_CONTROL_MODE",
+      "address": "200"
+    },
+    {
+      "constant": "HOLDING_REG_ON_OFF_ENABLE",
+      "address": "201"
+    },
+    {
+      "constant": "HOLDING_REG_RESERVED_202",
+      "address": "202"
+    },
+    {
+      "constant": "HOLDING_REG_RESERVED_203",
+      "address": "203"
+    },
+    {
+      "constant": "HOLDING_REG_RESERVED_204",
+      "address": "204"
+    },
+    {
+      "constant": "HOLDING_REG_SET_TEMPERATURE",
+      "address": "205"
+    },
+    {
+      "constant": "HOLDING_REG_RESERVED_206",
+      "address": "206"
+    },
+    {
+      "constant": "HOLDING_REG_RESERVED_207",
+      "address": "207"
+    },
+    {
+      "constant": "HOLDING_REG_RESERVED_208",
+      "address": "208"
+    },
+    {
+      "constant": "HOLDING_REG_SETTINGS_START",
+      "address": "200"
+    },
+    {
+      "constant": "HOLDING_REG_SETTINGS_COUNT_200_TO_208",
+      "address": "9"
+    }
+  ],
+  "commands": [
+    "BMS_",
+    "BMS_ADDRESS_OFFSET",
+    "BMS_ENABLE_STORAGE_LOGGING",
+    "BMS_FAN_AUTO",
+    "BMS_FAN_OFF",
+    "BMS_FAN_ON",
+    "BMS_R",
+    "BMS_READ_ALARMS",
+    "BMS_READ_ALL",
+    "BMS_TCP_COMMANDS",
+    "CHILLER_",
+    "CHILLER_OFF",
+    "CHILLER_ON",
+    "GATEWAY_STATUS",
+    "PCS_",
+    "PCS_ACTIVE_POWER_WRITE",
+    "PCS_COMMAND_FAILED",
+    "PCS_COMM_STATUS_CHANGED",
+    "PCS_DEVICE_STANDBY",
+    "PCS_FAULT_RESET_WRITE",
+    "PCS_HEARTBEAT",
+    "PCS_HEARTBEAT_WRITE",
+    "PCS_POLLING_ERROR",
+    "PCS_POWER_OFF",
+    "PCS_POWER_OFF_WRITE",
+    "PCS_POWER_ON",
+    "PCS_POWER_ON_WRITE",
+    "PCS_R",
+    "PCS_REACTIVE_POWER_WRITE",
+    "PCS_READ",
+    "PCS_RESET_FAULT",
+    "PCS_SERVICE_STARTED",
+    "PCS_SERVICE_STOPPED",
+    "PCS_SET_ACTIVE_POWER",
+    "PCS_SET_REACTIVE_POWER",
+    "PCS_STANDBY",
+    "PCS_STANDBY_WRITE",
+    "PCS_STATUS",
+    "PCS_STORAGE_MANAGER_STARTED",
+    "PCS_STORAGE_TELEMETRY_LOG_EXCEPTION",
+    "PCS_TEST_ERROR",
+    "PCS_TEST_EVENT",
+    "PCS_W",
+    "READ_ALL",
+    "READ_ALL_ASSETS",
+    "READ_BLOCKS",
+    "READ_BMS",
+    "READ_BMS_ALARMS",
+    "READ_BMS_ALL",
+    "READ_GATEWAY_TELEMETRY",
+    "READ_MODE",
+    "READ_ONOFF",
+    "READ_PCS",
+    "READ_SETTINGS",
+    "READ_TEMP",
+    "RESET_BCU",
+    "RESET_BMS",
+    "SET_MODE",
+    "SET_TEMP",
+    "SET_TEMPERATURE_WRITE",
+    "STATUS"
+  ],
+  "operator_filters": {
+    "exact_hidden_keys": [
+      "storage_logger",
+      "raw_telemetry_registers",
+      "raw_registers",
+      "register_map",
+      "debug",
+      "internal",
+      "diagnostics",
+      "raw_log_response",
+      "settings_registers_200_to_208",
+      "fault_binary",
+      "fault_active_bits",
+      "control_mode_raw",
+      "on_off_raw",
+      "on_off_status_raw",
+      "set_temperature_raw"
+    ],
+    "hidden_substrings": [
+      "raw_telemetry",
+      "raw_register",
+      "registers_",
+      "_registers",
+      "register_block",
+      "storage_logger",
+      "logger_",
+      "_logger",
+      "debug",
+      "internal",
+      "binary",
+      "active_bits"
+    ],
+    "allowed_top_level_keys": [
+      "type",
+      "status",
+      "gateway_id",
+      "asset_id",
+      "asset_type",
+      "timestamp",
+      "last_poll_time",
+      "online",
+      "message",
+      "data",
+      "telemetry",
+      "assets",
+      "pcs",
+      "bms",
+      "chiller"
+    ]
+  },
+  "log_filters": {
+    "telemetry_exact_filter_keys": [
+      "modbus_status",
+      "logger_status",
+      "vendor",
+      "comm_status",
+      "operating_status",
+      "fault_status",
+      "communication_status",
+      "bcu_state",
+      "current_state"
+    ],
+    "event_exact_filter_keys": [
+      "event_type",
+      "status",
+      "source",
+      "vendor",
+      "command"
+    ],
+    "error_exact_filter_keys": [
+      "error_type",
+      "error_source",
+      "source"
+    ]
+  },
+  "configs": {
+    "actual_network_assets.json": {
+      "gateway": {
+        "gateway_id": "imx93_gateway_1"
+      },
+      "network": {
+        "pc_telemetry_ip": "192.168.10.1",
+        "udp_telemetry_port": 5005,
+        "tcp_command_host": "0.0.0.0",
+        "tcp_command_port": 6000
+      },
+      "log_http": {
+        "enabled": true,
+        "host": "0.0.0.0",
+        "port": 7000,
+        "max_rows": 500
+      },
+      "logging": {
+        "base_path": "/home/root/ems_logs_test"
+      },
+      "web_api": {
+        "enabled": true,
+        "host": "0.0.0.0",
+        "port": 8000,
+        "enable_auth": false,
+        "cors_allow_origin": "*"
+      },
+      "assets": [
+        {
+          "asset_key": "chiller",
+          "asset_id": "chiller_1",
+          "asset_type": "chiller",
+          "enabled": true,
+          "vendor": "current",
+          "protocol": "modbus_rtu",
+          "profile": "current_chiller_modbus_rtu",
+          "connection": {
+            "serial_port": "/dev/ttyUSB0",
+            "baudrate": 9600,
+            "bytesize": 8,
+            "parity": "N",
+            "stopbits": 1,
+            "slave_id": 1
+          },
+          "poll_interval_sec": 1.0,
+          "timeout_sec": 2.0
+        },
+        {
+          "asset_key": "pcs",
+          "asset_id": "pcs_1",
+          "asset_type": "pcs",
+          "enabled": true,
+          "vendor": "njoy",
+          "protocol": "modbus_tcp",
+          "profile": "njoy_125kw",
+          "connection": {
+            "host": "192.168.1.200",
+            "port": 502,
+            "unit_id": 1
+          },
+          "poll_interval_sec": 5.0,
+          "timeout_sec": 3.0,
+          "retries": 2
+        },
+        {
+          "asset_key": "bms",
+          "asset_id": "bms_1",
+          "asset_type": "bms",
+          "enabled": true,
+          "vendor": "simulator",
+          "protocol": "modbus_tcp",
+          "profile": "simulator_modbus_tcp",
+          "connection": {
+            "host": "192.168.10.1",
+            "port": 502,
+            "unit_id": 1
+          },
+          "poll_interval_sec": 1.0,
+          "timeout_sec": 2.0
+        }
+      ]
+    },
+    "future_asset_protocol_examples.json": {
+      "note": "Documentation-only example. Do not use this file to start the gateway until the matching protocol drivers/services are implemented.",
+      "assets": [
+        {
+          "asset_key": "bms_rtu_demo",
+          "asset_id": "bms_2",
+          "asset_type": "bms",
+          "enabled": false,
+          "vendor": "future_vendor_a",
+          "protocol": "modbus_rtu",
+          "profile": "future_vendor_a_bms_rtu",
+          "connection": {
+            "serial_port": "/dev/ttyUSB1",
+            "baudrate": 9600,
+            "bytesize": 8,
+            "parity": "N",
+            "stopbits": 1,
+            "slave_id": 2
+          }
+        },
+        {
+          "asset_key": "bms_can_demo",
+          "asset_id": "bms_3",
+          "asset_type": "bms",
+          "enabled": false,
+          "vendor": "future_vendor_b",
+          "protocol": "can",
+          "profile": "future_vendor_b_bms_can",
+          "connection": {
+            "interface": "can0",
+            "bitrate": 500000
+          }
+        },
+        {
+          "asset_key": "meter_1",
+          "asset_id": "meter_1",
+          "asset_type": "energy_meter",
+          "enabled": false,
+          "vendor": "kew",
+          "protocol": "modbus_rtu",
+          "profile": "kew_meter_modbus_rtu_v1",
+          "connection": {
+            "serial_port": "/dev/ttyUSB2",
+            "baudrate": 9600,
+            "bytesize": 8,
+            "parity": "N",
+            "stopbits": 1,
+            "slave_id": 1
+          }
+        }
+      ]
+    },
+    "lab_pc_simulators.json": {
+      "gateway": {
+        "gateway_id": "imx93_gateway_1"
+      },
+      "network": {
+        "pc_telemetry_ip": "192.168.10.1",
+        "udp_telemetry_port": 5005,
+        "tcp_command_host": "0.0.0.0",
+        "tcp_command_port": 6000
+      },
+      "log_http": {
+        "enabled": true,
+        "host": "0.0.0.0",
+        "port": 7000,
+        "max_rows": 500
+      },
+      "logging": {
+        "base_path": "/home/root/ems_logs_test"
+      },
+      "web_api": {
+        "enabled": true,
+        "host": "0.0.0.0",
+        "port": 8000,
+        "enable_auth": false,
+        "cors_allow_origin": "*"
+      },
+      "assets": [
+        {
+          "asset_key": "chiller",
+          "asset_id": "chiller_1",
+          "asset_type": "chiller",
+          "enabled": false,
+          "vendor": "current",
+          "protocol": "modbus_rtu",
+          "profile": "current_chiller_modbus_rtu",
+          "connection": {
+            "serial_port": "/dev/ttyUSB0",
+            "baudrate": 9600,
+            "bytesize": 8,
+            "parity": "N",
+            "stopbits": 1,
+            "slave_id": 1
+          }
+        },
+        {
+          "asset_key": "pcs",
+          "asset_id": "pcs_1",
+          "asset_type": "pcs",
+          "enabled": true,
+          "vendor": "njoy",
+          "protocol": "modbus_tcp",
+          "profile": "njoy_125kw",
+          "connection": {
+            "host": "192.168.10.1",
+            "port": 1502,
+            "unit_id": 1
+          },
+          "poll_interval_sec": 5.0,
+          "timeout_sec": 3.0,
+          "retries": 2
+        },
+        {
+          "asset_key": "bms",
+          "asset_id": "bms_1",
+          "asset_type": "bms",
+          "enabled": true,
+          "vendor": "simulator",
+          "protocol": "modbus_tcp",
+          "profile": "simulator_modbus_tcp",
+          "connection": {
+            "host": "192.168.10.1",
+            "port": 2502,
+            "unit_id": 1
+          },
+          "poll_interval_sec": 1.0,
+          "timeout_sec": 2.0
+        }
+      ]
+    },
+    "mock_local.json": {
+      "GATEWAY_ID": "imx93_gateway_1",
+      "ASSET_ID": "chiller_1",
+      "CHILLER_ENABLED": true,
+      "PCS_ENABLED": false,
+      "BMS_ENABLED": false,
+      "PC_TELEMETRY_IP": "127.0.0.1",
+      "UDP_TELEMETRY_PORT": 5005,
+      "TCP_COMMAND_HOST": "0.0.0.0",
+      "TCP_COMMAND_PORT": 6000,
+      "ENABLE_LOG_HTTP_SERVER": true,
+      "LOG_HTTP_HOST": "0.0.0.0",
+      "LOG_HTTP_PORT": 7000,
+      "ENABLE_WEB_API_SERVER": true,
+      "WEB_API_HOST": "0.0.0.0",
+      "WEB_API_PORT": 8000,
+      "WEB_API_ENABLE_AUTH": false
+    }
+  }
+}
