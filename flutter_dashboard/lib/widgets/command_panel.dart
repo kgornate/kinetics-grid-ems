@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../features/commands/commands.dart';
 
 class CommandPanel extends StatefulWidget {
   final Future<void> Function(String command, {dynamic value}) onSendCommand;
@@ -119,23 +120,23 @@ class _CommandPanelState extends State<CommandPanel> {
       runSpacing: 12,
       children: [
         FilledButton(
-          onPressed: () => _sendCommand('READ_ALL'),
+          onPressed: () => _sendCommand(GatewayCommandNames.readChillerAll),
           child: const Text('Read Chiller'),
         ),
         FilledButton.tonal(
-          onPressed: () => _sendCommand('READ_SETTINGS'),
+          onPressed: () => _sendCommand(GatewayCommandNames.readChillerSettings),
           child: const Text('Read Settings'),
         ),
         FilledButton.tonal(
-          onPressed: () => _sendCommand('READ_MODE'),
+          onPressed: () => _sendCommand(GatewayCommandNames.readChillerMode),
           child: const Text('Read Mode'),
         ),
         FilledButton.tonal(
-          onPressed: () => _sendCommand('READ_TEMP'),
+          onPressed: () => _sendCommand(GatewayCommandNames.readChillerTemperature),
           child: const Text('Read Temp'),
         ),
         FilledButton.tonal(
-          onPressed: () => _sendCommand('READ_ONOFF'),
+          onPressed: () => _sendCommand(GatewayCommandNames.readChillerOnOff),
           child: const Text('Read ON/OFF'),
         ),
       ],
@@ -176,7 +177,7 @@ class _CommandPanelState extends State<CommandPanel> {
                 return;
               }
 
-              _sendCommand('SET_TEMP', value: temp);
+              _sendCommand(GatewayCommandNames.setChillerTemperature, value: temp);
             },
             child: const Text('Set Temp'),
           ),
@@ -232,7 +233,7 @@ class _CommandPanelState extends State<CommandPanel> {
           height: 44,
           child: FilledButton(
             onPressed: () {
-              _sendCommand('SET_MODE', value: _selectedMode);
+              _sendCommand(GatewayCommandNames.setChillerMode, value: _selectedMode);
             },
             child: const Text('Set Mode'),
           ),
@@ -253,7 +254,7 @@ class _CommandPanelState extends State<CommandPanel> {
             onPressed: () => _confirmAndSend(
               title: 'Confirm Chiller ON',
               message: 'Are you sure you want to send CHILLER_ON command?',
-              command: 'CHILLER_ON',
+              command: GatewayCommandNames.chillerOn,
             ),
             child: const Text('Chiller ON'),
           ),
@@ -265,7 +266,7 @@ class _CommandPanelState extends State<CommandPanel> {
             onPressed: () => _confirmAndSend(
               title: 'Confirm Chiller OFF',
               message: 'Are you sure you want to send CHILLER_OFF command?',
-              command: 'CHILLER_OFF',
+              command: GatewayCommandNames.chillerOff,
             ),
             child: const Text('Chiller OFF'),
           ),
@@ -280,15 +281,15 @@ class _CommandPanelState extends State<CommandPanel> {
       runSpacing: 12,
       children: [
         FilledButton(
-          onPressed: () => _sendCommand('PCS_READ'),
+          onPressed: () => _sendCommand(GatewayCommandNames.readPcs),
           child: const Text('Read PCS'),
         ),
         FilledButton.tonal(
-          onPressed: () => _sendCommand('STATUS'),
+          onPressed: () => _sendCommand(GatewayCommandNames.status),
           child: const Text('Gateway Status'),
         ),
         FilledButton.tonal(
-          onPressed: () => _sendCommand('READ_ALL_ASSETS'),
+          onPressed: () => _sendCommand(GatewayCommandNames.readAllAssets),
           child: const Text('Read All Assets'),
         ),
       ],
@@ -330,7 +331,7 @@ class _CommandPanelState extends State<CommandPanel> {
                 return;
               }
 
-              _sendCommand('PCS_SET_ACTIVE_POWER', value: kw);
+              _sendCommand(GatewayCommandNames.setPcsActivePower, value: kw);
             },
             child: const Text('Set kW'),
           ),
@@ -373,7 +374,7 @@ class _CommandPanelState extends State<CommandPanel> {
                 return;
               }
 
-              _sendCommand('PCS_SET_REACTIVE_POWER', value: kvar);
+              _sendCommand(GatewayCommandNames.setPcsReactivePower, value: kvar);
             },
             child: const Text('Set kvar'),
           ),
@@ -416,7 +417,7 @@ class _CommandPanelState extends State<CommandPanel> {
                 return;
               }
 
-              _sendCommand('PCS_HEARTBEAT', value: value);
+              _sendCommand(GatewayCommandNames.pcsHeartbeat, value: value);
             },
             child: const Text('Heartbeat'),
           ),
@@ -437,7 +438,7 @@ class _CommandPanelState extends State<CommandPanel> {
             onPressed: () => _confirmAndSend(
               title: 'Confirm PCS Power ON',
               message: 'Are you sure you want to send PCS_POWER_ON command?',
-              command: 'PCS_POWER_ON',
+              command: GatewayCommandNames.pcsPowerOn,
             ),
             child: const Text('PCS ON'),
           ),
@@ -449,7 +450,7 @@ class _CommandPanelState extends State<CommandPanel> {
             onPressed: () => _confirmAndSend(
               title: 'Confirm PCS Power OFF',
               message: 'Are you sure you want to send PCS_POWER_OFF command?',
-              command: 'PCS_POWER_OFF',
+              command: GatewayCommandNames.pcsPowerOff,
             ),
             child: const Text('PCS OFF'),
           ),
@@ -461,7 +462,7 @@ class _CommandPanelState extends State<CommandPanel> {
             onPressed: () => _confirmAndSend(
               title: 'Confirm PCS Fault Reset',
               message: 'Are you sure you want to send PCS_RESET_FAULT command?',
-              command: 'PCS_RESET_FAULT',
+              command: GatewayCommandNames.pcsResetFault,
             ),
             child: const Text('Reset Fault'),
           ),
@@ -477,15 +478,15 @@ class _CommandPanelState extends State<CommandPanel> {
       runSpacing: 12,
       children: [
         FilledButton(
-          onPressed: () => _sendCommand('READ_BMS_ALL'),
+          onPressed: () => _sendCommand(GatewayCommandNames.readBmsAll),
           child: const Text('Read BMS'),
         ),
         FilledButton.tonal(
-          onPressed: () => _sendCommand('READ_BMS_ALARMS'),
+          onPressed: () => _sendCommand(GatewayCommandNames.readBmsAlarms),
           child: const Text('Read BMS Alarms'),
         ),
         FilledButton.tonal(
-          onPressed: () => _sendCommand('READ_ALL_ASSETS'),
+          onPressed: () => _sendCommand(GatewayCommandNames.readAllAssets),
           child: const Text('Read All Assets'),
         ),
       ],
@@ -504,7 +505,7 @@ class _CommandPanelState extends State<CommandPanel> {
             onPressed: () => _confirmAndSend(
               title: 'Confirm BMS Precharge Start',
               message: 'Are you sure you want to send START_BMS_PRECHARGE command?',
-              command: 'START_BMS_PRECHARGE',
+              command: GatewayCommandNames.startBmsPrecharge,
             ),
             child: const Text('Start Precharge'),
           ),
@@ -516,7 +517,7 @@ class _CommandPanelState extends State<CommandPanel> {
             onPressed: () => _confirmAndSend(
               title: 'Confirm BMS Precharge Stop',
               message: 'Are you sure you want to send STOP_BMS_PRECHARGE command?',
-              command: 'STOP_BMS_PRECHARGE',
+              command: GatewayCommandNames.stopBmsPrecharge,
             ),
             child: const Text('Stop Precharge'),
           ),
@@ -528,7 +529,7 @@ class _CommandPanelState extends State<CommandPanel> {
             onPressed: () => _confirmAndSend(
               title: 'Confirm Insulation Test',
               message: 'Are you sure you want to send START_BMS_INSULATION_TEST command?',
-              command: 'START_BMS_INSULATION_TEST',
+              command: GatewayCommandNames.startBmsInsulationTest,
             ),
             child: const Text('Insulation Test'),
           ),
@@ -537,7 +538,7 @@ class _CommandPanelState extends State<CommandPanel> {
           width: 110,
           height: 44,
           child: FilledButton.tonal(
-            onPressed: () => _sendCommand('BMS_FAN_AUTO'),
+            onPressed: () => _sendCommand(GatewayCommandNames.bmsFanAuto),
             child: const Text('Fan Auto'),
           ),
         ),
@@ -545,7 +546,7 @@ class _CommandPanelState extends State<CommandPanel> {
           width: 100,
           height: 44,
           child: FilledButton.tonal(
-            onPressed: () => _sendCommand('BMS_FAN_ON'),
+            onPressed: () => _sendCommand(GatewayCommandNames.bmsFanOn),
             child: const Text('Fan ON'),
           ),
         ),
@@ -553,7 +554,7 @@ class _CommandPanelState extends State<CommandPanel> {
           width: 100,
           height: 44,
           child: FilledButton.tonal(
-            onPressed: () => _sendCommand('BMS_FAN_OFF'),
+            onPressed: () => _sendCommand(GatewayCommandNames.bmsFanOff),
             child: const Text('Fan OFF'),
           ),
         ),
@@ -564,7 +565,7 @@ class _CommandPanelState extends State<CommandPanel> {
             onPressed: () => _confirmAndSend(
               title: 'Confirm BCU Reset',
               message: 'Are you sure you want to send RESET_BCU command?',
-              command: 'RESET_BCU',
+              command: GatewayCommandNames.resetBcu,
             ),
             child: const Text('Reset BCU'),
           ),

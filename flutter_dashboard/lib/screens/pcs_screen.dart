@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../features/commands/commands.dart';
 
 import 'package:flutter/material.dart';
 
@@ -79,15 +80,15 @@ class _PcsScreenState extends State<PcsScreen> {
 
       final upperCommand = command.toUpperCase();
       if (response.isOk &&
-          (upperCommand == 'PCS_READ' || upperCommand == 'READ_PCS')) {
+          (upperCommand == GatewayCommandNames.readPcs || upperCommand == GatewayCommandNames.readPcsAlias)) {
         if (response.data.isNotEmpty) {
           _pcs = PcsTelemetry.fromJson(response.data);
         }
       }
 
       if (response.isOk &&
-          (upperCommand == 'READ_ALL_ASSETS' ||
-              upperCommand == 'READ_GATEWAY_TELEMETRY')) {
+          (upperCommand == GatewayCommandNames.readAllAssets ||
+              upperCommand == GatewayCommandNames.readGatewayTelemetry)) {
         final pcsData = _extractPcsFromTelemetryPacket(response.data);
         if (pcsData.isNotEmpty) {
           _pcs = PcsTelemetry.fromJson(pcsData);

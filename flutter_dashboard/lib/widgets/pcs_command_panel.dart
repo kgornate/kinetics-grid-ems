@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../features/commands/commands.dart';
 
 class PcsCommandPanel extends StatefulWidget {
   final Future<void> Function(String command, {dynamic value}) onSendCommand;
@@ -95,15 +96,15 @@ class _PcsCommandPanelState extends State<PcsCommandPanel> {
       runSpacing: 12,
       children: [
         FilledButton(
-          onPressed: () => _sendCommand('PCS_READ'),
+          onPressed: () => _sendCommand(GatewayCommandNames.readPcs),
           child: const Text('Read PCS'),
         ),
         FilledButton.tonal(
-          onPressed: () => _sendCommand('READ_ALL_ASSETS'),
+          onPressed: () => _sendCommand(GatewayCommandNames.readAllAssets),
           child: const Text('Read All Assets'),
         ),
         FilledButton.tonal(
-          onPressed: () => _sendCommand('STATUS'),
+          onPressed: () => _sendCommand(GatewayCommandNames.status),
           child: const Text('Gateway Status'),
         ),
       ],
@@ -146,7 +147,7 @@ class _PcsCommandPanelState extends State<PcsCommandPanel> {
               _confirmAndSendValue(
                 title: 'Confirm PCS Active Power',
                 message: 'Send PCS_SET_ACTIVE_POWER = $value kW?',
-                command: 'PCS_SET_ACTIVE_POWER',
+                command: GatewayCommandNames.setPcsActivePower,
                 value: value,
               );
             },
@@ -193,7 +194,7 @@ class _PcsCommandPanelState extends State<PcsCommandPanel> {
               _confirmAndSendValue(
                 title: 'Confirm PCS Reactive Power',
                 message: 'Send PCS_SET_REACTIVE_POWER = $value kvar?',
-                command: 'PCS_SET_REACTIVE_POWER',
+                command: GatewayCommandNames.setPcsReactivePower,
                 value: value,
               );
             },
@@ -236,7 +237,7 @@ class _PcsCommandPanelState extends State<PcsCommandPanel> {
                 _showMessage('Invalid heartbeat value. Use 0 to 255.');
                 return;
               }
-              _sendCommand('PCS_HEARTBEAT', value: value);
+              _sendCommand(GatewayCommandNames.pcsHeartbeat, value: value);
             },
             child: const Text('Heartbeat'),
           ),
@@ -257,7 +258,7 @@ class _PcsCommandPanelState extends State<PcsCommandPanel> {
             onPressed: () => _confirmAndSend(
               title: 'Confirm PCS Power ON',
               message: 'Are you sure you want to send PCS_POWER_ON?',
-              command: 'PCS_POWER_ON',
+              command: GatewayCommandNames.pcsPowerOn,
             ),
             child: const Text('PCS ON'),
           ),
@@ -269,7 +270,7 @@ class _PcsCommandPanelState extends State<PcsCommandPanel> {
             onPressed: () => _confirmAndSend(
               title: 'Confirm PCS Power OFF',
               message: 'Recommended shutdown: set active/reactive power to 0 first, then send PCS_POWER_OFF. Continue?',
-              command: 'PCS_POWER_OFF',
+              command: GatewayCommandNames.pcsPowerOff,
             ),
             child: const Text('PCS OFF'),
           ),
@@ -281,7 +282,7 @@ class _PcsCommandPanelState extends State<PcsCommandPanel> {
             onPressed: () => _confirmAndSend(
               title: 'Confirm PCS Fault Reset',
               message: 'Send PCS_RESET_FAULT? Use only after checking actual PCS fault reason.',
-              command: 'PCS_RESET_FAULT',
+              command: GatewayCommandNames.pcsResetFault,
             ),
             child: const Text('Reset Fault'),
           ),

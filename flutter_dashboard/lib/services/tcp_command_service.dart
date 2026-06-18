@@ -1,7 +1,6 @@
-import 'dart:convert';
-import 'dart:io';
 import 'dart:math';
 
+import '../core/network/tcp_socket_client.dart';
 import '../models/gateway_response.dart';
 
 class TcpCommandService {
@@ -19,60 +18,42 @@ class TcpCommandService {
     required String command,
     dynamic value,
     bool verify = true,
+    String? requestId,
+    Map<String, dynamic> params = const <String, dynamic>{},
   }) async {
-    final requestId = _generateRequestId();
+    final effectiveRequestId = requestId ?? _generateRequestId();
 
     final packet = <String, dynamic>{
       'type': 'command',
-      'request_id': requestId,
+      'request_id': effectiveRequestId,
       'timestamp': DateTime.now().toIso8601String(),
       'command': command.toUpperCase(),
       'verify': verify,
+      ...params,
     };
 
     if (value != null) {
       packet['value'] = value;
     }
 
-    Socket? socket;
-
     try {
-      socket = await Socket.connect(
-        gatewayIp,
-        gatewayPort,
+      final client = TcpSocketClient(
+        host: gatewayIp,
+        port: gatewayPort,
         timeout: timeout,
       );
-
-      final message = '${jsonEncode(packet)}\n';
-      socket.write(message);
-      await socket.flush();
-
-      final responseLine = await socket
-          .cast<List<int>>()
-          .transform(utf8.decoder)
-          .transform(const LineSplitter())
-          .first
-          .timeout(timeout);
-
-      final decoded = jsonDecode(responseLine);
-
-      if (decoded is! Map<String, dynamic>) {
-        throw Exception('Invalid response format');
-      }
-
-      return GatewayResponse.fromJson(Map<String, dynamic>.from(decoded));
+      final decoded = await client.sendJsonLine(packet);
+      return GatewayResponse.fromJson(decoded);
     } catch (e) {
       return GatewayResponse(
         type: 'local_error',
-        requestId: requestId,
+        requestId: effectiveRequestId,
         timestamp: DateTime.now().toIso8601String(),
         status: 'error',
         command: command.toUpperCase(),
         message: e.toString(),
         data: {},
       );
-    } finally {
-      socket?.destroy();
     }
   }
 

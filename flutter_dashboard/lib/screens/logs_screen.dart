@@ -3,7 +3,12 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../config/app_config.dart';
+import '../features/logs/controllers/log_filter_builder.dart';
+import '../features/logs/log_field_catalog.dart';
+import '../features/logs/widgets/widgets.dart';
+import '../models/log_filter_model.dart';
 import '../models/log_models.dart';
+import '../repositories/log_repository.dart';
 import '../services/log_api_service.dart';
 
 class LogsScreen extends StatefulWidget {
@@ -154,63 +159,20 @@ class _LogsScreenState extends State<LogsScreen> {
     'logger_status',
   ];
 
-  bool get _isPcsAsset => _selectedAssetId == AppConfig.pcsAssetId;
-  bool get _isBmsAsset => _selectedAssetId == AppConfig.bmsAssetId;
+  bool get _isPcsAsset => LogFieldCatalog.isPcsAsset(_selectedAssetId);
+  bool get _isBmsAsset => LogFieldCatalog.isBmsAsset(_selectedAssetId);
 
-  List<String> get _activeTelemetryFieldOrder {
-    if (_isPcsAsset) return _pcsTelemetryFieldOrder;
-    if (_isBmsAsset) return _bmsTelemetryFieldOrder;
-    return _chillerTelemetryFieldOrder;
-  }
+  List<String> get _activeTelemetryFieldOrder =>
+      LogFieldCatalog.telemetryFieldOrder(_selectedAssetId);
 
-  List<String> get _activeTelemetryPreferredColumns {
-    if (_isPcsAsset) return _pcsTelemetryFieldOrder;
-    if (_isBmsAsset) return _bmsTelemetryFieldOrder;
-    return _chillerTelemetryFieldOrder;
-  }
+  List<String> get _activeTelemetryPreferredColumns =>
+      LogFieldCatalog.telemetryFieldOrder(_selectedAssetId);
 
-  List<String> get _activeEventPreferredColumns {
-    if (_isPcsAsset || _isBmsAsset) {
-      return const [
-        'timestamp',
-        'gateway_id',
-        'asset_id',
-        'vendor',
-        'event_type',
-        'command',
-        'old_value',
-        'new_value',
-        'readback_value',
-        'source',
-        'status',
-        'description',
-        'error',
-      ];
-    }
+  List<String> get _activeEventPreferredColumns =>
+      LogFieldCatalog.eventPreferredColumns(_selectedAssetId);
 
-    return const [
-      'timestamp',
-      'gateway_id',
-      'asset_id',
-      'event_type',
-      'old_value',
-      'new_value',
-      'source',
-      'status',
-      'description',
-    ];
-  }
-
-  List<String> get _activeErrorPreferredColumns {
-    return const [
-      'timestamp',
-      'gateway_id',
-      'asset_id',
-      'error_type',
-      'error_source',
-      'description',
-    ];
-  }
+  List<String> get _activeErrorPreferredColumns =>
+      LogFieldCatalog.errorPreferredColumns;
 
   @override
   void initState() {
@@ -240,59 +202,8 @@ class _LogsScreenState extends State<LogsScreen> {
     super.dispose();
   }
 
-  Set<String> _defaultTelemetryFieldsForAsset(String assetId) {
-    if (assetId == AppConfig.pcsAssetId) {
-      return {
-        'timestamp',
-        'vendor',
-        'comm_status',
-        'active_power_kw',
-        'reactive_power_kvar',
-        'power_factor',
-        'frequency_hz',
-        'battery_voltage_v',
-        'battery_current_a',
-        'dc_power_kw',
-        'operating_status',
-        'fault_status',
-        'logger_status',
-      };
-    }
-
-    if (assetId == AppConfig.bmsAssetId) {
-      return {
-        'timestamp',
-        'comm_status',
-        'soc_percent',
-        'soh_percent',
-        'rack_voltage_v',
-        'rack_current_a',
-        'power_kw',
-        'max_cell_voltage_mv',
-        'min_cell_voltage_mv',
-        'cell_voltage_diff_mv',
-        'max_cell_temp_c',
-        'min_cell_temp_c',
-        'insulation_resistance_kohm',
-        'precharge_stage',
-        'bcu_state',
-        'current_state',
-        'alarm_count',
-        'logger_status',
-      };
-    }
-
-    return {
-      'timestamp',
-      'outlet_water_temp',
-      'return_water_temp',
-      'set_temperature',
-      'control_mode',
-      'system_on_off',
-      'modbus_status',
-      'logger_status',
-    };
-  }
+  Set<String> _defaultTelemetryFieldsForAsset(String assetId) =>
+      LogFieldCatalog.defaultTelemetryFields(assetId);
 
   String _todayDate() {
     final now = DateTime.now();
@@ -302,22 +213,19 @@ class _LogsScreenState extends State<LogsScreen> {
         '${now.day.toString().padLeft(2, '0')}';
   }
 
-  LogApiService _api() {
-    return LogApiService(
-      gatewayIp: _gatewayIpController.text.trim(),
-      port: AppConfig.logHttpPort,
-      timeout: AppConfig.httpTimeout,
+  LogRepository _api() {
+    return LogRepository(
+      api: LogApiService(
+        gatewayIp: _gatewayIpController.text.trim(),
+        port: AppConfig.logHttpPort,
+        timeout: AppConfig.httpTimeout,
+      ),
     );
   }
 
-  String? _filterText(String text) {
-    final trimmed = text.trim();
-    return trimmed.isEmpty ? null : trimmed;
-  }
+  String? _filterText(String text) => LogFilterBuilder.text(text);
 
-  String? _filterDropdown(String value) {
-    return value.toLowerCase() == 'all' ? null : value;
-  }
+  String? _filterDropdown(String value) => LogFilterBuilder.dropdown(value);
 
   String? _telemetryFieldsCsv() {
     if (!_useSelectedTelemetryFields) return null;
@@ -358,7 +266,7 @@ class _LogsScreenState extends State<LogsScreen> {
     }
   }
 
-  Future<String> _loadStorageAndResolveDate(LogApiService api) async {
+  Future<String> _loadStorageAndResolveDate(LogRepository api) async {
     final assetsFuture = api.fetchAssets().catchError((_) {
       return LogAssetsResponse(
         status: 'fallback',
@@ -392,6 +300,57 @@ class _LogsScreenState extends State<LogsScreen> {
     return selectedDate;
   }
 
+  LogFilterModel _telemetryFilter(String effectiveDate) {
+    return LogFilterBuilder.telemetry(
+      assetId: _selectedAssetId,
+      date: effectiveDate,
+      limit: _limit,
+      startTime: _filterText(_startTimeController.text),
+      endTime: _filterText(_endTimeController.text),
+      fields: _telemetryFieldsCsv(),
+      modbusStatus: _isPcsAsset ? null : _filterDropdown(_modbusStatusFilter),
+      loggerStatus: _filterDropdown(_loggerStatusFilter),
+      vendor: _isPcsAsset ? _filterDropdown(_pcsVendorFilter) : null,
+      commStatus: (_isPcsAsset || _isBmsAsset)
+          ? _filterDropdown(_pcsCommStatusFilter)
+          : null,
+      operatingStatus: _isPcsAsset
+          ? _filterDropdown(_pcsOperatingStatusFilter)
+          : null,
+      faultStatus: _isPcsAsset ? _filterDropdown(_pcsFaultStatusFilter) : null,
+      search: _filterText(_searchController.text),
+    );
+  }
+
+  LogFilterModel _eventFilter(String effectiveDate) {
+    return LogFilterBuilder.events(
+      assetId: _selectedAssetId,
+      date: effectiveDate,
+      limit: _limit,
+      startTime: _filterText(_startTimeController.text),
+      endTime: _filterText(_endTimeController.text),
+      eventType: _filterDropdown(_eventTypeFilter),
+      status: _filterDropdown(_eventStatusFilter),
+      command: (_isPcsAsset || _isBmsAsset)
+          ? _filterDropdown(_pcsCommandFilter)
+          : null,
+      vendor: _isPcsAsset ? _filterDropdown(_pcsVendorFilter) : null,
+      search: _filterText(_searchController.text),
+    );
+  }
+
+  LogFilterModel _errorFilter(String effectiveDate) {
+    return LogFilterBuilder.errors(
+      assetId: _selectedAssetId,
+      date: effectiveDate,
+      limit: _limit,
+      startTime: _filterText(_startTimeController.text),
+      endTime: _filterText(_endTimeController.text),
+      errorType: _filterDropdown(_errorTypeFilter),
+      search: _filterText(_searchController.text),
+    );
+  }
+
   Future<void> _refreshAll() async {
     setState(() {
       _loading = true;
@@ -405,41 +364,13 @@ class _LogsScreenState extends State<LogsScreen> {
 
       final results = await Future.wait([
         api.fetchTelemetryLogs(
-          assetId: _selectedAssetId,
-          date: effectiveDate,
-          limit: _limit,
-          startTime: _filterText(_startTimeController.text),
-          endTime: _filterText(_endTimeController.text),
-          fields: _telemetryFieldsCsv(),
-          modbusStatus: _isPcsAsset ? null : _filterDropdown(_modbusStatusFilter),
-          loggerStatus: _filterDropdown(_loggerStatusFilter),
-          vendor: _isPcsAsset ? _filterDropdown(_pcsVendorFilter) : null,
-          commStatus: (_isPcsAsset || _isBmsAsset) ? _filterDropdown(_pcsCommStatusFilter) : null,
-          operatingStatus:
-              _isPcsAsset ? _filterDropdown(_pcsOperatingStatusFilter) : null,
-          faultStatus: _isPcsAsset ? _filterDropdown(_pcsFaultStatusFilter) : null,
-          search: _filterText(_searchController.text),
+          _telemetryFilter(effectiveDate),
         ),
         api.fetchEventLogs(
-          assetId: _selectedAssetId,
-          date: effectiveDate,
-          limit: _limit,
-          startTime: _filterText(_startTimeController.text),
-          endTime: _filterText(_endTimeController.text),
-          eventType: _filterDropdown(_eventTypeFilter),
-          status: _filterDropdown(_eventStatusFilter),
-          command: (_isPcsAsset || _isBmsAsset) ? _filterDropdown(_pcsCommandFilter) : null,
-          vendor: _isPcsAsset ? _filterDropdown(_pcsVendorFilter) : null,
-          search: _filterText(_searchController.text),
+          _eventFilter(effectiveDate),
         ),
         api.fetchErrorLogs(
-          assetId: _selectedAssetId,
-          date: effectiveDate,
-          limit: _limit,
-          startTime: _filterText(_startTimeController.text),
-          endTime: _filterText(_endTimeController.text),
-          errorType: _filterDropdown(_errorTypeFilter),
-          search: _filterText(_searchController.text),
+          _errorFilter(effectiveDate),
         ),
         api.fetchMetadata(assetId: _selectedAssetId),
       ]);
@@ -474,20 +405,7 @@ class _LogsScreenState extends State<LogsScreen> {
       final effectiveDate = await _loadStorageAndResolveDate(api);
 
       final logs = await api.fetchTelemetryLogs(
-        assetId: _selectedAssetId,
-        date: effectiveDate,
-        limit: _limit,
-        startTime: _filterText(_startTimeController.text),
-        endTime: _filterText(_endTimeController.text),
-        fields: _telemetryFieldsCsv(),
-        modbusStatus: _isPcsAsset ? null : _filterDropdown(_modbusStatusFilter),
-        loggerStatus: _filterDropdown(_loggerStatusFilter),
-        vendor: _isPcsAsset ? _filterDropdown(_pcsVendorFilter) : null,
-        commStatus: (_isPcsAsset || _isBmsAsset) ? _filterDropdown(_pcsCommStatusFilter) : null,
-        operatingStatus:
-            _isPcsAsset ? _filterDropdown(_pcsOperatingStatusFilter) : null,
-        faultStatus: _isPcsAsset ? _filterDropdown(_pcsFaultStatusFilter) : null,
-        search: _filterText(_searchController.text),
+        _telemetryFilter(effectiveDate),
       );
 
       setState(() {
@@ -1245,120 +1163,17 @@ class _LogsScreenState extends State<LogsScreen> {
     required LogApiResponse? response,
     required List<String> preferredColumns,
   }) {
-    if (response == null) {
-      return _emptyState(
-        title: title,
-        message: 'Press Refresh Logs to load data from i.MX93.',
-      );
-    }
-
-    if (!response.isOk) {
-      return _emptyState(
-        title: title,
-        message: response.message ?? 'API returned status: ${response.status}',
-      );
-    }
-
-    final rows = response.rows;
-
-    if (rows.isEmpty) {
-      return _emptyState(
-        title: title,
-        message: 'No rows found in ${response.fileName ?? 'log file'}.',
-      );
-    }
-
-    final availableColumns = preferredColumns.where((column) {
-      return rows.any((row) => row.containsKey(column));
-    }).toList();
-
-    final columns = availableColumns.isNotEmpty
-        ? availableColumns
-        : rows.first.keys.map((key) => key.toString()).toList();
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
-      child: Card(
-        elevation: 1,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildTableHeader(title, response),
-            const Divider(height: 1),
-            Expanded(
-              child: Scrollbar(
-                thumbVisibility: true,
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: SingleChildScrollView(
-                    child: DataTable(
-                      headingRowColor: WidgetStateProperty.all(
-                        Colors.blueGrey.withValues(alpha: 0.08),
-                      ),
-                      columns: columns.map((column) {
-                        return DataColumn(
-                          label: Text(
-                            column,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        );
-                      }).toList(),
-                      rows: rows.map((row) {
-                        return DataRow(
-                          cells: columns.map((column) {
-                            final text = _value(row[column]);
-                            final isLong = text.length > 45;
-
-                            return DataCell(
-                              SizedBox(
-                                width: isLong ? 380 : null,
-                                child: SelectableText(
-                                  text,
-                                  maxLines: isLong ? 3 : 1,
-                                ),
-                              ),
-                            );
-                          }).toList(),
-                        );
-                      }).toList(),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
+    return LogDataTable(
+      title: title,
+      response: response,
+      preferredColumns: preferredColumns,
+      fallbackAssetId: _selectedAssetId,
     );
   }
-
   Widget _buildTableHeader(String title, LogApiResponse response) {
-    return Padding(
-      padding: const EdgeInsets.all(14),
-      child: Wrap(
-        spacing: 18,
-        runSpacing: 8,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: [
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          Text('Asset: ${response.assetId.isNotEmpty ? response.assetId : _selectedAssetId}'),
-          Text('File: ${response.fileName ?? '--'}'),
-          Text('Total rows: ${response.totalRows}'),
-          Text('Filtered: ${response.filteredRows}'),
-          Text('Showing: ${response.rowsCount}'),
-          Text('Limit: ${response.limit}'),
-        ],
-      ),
-    );
+    return const SizedBox.shrink();
   }
+
 
   Widget _buildStorageTab() {
     return SingleChildScrollView(
@@ -1366,191 +1181,23 @@ class _LogsScreenState extends State<LogsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildStorageStatusCard(),
+          StorageStatusCard(status: _storageStatus),
           const SizedBox(height: 12),
-          _buildLogFilesCard(),
+          LogFilesCard(
+            files: _logFiles,
+            assetId: _selectedAssetId,
+            onDateSelected: (date) {
+              setState(() {
+                _dateController.text = date;
+              });
+              _fetchTelemetryOnly();
+            },
+          ),
           const SizedBox(height: 12),
-          _buildMetadataCard(),
+          MetadataCard(metadata: _metadata),
         ],
       ),
     );
   }
 
-  Widget _buildStorageStatusCard() {
-    final status = _storageStatus;
-
-    return Card(
-      elevation: 1,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: status == null
-            ? const Text('Storage status not loaded yet.')
-            : Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Storage Status',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  _infoRow('API Status', status.status),
-                  _infoRow('Base Path', status.basePath),
-                  _infoRow('Asset ID', status.assetId),
-                  _infoRow('Base Path Exists', status.exists.toString()),
-                  _infoRow(
-                    'Telemetry Directory Exists',
-                    status.telemetryDirExists.toString(),
-                  ),
-                  _infoRow('Events File Exists', status.eventsFileExists.toString()),
-                  _infoRow('Errors File Exists', status.errorsFileExists.toString()),
-                  _infoRow(
-                    'Metadata File Exists',
-                    status.metadataFileExists.toString(),
-                  ),
-                  _infoRow('Telemetry Files', status.telemetryFilesCount.toString()),
-                  _infoRow('Latest Telemetry File', status.latestTelemetryFile ?? '--'),
-                  const Divider(height: 22),
-                  _infoRow('Disk Total', formatBytes(status.diskTotalBytes)),
-                  _infoRow('Disk Used', formatBytes(status.diskUsedBytes)),
-                  _infoRow('Disk Free', formatBytes(status.diskFreeBytes)),
-                  const Divider(height: 22),
-                  _infoRow('EMS Logs Total Size', formatBytes(status.logTotalBytes)),
-                  _infoRow('Telemetry Logs Size', formatBytes(status.telemetryLogBytes)),
-                  _infoRow('Event Log Size', formatBytes(status.eventLogBytes)),
-                  _infoRow('Error Log Size', formatBytes(status.errorLogBytes)),
-                  _infoRow('Metadata Size', formatBytes(status.metadataBytes)),
-                ],
-              ),
-      ),
-    );
-  }
-
-  Widget _buildLogFilesCard() {
-    final files = _logFiles;
-
-    return Card(
-      elevation: 1,
-      child: ExpansionTile(
-        initiallyExpanded: true,
-        title: Text('Available Telemetry Log Files - $_selectedAssetId'),
-        subtitle: Text(
-          files == null ? 'Not loaded' : '${files.filesCount} file(s) available',
-        ),
-        children: [
-          if (files == null || files.files.isEmpty)
-            const Padding(
-              padding: EdgeInsets.all(16),
-              child: Text('No log files available.'),
-            )
-          else
-            ...files.files.map(
-              (file) => ListTile(
-                dense: true,
-                leading: const Icon(Icons.description),
-                title: Text(file),
-                subtitle: Text(_selectedAssetId),
-                onTap: () {
-                  final date = file.replaceAll('.csv', '');
-
-                  setState(() {
-                    _dateController.text = date;
-                  });
-
-                  _fetchTelemetryOnly();
-                },
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMetadataCard() {
-    final metadata = _metadata;
-
-    return Card(
-      elevation: 1,
-      child: ExpansionTile(
-        initiallyExpanded: true,
-        title: const Text('Gateway Metadata'),
-        subtitle: Text(metadata == null ? 'Not loaded' : metadata.status),
-        children: [
-          if (metadata == null || metadata.metadata.isEmpty)
-            const Padding(
-              padding: EdgeInsets.all(16),
-              child: Text('No metadata loaded.'),
-            )
-          else
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: metadata.metadata.entries.map((entry) {
-                  return _infoRow(entry.key, entry.value.toString());
-                }).toList(),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _infoRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 7),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 220,
-            child: Text(
-              label,
-              style: const TextStyle(
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-          Expanded(
-            child: SelectableText(value),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _emptyState({
-    required String title,
-    required String message,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
-      child: Card(
-        elevation: 1,
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(30),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  message,
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 }

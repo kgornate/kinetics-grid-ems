@@ -1,9 +1,12 @@
+import '../core/config/app_environment.dart';
+import '../core/config/network_config.dart';
+
 class AppConfig {
   static const String defaultGatewayIp = '192.168.10.2';
 
+  static const int webApiPort = 8000;
   static const int tcpCommandPort = 6000;
   static const int udpTelemetryPort = 5005;
-
   static const int logHttpPort = 7000;
 
   static const Duration tcpTimeout = Duration(seconds: 5);
@@ -28,6 +31,18 @@ class AppConfig {
 
   // Kept for backward compatibility with existing chiller code.
   static const String assetId = chillerAssetId;
+
+  static final AppEnvironment defaultEnvironment = AppEnvironment.hardware(
+    ethHost: defaultGatewayIp,
+  );
+
+  static NetworkConfig networkForGateway(String gatewayIp) {
+    return NetworkConfig.hardware(ethHost: gatewayIp);
+  }
+
+  static String webApiBaseUrl(String gatewayIp) {
+    return 'http://$gatewayIp:$webApiPort';
+  }
 
   static String logApiBaseUrl(String gatewayIp) {
     return 'http://$gatewayIp:$logHttpPort';

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import '../features/commands/commands.dart';
 
 import 'package:flutter/material.dart';
 
@@ -7,15 +8,22 @@ import '../config/app_config.dart';
 import '../models/bms_telemetry.dart';
 import '../models/chiller_telemetry.dart';
 import '../models/gateway_response.dart';
+import '../models/models.dart';
+import '../repositories/repositories.dart';
+import '../features/assets/widgets/widgets.dart';
 import '../models/pcs_telemetry.dart';
 import '../services/tcp_command_service.dart';
 import '../services/udp_telemetry_service.dart';
+import '../features/dashboard/widgets/widgets.dart';
 import '../widgets/command_panel.dart';
-import '../widgets/status_indicator.dart';
-import '../widgets/telemetry_card.dart';
 import 'bms_screen.dart';
 import 'logs_screen.dart';
 import 'pcs_screen.dart';
+import 'asset_navigation_screen.dart';
+import 'health_dashboard_screen.dart';
+import 'operator_dashboard_screen.dart';
+import 'storage_health_screen.dart';
+import 'asset_detail_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -40,16 +48,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
   BmsTelemetry? _latestBmsTelemetry;
   Map<String, dynamic>? _latestRawPacket;
   GatewayResponse? _lastResponse;
+  AssetListResponse? _assetCatalog;
+  AssetsHealthResponse? _assetHealth;
+  Timer? _assetCatalogTimer;
 
   bool _udpRunning = false;
   bool _commandInProgress = false;
   String _statusMessage = 'Dashboard initialized';
+  bool _assetCatalogLoading = false;
+  String? _assetCatalogError;
 
   @override
   void initState() {
     super.initState();
     _setupStreams();
     _startUdpListener();
+    _loadDynamicAssets();
+    _assetCatalogTimer = Timer.periodic(
+      const Duration(seconds: 10),
+      (_) => _loadDynamicAssets(silent: true),
+    );
   }
 
   void _setupStreams() {
@@ -142,7 +160,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
       final upperCommand = command.toUpperCase();
 
-      if (response.isOk && upperCommand == 'READ_ALL') {
+      if (response.isOk && upperCommand == GatewayCommandNames.readChillerAll) {
         final data = _extractDataOrMockState(response.data);
         if (data.isNotEmpty) {
           _latestTelemetry = ChillerTelemetry.fromJson(data);
@@ -150,26 +168,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
       }
 
       if (response.isOk &&
-          (upperCommand == 'PCS_READ' || upperCommand == 'READ_PCS')) {
+          (upperCommand == GatewayCommandNames.readPcs || upperCommand == GatewayCommandNames.readPcsAlias)) {
         if (response.data.isNotEmpty) {
           _latestPcsTelemetry = PcsTelemetry.fromJson(response.data);
         }
       }
 
       if (response.isOk &&
-          (upperCommand == 'READ_BMS' ||
-              upperCommand == 'READ_BMS_ALL' ||
-              upperCommand == 'BMS_READ_ALL' ||
-              upperCommand == 'READ_BMS_ALARMS' ||
-              upperCommand == 'BMS_READ_ALARMS')) {
+          (upperCommand == GatewayCommandNames.readBms ||
+              upperCommand == GatewayCommandNames.readBmsAll ||
+              upperCommand == GatewayCommandNames.readBmsAllAlias ||
+              upperCommand == GatewayCommandNames.readBmsAlarms ||
+              upperCommand == GatewayCommandNames.readBmsAlarmsAlias)) {
         if (response.data.isNotEmpty) {
           _latestBmsTelemetry = BmsTelemetry.fromJson(response.data);
         }
       }
 
       if (response.isOk &&
-          (upperCommand == 'READ_ALL_ASSETS' ||
-              upperCommand == 'READ_GATEWAY_TELEMETRY')) {
+          (upperCommand == GatewayCommandNames.readAllAssets ||
+              upperCommand == GatewayCommandNames.readGatewayTelemetry)) {
         final pcs = _extractPcsFromTelemetryPacket(response.data);
         if (pcs.isNotEmpty) {
           _latestPcsTelemetry = PcsTelemetry.fromJson(pcs);
@@ -180,6 +198,92 @@ class _DashboardScreenState extends State<DashboardScreen> {
         }
       }
     });
+  }
+
+  Future<void> _loadDynamicAssets({bool silent = false}) async {
+    final gatewayIp = _gatewayIpController.text.trim();
+    if (gatewayIp.isEmpty) return;
+
+    if (!silent && mounted) {
+      setState(() {
+        _assetCatalogLoading = true;
+        _assetCatalogError = null;
+      });
+    }
+
+    try {
+      final assetsRepo = AssetRepository.forGateway(gatewayIp);
+      final healthRepo = HealthRepository.forGateway(gatewayIp);
+      final results = await Future.wait([
+        assetsRepo.fetchAssets(),
+        healthRepo.fetchAssetsHealth(),
+      ]);
+
+      if (!mounted) return;
+      setState(() {
+        _assetCatalog = results[0] as AssetListResponse;
+        _assetHealth = results[1] as AssetsHealthResponse;
+        _assetCatalogLoading = false;
+        _assetCatalogError = null;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _assetCatalogLoading = false;
+        _assetCatalogError = 'Asset catalog unavailable: $error';
+      });
+    }
+  }
+
+  void _openDynamicAsset(AssetModel asset) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => AssetDetailScreen(
+          gatewayIp: _gatewayIpController.text.trim(),
+          asset: asset,
+        ),
+      ),
+    );
+  }
+
+  void _openAssetNavigationScreen() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => AssetNavigationScreen(
+          gatewayIp: _gatewayIpController.text.trim(),
+        ),
+      ),
+    );
+  }
+
+  void _openHealthDashboardScreen() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => HealthDashboardScreen(
+          gatewayIp: _gatewayIpController.text.trim(),
+        ),
+      ),
+    );
+  }
+
+  void _openStorageHealthScreen() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => StorageHealthScreen(
+          gatewayIp: _gatewayIpController.text.trim(),
+        ),
+      ),
+    );
+  }
+
+  void _openOperatorDashboardScreen() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => OperatorDashboardScreen(
+          gatewayIp: _gatewayIpController.text.trim(),
+        ),
+      ),
+    );
   }
 
   void _openLogsScreen() {
@@ -221,6 +325,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _telemetrySubscription?.cancel();
     _pcsTelemetrySubscription?.cancel();
     _bmsTelemetrySubscription?.cancel();
+    _assetCatalogTimer?.cancel();
     _rawPacketSubscription?.cancel();
     _udpService.dispose();
     super.dispose();
@@ -315,6 +420,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
         title: const Text('EMS Dashboard - Chiller + PCS + BMS'),
         actions: [
           TextButton.icon(
+            onPressed: _openOperatorDashboardScreen,
+            icon: const Icon(Icons.visibility),
+            label: const Text('Operator'),
+          ),
+          TextButton.icon(
+            onPressed: _openAssetNavigationScreen,
+            icon: const Icon(Icons.view_module),
+            label: const Text('Assets'),
+          ),
+          TextButton.icon(
+            onPressed: _openHealthDashboardScreen,
+            icon: const Icon(Icons.health_and_safety),
+            label: const Text('Health'),
+          ),
+          TextButton.icon(
+            onPressed: _openStorageHealthScreen,
+            icon: const Icon(Icons.storage),
+            label: const Text('Storage'),
+          ),
+          TextButton.icon(
             onPressed: _openLogsScreen,
             icon: const Icon(Icons.history),
             label: const Text('Logs'),
@@ -343,6 +468,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _buildTopConfigCard(),
+                  const SizedBox(height: 16),
+                  _buildDynamicAssetPanel(),
                   const SizedBox(height: 16),
                   _buildStatusRow(chiller, pcs, bms),
                   const SizedBox(height: 16),
@@ -397,429 +524,65 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _sectionHeader(String title) {
-    return Text(
-      title,
-      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
+    return DashboardSectionHeader(title: title);
+  }
+
+
+  Widget _buildTopConfigCard() {
+    return GatewayConfigCard(
+      gatewayIpController: _gatewayIpController,
+      udpRunning: _udpRunning,
+      commandInProgress: _commandInProgress,
+      onToggleUdp: _udpRunning ? _stopUdpListener : _startUdpListener,
+      onOpenLogs: _openLogsScreen,
     );
   }
 
-  Widget _buildTopConfigCard() {
-    return Card(
-      elevation: 1,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            Expanded(
-              child: TextField(
-                controller: _gatewayIpController,
-                decoration: const InputDecoration(
-                  labelText: 'i.MX93 Gateway IP',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.router),
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            FilledButton.tonal(
-              onPressed: _udpRunning ? _stopUdpListener : _startUdpListener,
-              child: Text(_udpRunning ? 'Stop UDP' : 'Start UDP'),
-            ),
-            const SizedBox(width: 12),
-            FilledButton.icon(
-              onPressed: _openLogsScreen,
-              icon: const Icon(Icons.history),
-              label: const Text('Logs'),
-            ),
-            const SizedBox(width: 12),
-            if (_commandInProgress)
-              const SizedBox(
-                width: 28,
-                height: 28,
-                child: CircularProgressIndicator(strokeWidth: 3),
-              ),
-          ],
-        ),
-      ),
+
+  Widget _buildDynamicAssetPanel() {
+    return DynamicAssetSummaryPanel(
+      assets: _assetCatalog,
+      health: _assetHealth,
+      loading: _assetCatalogLoading,
+      error: _assetCatalogError,
+      onRefresh: () => _loadDynamicAssets(),
+      onOpenAsset: _openDynamicAsset,
     );
   }
 
   Widget _buildStatusRow(ChillerTelemetry? chiller, PcsTelemetry? pcs, BmsTelemetry? bms) {
-    return Wrap(
-      spacing: 12,
-      runSpacing: 12,
-      children: [
-        StatusIndicator(
-          label: 'Gateway UDP',
-          status: _udpRunning ? 'LISTENING' : 'STOPPED',
-          active: _udpRunning,
-        ),
-        StatusIndicator(
-          label: 'BMS Comm',
-          status: bms?.effectiveCommStatus,
-          active: bms?.isOnline ?? false,
-        ),
-        StatusIndicator(
-          label: 'BMS State',
-          status: bms?.bcuState,
-          active: bms != null &&
-              (bms.bcuState == null ||
-                  bms.bcuState!.toLowerCase().contains('normal')),
-        ),
-        StatusIndicator(
-          label: 'BMS Alarms',
-          status: bms == null ? '--' : '${bms.alarmCount}',
-          active: bms != null && !bms.hasAlarms,
-        ),
-        StatusIndicator(
-          label: 'PCS Comm',
-          status: pcs?.commStatus,
-          active: pcs?.isOnline ?? false,
-        ),
-        StatusIndicator(
-          label: 'PCS Status',
-          status: pcs?.operatingStatus,
-          active: pcs?.isRunning ?? false,
-        ),
-        StatusIndicator(
-          label: 'PCS Fault',
-          status: pcs == null ? '--' : (pcs.faultStatus ? 'FAULT' : 'NORMAL'),
-          active: pcs != null && !pcs.faultStatus,
-        ),
-        StatusIndicator(
-          label: 'Chiller Comm',
-          status: chiller?.communicationStatus,
-          active: chiller?.isOnline ?? false,
-        ),
-        StatusIndicator(
-          label: 'Water Pump',
-          status: chiller?.waterPump,
-          active: chiller?.waterPump == 'RUNNING',
-        ),
-      ],
+    return DashboardStatusRow(
+      udpRunning: _udpRunning,
+      chiller: chiller,
+      pcs: pcs,
+      bms: bms,
     );
   }
+
 
 
   Widget _buildBmsTelemetryGrid(BmsTelemetry? b) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        int crossAxisCount = 3;
-
-        if (constraints.maxWidth < 900) {
-          crossAxisCount = 2;
-        }
-
-        if (constraints.maxWidth < 560) {
-          crossAxisCount = 1;
-        }
-
-        return GridView.count(
-          crossAxisCount: crossAxisCount,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          childAspectRatio: 2.35,
-          crossAxisSpacing: 12,
-          mainAxisSpacing: 12,
-          children: [
-            TelemetryCard(
-              title: 'SOC',
-              value: _doubleValue(b?.socPercent),
-              unit: '%',
-              icon: Icons.battery_full,
-            ),
-            TelemetryCard(
-              title: 'SOH',
-              value: _doubleValue(b?.sohPercent),
-              unit: '%',
-              icon: Icons.health_and_safety,
-            ),
-            TelemetryCard(
-              title: 'Rack Voltage',
-              value: _doubleValue(b?.rackVoltageV),
-              unit: 'V',
-              icon: Icons.bolt,
-            ),
-            TelemetryCard(
-              title: 'Rack Current',
-              value: _doubleValue(b?.rackCurrentA),
-              unit: 'A',
-              icon: Icons.electric_meter,
-            ),
-            TelemetryCard(
-              title: 'Power',
-              value: _doubleValue(b?.powerKw, digits: 2),
-              unit: 'kW',
-              icon: Icons.power,
-            ),
-            TelemetryCard(
-              title: 'Max Cell Voltage',
-              value: _doubleValue(b?.maxCellVoltageMv, digits: 0),
-              unit: 'mV',
-              icon: Icons.arrow_upward,
-            ),
-            TelemetryCard(
-              title: 'Min Cell Voltage',
-              value: _doubleValue(b?.minCellVoltageMv, digits: 0),
-              unit: 'mV',
-              icon: Icons.arrow_downward,
-            ),
-            TelemetryCard(
-              title: 'Voltage Diff',
-              value: _doubleValue(b?.cellVoltageDiffMv, digits: 0),
-              unit: 'mV',
-              icon: Icons.compare_arrows,
-            ),
-            TelemetryCard(
-              title: 'Max Temp',
-              value: _doubleValue(b?.maxCellTempC),
-              unit: '°C',
-              icon: Icons.device_thermostat,
-            ),
-            TelemetryCard(
-              title: 'Min Temp',
-              value: _doubleValue(b?.minCellTempC),
-              unit: '°C',
-              icon: Icons.thermostat,
-            ),
-            TelemetryCard(
-              title: 'Insulation',
-              value: _doubleValue(b?.insulationResistanceKohm, digits: 0),
-              unit: 'kΩ',
-              icon: Icons.security,
-            ),
-            TelemetryCard(
-              title: 'Alarm Count',
-              value: _value(b?.alarmCount),
-              icon: Icons.warning_amber,
-            ),
-          ],
-        );
-      },
-    );
+    return BmsTelemetryGrid(telemetry: b);
   }
+
 
   Widget _buildPcsTelemetryGrid(PcsTelemetry? p) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        int crossAxisCount = 3;
-
-        if (constraints.maxWidth < 900) {
-          crossAxisCount = 2;
-        }
-
-        if (constraints.maxWidth < 560) {
-          crossAxisCount = 1;
-        }
-
-        return GridView.count(
-          crossAxisCount: crossAxisCount,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          childAspectRatio: 2.35,
-          crossAxisSpacing: 12,
-          mainAxisSpacing: 12,
-          children: [
-            TelemetryCard(
-              title: 'Active Power',
-              value: _doubleValue(p?.activePowerKw),
-              unit: 'kW',
-              icon: Icons.bolt,
-            ),
-            TelemetryCard(
-              title: 'Reactive Power',
-              value: _doubleValue(p?.reactivePowerKvar),
-              unit: 'kvar',
-              icon: Icons.electrical_services,
-            ),
-            TelemetryCard(
-              title: 'Power Factor',
-              value: _doubleValue(p?.powerFactor, digits: 2),
-              icon: Icons.speed,
-            ),
-            TelemetryCard(
-              title: 'Frequency',
-              value: _doubleValue(p?.frequencyHz, digits: 2),
-              unit: 'Hz',
-              icon: Icons.show_chart,
-            ),
-            TelemetryCard(
-              title: 'Battery Voltage',
-              value: _doubleValue(p?.batteryVoltageV),
-              unit: 'V',
-              icon: Icons.battery_charging_full,
-            ),
-            TelemetryCard(
-              title: 'Battery Current',
-              value: _doubleValue(p?.batteryCurrentA),
-              unit: 'A',
-              icon: Icons.electric_meter,
-            ),
-            TelemetryCard(
-              title: 'DC Power',
-              value: _doubleValue(p?.dcPowerKw),
-              unit: 'kW',
-              icon: Icons.power,
-            ),
-            TelemetryCard(
-              title: 'Bus Voltage',
-              value: _doubleValue(p?.busVoltageV),
-              unit: 'V',
-              icon: Icons.cable,
-            ),
-            TelemetryCard(
-              title: 'AB Line Voltage',
-              value: _doubleValue(p?.abVoltageV),
-              unit: 'V',
-              icon: Icons.offline_bolt,
-            ),
-            TelemetryCard(
-              title: 'BC Line Voltage',
-              value: _doubleValue(p?.bcVoltageV),
-              unit: 'V',
-              icon: Icons.offline_bolt,
-            ),
-            TelemetryCard(
-              title: 'CA Line Voltage',
-              value: _doubleValue(p?.caVoltageV),
-              unit: 'V',
-              icon: Icons.offline_bolt,
-            ),
-            TelemetryCard(
-              title: 'Phase A Current',
-              value: _doubleValue(p?.phaseACurrentA),
-              unit: 'A',
-              icon: Icons.electrical_services,
-            ),
-            TelemetryCard(
-              title: 'IGBT Temp',
-              value: _doubleValue(p?.igbtTemperatureC),
-              unit: '°C',
-              icon: Icons.device_thermostat,
-            ),
-            TelemetryCard(
-              title: 'Ambient Temp',
-              value: _doubleValue(p?.ambientTemperatureC),
-              unit: '°C',
-              icon: Icons.thermostat,
-            ),
-            TelemetryCard(
-              title: 'Last PCS Update',
-              value: _formatTime(p?.receivedAt),
-              icon: Icons.access_time,
-            ),
-          ],
-        );
-      },
-    );
+    return PcsTelemetryGrid(telemetry: p);
   }
+
 
   Widget _buildChillerTelemetryGrid(ChillerTelemetry? t) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        int crossAxisCount = 3;
-
-        if (constraints.maxWidth < 800) {
-          crossAxisCount = 2;
-        }
-
-        if (constraints.maxWidth < 520) {
-          crossAxisCount = 1;
-        }
-
-        return GridView.count(
-          crossAxisCount: crossAxisCount,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          childAspectRatio: 2.35,
-          crossAxisSpacing: 12,
-          mainAxisSpacing: 12,
-          children: [
-            TelemetryCard(
-              title: 'Outlet Water Temp',
-              value: _doubleValue(t?.outletWaterTemp),
-              unit: '°C',
-              icon: Icons.thermostat,
-            ),
-            TelemetryCard(
-              title: 'Return Water Temp',
-              value: _doubleValue(t?.returnWaterTemp),
-              unit: '°C',
-              icon: Icons.thermostat_auto,
-            ),
-            TelemetryCard(
-              title: 'Ambient Temp',
-              value: _doubleValue(t?.ambientTemp),
-              unit: '°C',
-              icon: Icons.device_thermostat,
-            ),
-            TelemetryCard(
-              title: 'Outlet Pressure',
-              value: _doubleValue(t?.outletWaterPressure, digits: 2),
-              unit: 'Bar',
-              icon: Icons.speed,
-            ),
-            TelemetryCard(
-              title: 'Return Pressure',
-              value: _doubleValue(t?.returnWaterPressure, digits: 2),
-              unit: 'Bar',
-              icon: Icons.speed_outlined,
-            ),
-            TelemetryCard(
-              title: 'Set Temperature',
-              value: _value(t?.setTemperature),
-              unit: '°C',
-              icon: Icons.tune,
-            ),
-            TelemetryCard(
-              title: 'Control Mode',
-              value: _value(t?.controlMode),
-              icon: Icons.settings,
-            ),
-            TelemetryCard(
-              title: 'Make-up Pump',
-              value: _value(t?.makeupPump),
-              icon: Icons.water_drop,
-            ),
-            TelemetryCard(
-              title: 'Last Chiller Received',
-              value: _formatTime(t?.receivedAt),
-              icon: Icons.access_time,
-            ),
-          ],
-        );
-      },
-    );
+    return ChillerTelemetryGrid(telemetry: t);
   }
+
 
   Widget _buildRawPacketCard() {
-    return Card(
-      elevation: 1,
-      child: ExpansionTile(
-        title: const Text('Latest Raw UDP Packet'),
-        subtitle: Text(_statusMessage),
-        children: [
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            color: Colors.black87,
-            child: Text(
-              _latestRawPacket == null
-                  ? 'No UDP packet received yet'
-                  : const JsonEncoder.withIndent('  ').convert(_latestRawPacket),
-              style: const TextStyle(
-                color: Colors.white,
-                fontFamily: 'Consolas',
-                fontSize: 12,
-              ),
-            ),
-          ),
-        ],
-      ),
+    return RawPacketCard(
+      statusMessage: _statusMessage,
+      rawPacket: _latestRawPacket,
     );
   }
+
 
   Widget _buildReadableCommandResultCard() {
     final response = _lastResponse;
@@ -884,21 +647,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ];
     }
 
-    if (command == 'READ_BMS' ||
-        command == 'READ_BMS_ALL' ||
-        command == 'BMS_READ_ALL' ||
-        command == 'READ_BMS_ALARMS' ||
-        command == 'BMS_READ_ALARMS') {
+    if (command == GatewayCommandNames.readBms ||
+        command == GatewayCommandNames.readBmsAll ||
+        command == GatewayCommandNames.readBmsAllAlias ||
+        command == GatewayCommandNames.readBmsAlarms ||
+        command == GatewayCommandNames.readBmsAlarmsAlias) {
       return _buildBmsStateRows(data);
     }
 
-    if (command.startsWith('BMS_') ||
-        command == 'START_BMS_PRECHARGE' ||
-        command == 'STOP_BMS_PRECHARGE' ||
-        command == 'START_BMS_INSULATION_TEST' ||
-        command == 'START_INSULATION_TEST' ||
-        command == 'RESET_BCU' ||
-        command == 'RESET_BMS') {
+    if (GatewayCommandNames.isBmsCommand(command) ||
+        command == GatewayCommandNames.startBmsPrecharge ||
+        command == GatewayCommandNames.stopBmsPrecharge ||
+        command == GatewayCommandNames.startBmsInsulationTest ||
+        command == GatewayCommandNames.startInsulationTest ||
+        command == GatewayCommandNames.resetBcu ||
+        command == GatewayCommandNames.resetBms) {
       return [
         _resultSectionTitle('BMS Command Result'),
         _resultRow('Command', _value(data['command'] ?? response.command)),
@@ -909,11 +672,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ];
     }
 
-    if (command == 'PCS_READ' || command == 'READ_PCS' || command == 'PCS_STATUS') {
+    if (command == GatewayCommandNames.readPcs || command == GatewayCommandNames.readPcsAlias || command == GatewayCommandNames.pcsStatus) {
       return _buildPcsStateRows(data);
     }
 
-    if (command.startsWith('PCS_')) {
+    if (GatewayCommandNames.isPcsCommand(command)) {
       return [
         _resultSectionTitle('PCS Command Result'),
         _resultRow('PCS Command', _value(data['command'])),
@@ -927,7 +690,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ];
     }
 
-    if (command == 'READ_ALL_ASSETS' || command == 'READ_GATEWAY_TELEMETRY') {
+    if (command == GatewayCommandNames.readAllAssets || command == GatewayCommandNames.readGatewayTelemetry) {
       final bms = _extractBmsFromTelemetryPacket(data);
       if (bms.isNotEmpty) {
         return _buildBmsStateRows(bms);
@@ -939,7 +702,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       }
     }
 
-    if (command == 'READ_TEMP') {
+    if (command == GatewayCommandNames.readChillerTemperature) {
       return [
         _resultSectionTitle('Temperature Read Result'),
         _resultRow('Register', _value(data['register'])),
@@ -948,7 +711,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ];
     }
 
-    if (command == 'SET_TEMP') {
+    if (command == GatewayCommandNames.setChillerTemperature) {
       final readback = _asMap(data['readback']);
 
       return [
@@ -968,7 +731,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ];
     }
 
-    if (command == 'READ_MODE') {
+    if (command == GatewayCommandNames.readChillerMode) {
       return [
         _resultSectionTitle('Mode Read Result'),
         _resultRow('Register', _value(data['register'])),
@@ -977,7 +740,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ];
     }
 
-    if (command == 'SET_MODE') {
+    if (command == GatewayCommandNames.setChillerMode) {
       final readback = _asMap(data['readback']);
 
       return [
@@ -995,7 +758,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ];
     }
 
-    if (command == 'READ_ONOFF') {
+    if (command == GatewayCommandNames.readChillerOnOff) {
       return [
         _resultSectionTitle('ON/OFF Read Result'),
         _resultRow('Register', _value(data['register'])),
@@ -1004,7 +767,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ];
     }
 
-    if (command == 'READ_SETTINGS') {
+    if (command == GatewayCommandNames.readChillerSettings) {
       final controlMode = _asMap(data['control_mode']);
       final onOff = _asMap(data['on_off_enable']);
       final setTemp = _asMap(data['set_temperature']);
@@ -1020,7 +783,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ];
     }
 
-    if (command == 'READ_ALL') {
+    if (command == GatewayCommandNames.readChillerAll) {
       final telemetryData = _extractDataOrMockState(data);
 
       return [
@@ -1034,7 +797,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ];
     }
 
-    if (command == 'CHILLER_ON' || command == 'CHILLER_OFF') {
+    if (command == GatewayCommandNames.chillerOn || command == GatewayCommandNames.chillerOff) {
       final readback = _asMap(data['readback']);
 
       return [

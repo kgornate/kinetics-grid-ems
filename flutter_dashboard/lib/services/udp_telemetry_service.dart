@@ -1,13 +1,13 @@
 import 'dart:async';
-import 'dart:convert';
-import 'dart:io';
-
+import '../core/network/udp_json_listener.dart';
+import '../core/utils/json_utils.dart';
 import '../models/bms_telemetry.dart';
 import '../models/chiller_telemetry.dart';
 import '../models/pcs_telemetry.dart';
 
 class UdpTelemetryService {
-  RawDatagramSocket? _socket;
+  final UdpJsonListener _listener = UdpJsonListener();
+  StreamSubscription<Map<String, dynamic>>? _listenerSubscription;
 
   final StreamController<ChillerTelemetry> _telemetryController =
       StreamController<ChillerTelemetry>.broadcast();
@@ -26,45 +26,31 @@ class UdpTelemetryService {
   Stream<BmsTelemetry> get bmsTelemetryStream => _bmsTelemetryController.stream;
   Stream<Map<String, dynamic>> get rawPacketStream => _rawPacketController.stream;
 
-  bool get isRunning => _socket != null;
+  bool get isRunning => _listener.isRunning;
 
   Future<void> start({required int port}) async {
-    if (_socket != null) return;
+    if (_listener.isRunning) return;
 
-    _socket = await RawDatagramSocket.bind(InternetAddress.anyIPv4, port);
+    _listenerSubscription ??= _listener.stream.listen((decoded) {
+      _rawPacketController.add(decoded);
 
-    _socket!.listen((RawSocketEvent event) {
-      if (event != RawSocketEvent.read) return;
+      final chillerTelemetry = _parseChillerTelemetry(decoded);
+      if (chillerTelemetry != null) {
+        _telemetryController.add(chillerTelemetry);
+      }
 
-      final datagram = _socket!.receive();
-      if (datagram == null) return;
+      final pcsTelemetry = _parsePcsTelemetry(decoded);
+      if (pcsTelemetry != null) {
+        _pcsTelemetryController.add(pcsTelemetry);
+      }
 
-      try {
-        final message = utf8.decode(datagram.data);
-        final decoded = jsonDecode(message);
-
-        if (decoded is! Map<String, dynamic>) return;
-
-        _rawPacketController.add(decoded);
-
-        final chillerTelemetry = _parseChillerTelemetry(decoded);
-        if (chillerTelemetry != null) {
-          _telemetryController.add(chillerTelemetry);
-        }
-
-        final pcsTelemetry = _parsePcsTelemetry(decoded);
-        if (pcsTelemetry != null) {
-          _pcsTelemetryController.add(pcsTelemetry);
-        }
-
-        final bmsTelemetry = _parseBmsTelemetry(decoded);
-        if (bmsTelemetry != null) {
-          _bmsTelemetryController.add(bmsTelemetry);
-        }
-      } catch (_) {
-        // Ignore malformed UDP packets and keep listener alive.
+      final bmsTelemetry = _parseBmsTelemetry(decoded);
+      if (bmsTelemetry != null) {
+        _bmsTelemetryController.add(bmsTelemetry);
       }
     });
+
+    await _listener.start(port: port);
   }
 
   ChillerTelemetry? _parseChillerTelemetry(Map<String, dynamic> packet) {
@@ -132,18 +118,18 @@ class UdpTelemetryService {
   }
 
   Map<String, dynamic> _asMap(dynamic value) {
-    if (value is Map<String, dynamic>) return value;
-    if (value is Map) return Map<String, dynamic>.from(value);
-    return {};
+    return JsonUtils.asMap(value);
   }
 
   Future<void> stop() async {
-    _socket?.close();
-    _socket = null;
+    await _listener.stop();
+    await _listenerSubscription?.cancel();
+    _listenerSubscription = null;
   }
 
   Future<void> dispose() async {
     await stop();
+    await _listener.dispose();
     await _telemetryController.close();
     await _pcsTelemetryController.close();
     await _bmsTelemetryController.close();

@@ -84,6 +84,8 @@ class LogApiResponse {
   final int filteredRows;
   final int rowsCount;
   final int limit;
+  final int offset;
+  final Map<String, dynamic> filters;
   final List<Map<String, dynamic>> rows;
   final Map<String, dynamic> raw;
 
@@ -99,6 +101,8 @@ class LogApiResponse {
     required this.filteredRows,
     required this.rowsCount,
     required this.limit,
+    required this.offset,
+    required this.filters,
     required this.rows,
     required this.raw,
   });
@@ -116,6 +120,8 @@ class LogApiResponse {
       filteredRows: _toInt(json['filtered_rows']),
       rowsCount: _toInt(json['rows_count']),
       limit: _toInt(json['limit']),
+      offset: _toInt(json['offset']),
+      filters: _toMap(json['filters']),
       rows: _toMapList(json['rows']),
       raw: Map<String, dynamic>.from(json),
     );

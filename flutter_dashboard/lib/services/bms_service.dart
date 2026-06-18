@@ -2,6 +2,7 @@ import '../config/app_config.dart';
 import '../models/bms_telemetry.dart';
 import '../models/gateway_response.dart';
 import 'tcp_command_service.dart';
+import '../features/commands/commands.dart';
 
 class BmsService {
   final TcpCommandService tcp;
@@ -19,39 +20,39 @@ class BmsService {
   }
 
   Future<BmsCommandResult> readAll() async {
-    return _sendAndMaybeParse('READ_BMS_ALL');
+    return _sendAndMaybeParse(GatewayCommandNames.readBmsAll);
   }
 
   Future<BmsCommandResult> readAlarms() async {
-    return _sendAndMaybeParse('READ_BMS_ALARMS');
+    return _sendAndMaybeParse(GatewayCommandNames.readBmsAlarms);
   }
 
   Future<BmsCommandResult> startPrecharge() async {
-    return _sendAndMaybeParse('START_BMS_PRECHARGE');
+    return _sendAndMaybeParse(GatewayCommandNames.startBmsPrecharge);
   }
 
   Future<BmsCommandResult> stopPrecharge() async {
-    return _sendAndMaybeParse('STOP_BMS_PRECHARGE');
+    return _sendAndMaybeParse(GatewayCommandNames.stopBmsPrecharge);
   }
 
   Future<BmsCommandResult> startInsulationTest() async {
-    return _sendAndMaybeParse('START_BMS_INSULATION_TEST');
+    return _sendAndMaybeParse(GatewayCommandNames.startBmsInsulationTest);
   }
 
   Future<BmsCommandResult> fanAuto() async {
-    return _sendAndMaybeParse('BMS_FAN_AUTO');
+    return _sendAndMaybeParse(GatewayCommandNames.bmsFanAuto);
   }
 
   Future<BmsCommandResult> fanOn() async {
-    return _sendAndMaybeParse('BMS_FAN_ON');
+    return _sendAndMaybeParse(GatewayCommandNames.bmsFanOn);
   }
 
   Future<BmsCommandResult> fanOff() async {
-    return _sendAndMaybeParse('BMS_FAN_OFF');
+    return _sendAndMaybeParse(GatewayCommandNames.bmsFanOff);
   }
 
   Future<BmsCommandResult> resetBcu() async {
-    return _sendAndMaybeParse('RESET_BCU');
+    return _sendAndMaybeParse(GatewayCommandNames.resetBcu);
   }
 
   Future<BmsCommandResult> _sendAndMaybeParse(String command) async {

@@ -1,14 +1,20 @@
-import 'dart:async';
-import 'dart:convert';
-import 'dart:io';
-
 import '../config/app_config.dart';
+import '../core/api/api_client.dart';
+import '../core/api/api_exception.dart';
+import '../core/api/endpoint_paths.dart';
+import '../core/api/query_utils.dart';
 import '../models/log_models.dart';
+import '../models/log_filter_model.dart';
 
 class LogApiService {
   final String gatewayIp;
   final int port;
   final Duration timeout;
+  late final ApiClient _client = ApiClient(
+    host: gatewayIp,
+    port: port,
+    timeout: timeout,
+  );
 
   LogApiService({
     required this.gatewayIp,
@@ -20,83 +26,30 @@ class LogApiService {
     String path, {
     Map<String, String>? queryParameters,
   }) {
-    return Uri(
-      scheme: 'http',
-      host: gatewayIp,
-      port: port,
-      path: path,
-      queryParameters: queryParameters,
-    );
+    return _client.uri(path, queryParameters: queryParameters);
   }
 
   Map<String, String> _cleanQuery(Map<String, String?> query) {
-    final cleaned = <String, String>{};
-
-    query.forEach((key, value) {
-      if (value == null) return;
-
-      final trimmed = value.trim();
-
-      if (trimmed.isEmpty) return;
-      if (trimmed.toLowerCase() == 'all') return;
-
-      cleaned[key] = trimmed;
-    });
-
-    return cleaned;
+    return QueryUtils.clean(query);
   }
 
   Future<Map<String, dynamic>> _getJson(
     String path, {
     Map<String, String>? queryParameters,
   }) async {
-    final uri = _uri(path, queryParameters: queryParameters);
-
-    final client = HttpClient();
-    client.connectionTimeout = timeout;
-
     try {
-      final request = await client.getUrl(uri).timeout(timeout);
-      final response = await request.close().timeout(timeout);
-
-      final body = await response.transform(utf8.decoder).join().timeout(timeout);
-
-      final decoded = jsonDecode(body);
-
-      if (decoded is! Map) {
-        throw const FormatException('HTTP response is not a JSON object');
-      }
-
-      final json = Map<String, dynamic>.from(decoded);
-
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        final message =
-            json['message']?.toString() ?? 'HTTP ${response.statusCode} from log API';
-        throw LogApiException(message);
-      }
-
-      return json;
-    } on TimeoutException {
-      throw LogApiException(
-        'HTTP timeout while connecting to $gatewayIp:$port',
-      );
-    } on SocketException catch (e) {
-      throw LogApiException(
-        'Socket error while connecting to $gatewayIp:$port: ${e.message}',
-      );
-    } on FormatException catch (e) {
-      throw LogApiException('Invalid JSON from log API: ${e.message}');
-    } finally {
-      client.close(force: true);
+      return await _client.getJson(path, queryParameters: queryParameters);
+    } on ApiException catch (error) {
+      throw LogApiException(error.message);
     }
   }
 
   Future<Map<String, dynamic>> fetchHealth() async {
-    return _getJson('/api/health');
+    return _getJson(EndpointPaths.logHealth);
   }
 
   Future<LogAssetsResponse> fetchAssets() async {
-    final json = await _getJson('/api/logs/assets');
+    final json = await _getJson(EndpointPaths.logAssets);
     return LogAssetsResponse.fromJson(json);
   }
 
@@ -104,7 +57,7 @@ class LogApiService {
     String assetId = AppConfig.chillerAssetId,
   }) async {
     final json = await _getJson(
-      '/api/storage/status',
+      EndpointPaths.storageStatus,
       queryParameters: _cleanQuery({
         'asset_id': assetId,
       }),
@@ -112,11 +65,22 @@ class LogApiService {
     return StorageStatus.fromJson(json);
   }
 
+  Future<Map<String, dynamic>> fetchStorageHealth({
+    String assetId = AppConfig.chillerAssetId,
+  }) async {
+    return _getJson(
+      EndpointPaths.storageHealth,
+      queryParameters: _cleanQuery({
+        'asset_id': assetId,
+      }),
+    );
+  }
+
   Future<LogFilesResponse> fetchLogFiles({
     String assetId = AppConfig.chillerAssetId,
   }) async {
     final json = await _getJson(
-      '/api/logs/files',
+      EndpointPaths.logFiles,
       queryParameters: _cleanQuery({
         'asset_id': assetId,
       }),
@@ -138,9 +102,11 @@ class LogApiService {
     String? operatingStatus,
     String? faultStatus,
     String? search,
+    int? offset,
+    String? order,
   }) async {
     final json = await _getJson(
-      '/api/logs/telemetry',
+      EndpointPaths.logTelemetry,
       queryParameters: _cleanQuery({
         'asset_id': assetId,
         'date': date,
@@ -155,6 +121,8 @@ class LogApiService {
         'operating_status': operatingStatus,
         'fault_status': faultStatus,
         'search': search,
+        'offset': offset?.toString(),
+        'order': order,
       }),
     );
 
@@ -174,9 +142,11 @@ class LogApiService {
     String? vendor,
     String? search,
     String? fields,
+    int? offset,
+    String? order,
   }) async {
     final json = await _getJson(
-      '/api/logs/events',
+      EndpointPaths.logEvents,
       queryParameters: _cleanQuery({
         'asset_id': assetId,
         'limit': limit.toString(),
@@ -190,6 +160,8 @@ class LogApiService {
         'vendor': vendor,
         'search': search,
         'fields': fields,
+        'offset': offset?.toString(),
+        'order': order,
       }),
     );
 
@@ -206,9 +178,11 @@ class LogApiService {
     String? errorSource,
     String? search,
     String? fields,
+    int? offset,
+    String? order,
   }) async {
     final json = await _getJson(
-      '/api/logs/errors',
+      EndpointPaths.logErrors,
       queryParameters: _cleanQuery({
         'asset_id': assetId,
         'limit': limit.toString(),
@@ -219,9 +193,45 @@ class LogApiService {
         'error_source': errorSource,
         'search': search,
         'fields': fields,
+        'offset': offset?.toString(),
+        'order': order,
       }),
     );
 
+    return LogApiResponse.fromJson(json);
+  }
+
+
+  Future<LogApiResponse> fetchTelemetryLogsWithFilter(
+    LogFilterModel filter,
+  ) async {
+    if (filter.date == null || filter.date!.isEmpty) {
+      throw LogApiException('date is required for telemetry log queries');
+    }
+    final json = await _getJson(
+      EndpointPaths.logTelemetry,
+      queryParameters: _cleanQuery(filter.toQueryParameters()),
+    );
+    return LogApiResponse.fromJson(json);
+  }
+
+  Future<LogApiResponse> fetchEventLogsWithFilter(
+    LogFilterModel filter,
+  ) async {
+    final json = await _getJson(
+      EndpointPaths.logEvents,
+      queryParameters: _cleanQuery(filter.toQueryParameters()),
+    );
+    return LogApiResponse.fromJson(json);
+  }
+
+  Future<LogApiResponse> fetchErrorLogsWithFilter(
+    LogFilterModel filter,
+  ) async {
+    final json = await _getJson(
+      EndpointPaths.logErrors,
+      queryParameters: _cleanQuery(filter.toQueryParameters()),
+    );
     return LogApiResponse.fromJson(json);
   }
 
@@ -229,7 +239,7 @@ class LogApiService {
     String assetId = AppConfig.chillerAssetId,
   }) async {
     final json = await _getJson(
-      '/api/logs/metadata',
+      EndpointPaths.logMetadata,
       queryParameters: _cleanQuery({
         'asset_id': assetId,
       }),
@@ -242,7 +252,7 @@ class LogApiService {
     String assetId = AppConfig.chillerAssetId,
   }) {
     return _uri(
-      '/api/logs/download/telemetry',
+      EndpointPaths.telemetryCsvDownload,
       queryParameters: _cleanQuery({
         'asset_id': assetId,
         'date': date,
