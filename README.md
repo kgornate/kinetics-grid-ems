@@ -1,2 +1,1 @@
-testing for 1 commit
-testing for 2 commit
+SCRUM-17: branch of readme
