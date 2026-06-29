@@ -17,6 +17,7 @@ from nb_ems_gateway.dictionary.map_loader import load_register_map
 from nb_ems_gateway.polling.polling_service import PollingService
 from nb_ems_gateway.polling.scheduler import PollingScheduler, intervals_from_config
 from nb_ems_gateway.protocol.read_plan import create_read_plans
+from nb_ems_gateway.server_upload.uploader import ServerUploadService
 
 
 def main() -> None:
@@ -30,6 +31,8 @@ def main() -> None:
     print_startup_banner(config, register_map, args.mock)
 
     container = DependencyContainer.create(config=config, register_map=register_map)
+    upload_service = ServerUploadService(config.server_upload, container)
+    container.server_upload_service = upload_service
     reader = build_reader(config, register_map, mock=args.mock)
     plans = create_read_plans(register_map, max_registers_per_read=config.polling.max_registers_per_read)
     polling_service = PollingService(reader=reader, plans=plans, decoding_config=config.decoding, polling_config=config.polling)
@@ -49,11 +52,13 @@ def main() -> None:
             intervals=intervals_from_config(config),
         )
         await scheduler.start()
+        await upload_service.start()
         server_config = uvicorn.Config(app, host=config.api.host, port=config.api.port, log_level="info")
         server = uvicorn.Server(server_config)
         try:
             await server.serve()
         finally:
+            await upload_service.stop()
             await scheduler.stop()
             reader.close()
             container.close()

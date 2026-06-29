@@ -57,8 +57,18 @@ class StorageConfig(BaseModel):
 
 class ServerUploadConfig(BaseModel):
     enabled: bool = False
-    transport: str = "https_or_mqtt_future"
+    transport: str = "https_rest"
+    endpoint_url: str | None = None
+    api_key: str | None = None
+    network_interface: str = "mlan0"
+    source_ip: str | None = None
+    bind_to_interface_source_ip: bool = True
+    upload_interval_sec: float = 10.0
+    timeout_sec: float = 5.0
+    payload_mode: str = "key_signals"
     buffer_when_offline: bool = True
+    max_queue_size: int = 1000
+    verify_tls: bool = True
 
 
 class AppConfig(BaseModel):

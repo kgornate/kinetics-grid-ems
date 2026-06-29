@@ -1,0 +1,61 @@
+{
+  "gateway": {
+    "id": "northbound_ems_gateway_1",
+    "name": "NorthBound EMS Gateway",
+    "mode": "read_only"
+  },
+  "network": {
+    "field_interface": "eth1",
+    "application_interface": "eth0"
+  },
+  "existing_ems": {
+    "protocol": "modbus_tcp",
+    "host": "CHANGE_ME_EMS_LOCAL_IP",
+    "port": 515,
+    "unit_id": 1,
+    "register_function": "holding_registers",
+    "timeout_sec": 2.0,
+    "retries": 2
+  },
+  "register_map": {
+    "path": "data/register_maps/china_ems_northbound_v1.json"
+  },
+  "decoding": {
+    "data_type": "float32",
+    "registers_per_point": 2,
+    "byte_order": "ABCD",
+    "apply_factor": true
+  },
+  "polling": {
+    "enabled": true,
+    "default_interval_sec": 5,
+    "fast_interval_sec": 1,
+    "slow_interval_sec": 10,
+    "max_registers_per_read": 120
+  },
+  "api": {
+    "host": "0.0.0.0",
+    "port": 8000,
+    "commands_enabled": false
+  },
+  "storage": {
+    "enabled": true,
+    "type": "sqlite",
+    "path": "runtime/nb_ems_gateway.db"
+  },
+  "server_upload": {
+    "enabled": true,
+    "transport": "https_rest",
+    "endpoint_url": "https://CHANGE_ME_SERVER_HOST/api/v1/gateway/telemetry",
+    "api_key": "CHANGE_ME_API_TOKEN",
+    "network_interface": "mlan0",
+    "source_ip": null,
+    "bind_to_interface_source_ip": true,
+    "upload_interval_sec": 10,
+    "timeout_sec": 5,
+    "payload_mode": "key_signals",
+    "buffer_when_offline": true,
+    "max_queue_size": 1000,
+    "verify_tls": true
+  }
+}

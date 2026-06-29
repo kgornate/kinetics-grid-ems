@@ -116,3 +116,62 @@ Milestone 3: Pending - requires real Chinese EMS IP/network access.
 Milestone 4: Done for read-only API foundation - asset telemetry, key signals, categories, register filters.
 Milestone 5: Done for local logging foundation - SQLite snapshots, point history, event log, dashboard-ready APIs.
 ```
+
+## v0.3 HTTPS REST server upload update
+
+This package adds a configurable background server uploader. It sends read-only normalized telemetry, gateway health, and alarms to a backend server over HTTPS REST. This does not enable Modbus writes or any PCS/BMS/EMS control command.
+
+Default intended upload interface for v0.3:
+
+```text
+mlan0 = Wi-Fi server upload/uplink
+```
+
+To switch server upload from Wi-Fi to Ethernet later, change only this config field:
+
+```json
+"server_upload": {
+  "network_interface": "eth0"
+}
+```
+
+The server uploader config is:
+
+```json
+"server_upload": {
+  "enabled": true,
+  "transport": "https_rest",
+  "endpoint_url": "https://your-server.example.com/api/v1/gateway/telemetry",
+  "api_key": "YOUR_TOKEN",
+  "network_interface": "mlan0",
+  "source_ip": null,
+  "bind_to_interface_source_ip": true,
+  "upload_interval_sec": 10,
+  "timeout_sec": 5,
+  "payload_mode": "key_signals",
+  "buffer_when_offline": true,
+  "max_queue_size": 1000,
+  "verify_tls": true
+}
+```
+
+New server upload diagnostics APIs:
+
+```text
+GET  /api/server-upload/status
+POST /api/server-upload/upload-once
+```
+
+`POST /api/server-upload/upload-once` only pushes one read-only telemetry snapshot to the configured backend. It does not write to the Chinese EMS.
+
+A Wi-Fi upload template is provided at:
+
+```text
+configs/server_upload_wifi_template.json
+```
+
+More details are in:
+
+```text
+docs/server_upload_https.md
+```

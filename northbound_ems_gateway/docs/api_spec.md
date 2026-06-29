@@ -55,3 +55,36 @@ remote_status
 ## Safety rule
 
 There are no `POST /api/commands`, `POST /api/write-register`, `POST /api/start`, `POST /api/stop`, or similar write endpoints in this version.
+
+## Server upload diagnostics APIs - v0.3
+
+These APIs are for monitoring and testing the HTTPS REST upload service. They do not write to the Chinese EMS.
+
+### GET `/api/server-upload/status`
+
+Returns current uploader state:
+
+```json
+{
+  "enabled": true,
+  "transport": "https_rest",
+  "endpoint_url": "https://server.example.com/api/v1/gateway/telemetry",
+  "network_interface": "mlan0",
+  "source_ip": "192.168.88.21",
+  "payload_mode": "key_signals",
+  "upload_interval_sec": 10,
+  "queue_size": 0,
+  "success_count": 15,
+  "failure_count": 0,
+  "last_attempt_utc": "2026-06-29T10:20:00Z",
+  "last_success_utc": "2026-06-29T10:20:00Z",
+  "last_error": null,
+  "last_status_code": 200,
+  "running": true
+}
+```
+
+### POST `/api/server-upload/upload-once`
+
+Triggers one manual upload attempt using the latest read-only telemetry snapshot. This is intended for commissioning and backend testing.
+

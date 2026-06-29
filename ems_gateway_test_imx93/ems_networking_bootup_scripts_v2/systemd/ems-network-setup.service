@@ -1,0 +1,16 @@
+[Unit]
+Description=Configure EMS Gateway Network eth0 eth1 Wi-Fi for NorthBound Cloudflare Mode
+After=connman.service network.target
+Wants=network.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root/kinetics-grid-ems/ems_network_bootup
+ExecStartPre=/bin/sleep 20
+ExecStart=/root/kinetics-grid-ems/ems_network_bootup/ems_network_all_setup.sh
+RemainAfterExit=yes
+StandardOutput=journal+console
+StandardError=journal+console
+
+[Install]
+WantedBy=multi-user.target

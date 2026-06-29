@@ -45,7 +45,17 @@
   },
   "server_upload": {
     "enabled": false,
-    "transport": "https_or_mqtt_future",
-    "buffer_when_offline": true
+    "transport": "https_rest",
+    "endpoint_url": "https://CHANGE_ME_SERVER_HOST/api/v1/gateway/telemetry",
+    "api_key": "CHANGE_ME_API_TOKEN",
+    "network_interface": "mlan0",
+    "source_ip": null,
+    "bind_to_interface_source_ip": true,
+    "upload_interval_sec": 10,
+    "timeout_sec": 5,
+    "payload_mode": "key_signals",
+    "buffer_when_offline": true,
+    "max_queue_size": 1000,
+    "verify_tls": true
   }
 }

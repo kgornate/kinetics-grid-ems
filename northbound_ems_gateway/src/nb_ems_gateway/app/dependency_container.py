@@ -24,6 +24,7 @@ class DependencyContainer:
     alarm_engine: AlarmEngine
     latest_poll_errors: list[str]
     storage: SQLiteStore | None = None
+    server_upload_service: Any | None = None
 
     @classmethod
     def create(cls, config: AppConfig, register_map: RegisterMap) -> "DependencyContainer":
@@ -69,6 +70,17 @@ class DependencyContainer:
         if not self.storage:
             return {"enabled": False}
         return self.storage.status()
+
+    def server_upload_status(self) -> dict[str, Any]:
+        if not self.server_upload_service:
+            return {
+                "enabled": self.config.server_upload.enabled,
+                "transport": self.config.server_upload.transport,
+                "endpoint_url": self.config.server_upload.endpoint_url,
+                "network_interface": self.config.server_upload.network_interface,
+                "running": False,
+            }
+        return self.server_upload_service.status.to_dict()
 
     def close(self) -> None:
         if self.storage:

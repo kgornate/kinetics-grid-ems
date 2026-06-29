@@ -72,25 +72,27 @@ class DynamicAssetSummaryPanel extends StatelessWidget {
               const SizedBox(height: 12),
               LayoutBuilder(
                 builder: (context, constraints) {
+                  // Use a wrapping layout instead of a fixed-height grid.
+                  // Asset cards may include health recommendations, command state,
+                  // or longer labels; fixed grid heights can overflow on Windows.
                   final useTwoColumns = constraints.maxWidth > 900;
-                  return GridView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: assetList.length,
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: useTwoColumns ? 2 : 1,
-                      mainAxisExtent: 190,
-                      crossAxisSpacing: 12,
-                      mainAxisSpacing: 12,
-                    ),
-                    itemBuilder: (context, index) {
-                      final asset = assetList[index];
-                      return DynamicAssetCard(
-                        asset: asset,
-                        health: health?.assets[asset.assetId] ?? health?.assets[asset.assetKey],
-                        onOpen: onOpenAsset == null ? null : () => onOpenAsset!(asset),
+                  final cardWidth = useTwoColumns
+                      ? (constraints.maxWidth - 12) / 2
+                      : constraints.maxWidth;
+
+                  return Wrap(
+                    spacing: 12,
+                    runSpacing: 12,
+                    children: assetList.map((asset) {
+                      return SizedBox(
+                        width: cardWidth,
+                        child: DynamicAssetCard(
+                          asset: asset,
+                          health: health?.assets[asset.assetId] ?? health?.assets[asset.assetKey],
+                          onOpen: onOpenAsset == null ? null : () => onOpenAsset!(asset),
+                        ),
                       );
-                    },
+                    }).toList(),
                   );
                 },
               ),
