@@ -1,0 +1,23 @@
+# Cloudflare Tunnel config for the FRDM i.MX93 EMS Gateway
+# Goes on the i.MX93 device itself, NOT the Mac Mini.
+#
+# Place this file + credentials.json at /etc/cloudflared/ on the device
+# and run: cloudflared --config /etc/cloudflared/config.yml tunnel run
+
+tunnel: 6bf7b93d-1005-40d3-aabf-bf1348085c6d
+credentials-file: /etc/cloudflared/credentials.json
+
+# Don't auto-update on a constrained embedded device
+no-autoupdate: true
+
+ingress:
+  # REST + SSE API
+  - hostname: ems-api.unityess.cloud
+    service: http://localhost:8000
+
+  # Logs / events / history
+  - hostname: ems-logs.unityess.cloud
+    service: http://localhost:7000
+
+  # Catch-all — anything else returns 404
+  - service: http_status:404

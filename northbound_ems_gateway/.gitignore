@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+runtime/*.db
+runtime/*.sqlite
+runtime/*.log
+.env
+configs/actual_site.json
+*.zip

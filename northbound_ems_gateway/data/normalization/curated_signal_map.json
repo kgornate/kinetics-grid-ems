@@ -1,0 +1,940 @@
+{
+  "version": "v0.2",
+  "description": "Manual dashboard-grade normalization for key NorthBound EMS Bridge signals. All signals remain read-only.",
+  "signals_by_address": {
+    "4": {
+      "normalized_name": "existing_ems.mode.remote",
+      "display_name": "EMS Remote Mode",
+      "category": "mode",
+      "is_key_signal": true
+    },
+    "10": {
+      "normalized_name": "existing_ems.mode.manual_auto",
+      "display_name": "EMS Manual/Auto Mode",
+      "category": "mode",
+      "is_key_signal": true
+    },
+    "18": {
+      "normalized_name": "existing_ems.mode.remote_control_mode",
+      "display_name": "EMS Remote Control Mode Readback",
+      "category": "mode",
+      "is_key_signal": true
+    },
+    "20": {
+      "normalized_name": "existing_ems.mode.charge_discharge_control",
+      "display_name": "EMS Charge/Discharge Control Mode",
+      "category": "mode",
+      "is_key_signal": true
+    },
+    "38": {
+      "normalized_name": "existing_ems.status.bms",
+      "display_name": "EMS BMS Status",
+      "category": "status",
+      "is_key_signal": true
+    },
+    "40": {
+      "normalized_name": "existing_ems.status.pcs_running",
+      "display_name": "EMS PCS Running Status",
+      "category": "status",
+      "is_key_signal": true
+    },
+    "54": {
+      "normalized_name": "existing_ems.power.remote_command_kw",
+      "display_name": "Remote Power Command",
+      "category": "power_energy",
+      "is_key_signal": true
+    },
+    "60": {
+      "normalized_name": "existing_ems.power.total_available_charge_kw",
+      "display_name": "Total Available Charge Power",
+      "category": "power_energy",
+      "is_key_signal": true
+    },
+    "62": {
+      "normalized_name": "existing_ems.power.total_available_discharge_kw",
+      "display_name": "Total Available Discharge Power",
+      "category": "power_energy",
+      "is_key_signal": true
+    },
+    "80": {
+      "normalized_name": "existing_ems.battery.soc_percent",
+      "display_name": "System SOC",
+      "category": "soc_soh",
+      "is_key_signal": true
+    },
+    "118": {
+      "normalized_name": "existing_ems.safety.emergency_stop",
+      "display_name": "EMS Emergency Stop",
+      "category": "safety",
+      "is_key_signal": true
+    },
+    "130": {
+      "normalized_name": "existing_ems.communication.fire_protection_online",
+      "display_name": "Fire Protection Communication Status",
+      "category": "communication",
+      "is_key_signal": true
+    },
+    "134": {
+      "normalized_name": "existing_ems.fire.alarm_status",
+      "display_name": "EMS Fire Protection Alarm",
+      "category": "alarms",
+      "is_key_signal": true
+    },
+    "146": {
+      "normalized_name": "existing_ems.status.operating_state",
+      "display_name": "EMS Operating Status",
+      "category": "status",
+      "is_key_signal": true
+    },
+    "148": {
+      "normalized_name": "existing_ems.power.ess_power_kw",
+      "display_name": "ESS Power",
+      "category": "power_energy",
+      "is_key_signal": true
+    },
+    "180": {
+      "normalized_name": "existing_ems.grid.pcs_grid_on_off_status",
+      "display_name": "PCS Grid On/Off Status",
+      "category": "grid_mode",
+      "is_key_signal": true
+    },
+    "186": {
+      "normalized_name": "bms_1.communication.online",
+      "display_name": "BMS Online Status",
+      "category": "communication",
+      "is_key_signal": true
+    },
+    "190": {
+      "normalized_name": "bms_1.insulation.too_low_fault",
+      "display_name": "BMS Insulation Too Low",
+      "category": "insulation",
+      "is_key_signal": true
+    },
+    "202": {
+      "normalized_name": "bms_1.insulation.fault",
+      "display_name": "BMS Insulation Fault",
+      "category": "insulation",
+      "is_key_signal": true
+    },
+    "226": {
+      "normalized_name": "bms_1.contactor.fault",
+      "display_name": "BMS Contactor Fault",
+      "category": "contactors_precharge",
+      "is_key_signal": true
+    },
+    "370": {
+      "normalized_name": "bms_1.precharge.power_on_phase",
+      "display_name": "BMS Pre-Power-On Phase",
+      "category": "contactors_precharge",
+      "is_key_signal": true
+    },
+    "372": {
+      "normalized_name": "bms_1.status.system",
+      "display_name": "BMS System Status",
+      "category": "status",
+      "is_key_signal": true
+    },
+    "374": {
+      "normalized_name": "bms_1.communication.heartbeat",
+      "display_name": "BMS Heartbeat Frame",
+      "category": "communication",
+      "is_key_signal": true
+    },
+    "380": {
+      "normalized_name": "bms_1.status.charge_discharge",
+      "display_name": "BMS Charge/Discharge Status",
+      "category": "status",
+      "is_key_signal": true
+    },
+    "384": {
+      "normalized_name": "bms_1.contactor.positive_status",
+      "display_name": "Positive Contactor Status",
+      "category": "contactors_precharge",
+      "is_key_signal": true
+    },
+    "386": {
+      "normalized_name": "bms_1.contactor.precharge_status",
+      "display_name": "Precharge Contactor Status",
+      "category": "contactors_precharge",
+      "is_key_signal": true
+    },
+    "388": {
+      "normalized_name": "bms_1.contactor.negative_status",
+      "display_name": "Negative Contactor Status",
+      "category": "contactors_precharge",
+      "is_key_signal": true
+    },
+    "1500": {
+      "normalized_name": "bms_1.cell.min_voltage_cell_no",
+      "display_name": "Cell Number of Minimum Voltage",
+      "category": "voltage",
+      "is_key_signal": false
+    },
+    "1502": {
+      "normalized_name": "bms_1.cell.max_min_voltage_diff_v",
+      "display_name": "Max-Min Cell Voltage Difference",
+      "category": "voltage",
+      "is_key_signal": true
+    },
+    "1504": {
+      "normalized_name": "bms_1.cell.average_voltage_v",
+      "display_name": "Average Cell Voltage",
+      "category": "voltage",
+      "is_key_signal": true
+    },
+    "1506": {
+      "normalized_name": "bms_1.temperature.max_battery_c",
+      "display_name": "Max Battery Temperature",
+      "category": "thermal",
+      "is_key_signal": true
+    },
+    "1514": {
+      "normalized_name": "bms_1.temperature.min_battery_c",
+      "display_name": "Min Battery Temperature",
+      "category": "thermal",
+      "is_key_signal": true
+    },
+    "1522": {
+      "normalized_name": "bms_1.temperature.average_c",
+      "display_name": "Average Battery Temperature",
+      "category": "thermal",
+      "is_key_signal": true
+    },
+    "1528": {
+      "normalized_name": "bms_1.limits.max_charge_current_a",
+      "display_name": "BMS Max Acceptable Charge Current",
+      "category": "limits",
+      "is_key_signal": true
+    },
+    "1530": {
+      "normalized_name": "bms_1.limits.max_discharge_current_a",
+      "display_name": "BMS Max Acceptable Discharge Current",
+      "category": "limits",
+      "is_key_signal": true
+    },
+    "1532": {
+      "normalized_name": "bms_1.soc.display_percent",
+      "display_name": "BMS Display SOC",
+      "category": "soc_soh",
+      "is_key_signal": true
+    },
+    "1534": {
+      "normalized_name": "bms_1.soh.percent",
+      "display_name": "BMS SOH",
+      "category": "soc_soh",
+      "is_key_signal": true
+    },
+    "1546": {
+      "normalized_name": "bms_1.soc.internal_percent",
+      "display_name": "BMS Cluster Internal SOC",
+      "category": "soc_soh",
+      "is_key_signal": true
+    },
+    "1552": {
+      "normalized_name": "bms_1.dc.cluster_voltage_v",
+      "display_name": "BMS Cluster Total Voltage",
+      "category": "voltage",
+      "is_key_signal": true
+    },
+    "1554": {
+      "normalized_name": "bms_1.dc.cluster_current_a",
+      "display_name": "BMS Cluster Total Current",
+      "category": "current",
+      "is_key_signal": true
+    },
+    "1564": {
+      "normalized_name": "bms_1.insulation.total_resistance",
+      "display_name": "BMS Insulation Resistance",
+      "category": "insulation",
+      "is_key_signal": true
+    },
+    "1566": {
+      "normalized_name": "bms_1.insulation.positive_terminal_resistance",
+      "display_name": "Positive Terminal Insulation Resistance",
+      "category": "insulation",
+      "is_key_signal": true
+    },
+    "1568": {
+      "normalized_name": "bms_1.insulation.negative_terminal_resistance",
+      "display_name": "Negative Terminal Insulation Resistance",
+      "category": "insulation",
+      "is_key_signal": true
+    },
+    "1668": {
+      "normalized_name": "bms_1.insulation.resistance_at_alarm",
+      "display_name": "Insulation Resistance at Alarm",
+      "category": "insulation",
+      "is_key_signal": false
+    },
+    "1670": {
+      "normalized_name": "bms_1.insulation.resistance_at_shutdown",
+      "display_name": "Insulation Resistance at Shutdown",
+      "category": "insulation",
+      "is_key_signal": false
+    },
+    "1708": {
+      "normalized_name": "io_module.communication.online",
+      "display_name": "I/O Module Communication Status",
+      "category": "communication",
+      "is_key_signal": true
+    },
+    "1710": {
+      "normalized_name": "io_module.safety.emergency_stop_signal",
+      "display_name": "I/O Emergency Stop Signal",
+      "category": "safety",
+      "is_key_signal": true
+    },
+    "1712": {
+      "normalized_name": "io_module.safety.water_ingress_alarm",
+      "display_name": "I/O Water Ingress Alarm",
+      "category": "safety",
+      "is_key_signal": true
+    },
+    "1718": {
+      "normalized_name": "io_module.safety.door_access",
+      "display_name": "Door Access Status",
+      "category": "safety",
+      "is_key_signal": true
+    },
+    "1722": {
+      "normalized_name": "io_module.alarms.pcs_fault",
+      "display_name": "I/O PCS Fault Input",
+      "category": "alarms",
+      "is_key_signal": true
+    },
+    "1750": {
+      "normalized_name": "pcs_1.rating.rated_power_kw",
+      "display_name": "PCS Rated Power",
+      "category": "ratings",
+      "is_key_signal": true
+    },
+    "1752": {
+      "normalized_name": "pcs_1.power.charge_power_kw",
+      "display_name": "PCS Charge Power",
+      "category": "power_energy",
+      "is_key_signal": true
+    },
+    "1754": {
+      "normalized_name": "pcs_1.power.discharge_power_kw",
+      "display_name": "PCS Discharge Power",
+      "category": "power_energy",
+      "is_key_signal": true
+    },
+    "1758": {
+      "normalized_name": "pcs_1.summary.dc_power_kw",
+      "display_name": "PCS Summary DC Power",
+      "category": "power_energy",
+      "is_key_signal": true
+    },
+    "1760": {
+      "normalized_name": "pcs_1.limits.available_charge_power_kw",
+      "display_name": "PCS Available Charge Power",
+      "category": "limits",
+      "is_key_signal": true
+    },
+    "1762": {
+      "normalized_name": "pcs_1.limits.available_discharge_power_kw",
+      "display_name": "PCS Available Discharge Power",
+      "category": "limits",
+      "is_key_signal": true
+    },
+    "1770": {
+      "normalized_name": "pcs_1.limits.bms_available_charge_power_kw",
+      "display_name": "BMS Available Charge Power at PCS",
+      "category": "limits",
+      "is_key_signal": true
+    },
+    "1772": {
+      "normalized_name": "pcs_1.limits.bms_available_discharge_power_kw",
+      "display_name": "BMS Available Discharge Power at PCS",
+      "category": "limits",
+      "is_key_signal": true
+    },
+    "1774": {
+      "normalized_name": "pcs_1.limits.bms_max_charge_current_a",
+      "display_name": "BMS Max Charge Current at PCS",
+      "category": "limits",
+      "is_key_signal": true
+    },
+    "1776": {
+      "normalized_name": "pcs_1.limits.bms_max_discharge_current_a",
+      "display_name": "BMS Max Discharge Current at PCS",
+      "category": "limits",
+      "is_key_signal": true
+    },
+    "1784": {
+      "normalized_name": "pcs_1.mode.charge_discharge_control",
+      "display_name": "PCS Charge/Discharge Control Mode",
+      "category": "mode",
+      "is_key_signal": true
+    },
+    "1786": {
+      "normalized_name": "pcs_1.battery.soc_percent",
+      "display_name": "PCS SOC",
+      "category": "soc_soh",
+      "is_key_signal": true
+    },
+    "1794": {
+      "normalized_name": "pcs_1.status.running_summary",
+      "display_name": "PCS Running Status Summary",
+      "category": "status",
+      "is_key_signal": true
+    },
+    "1796": {
+      "normalized_name": "pcs_1.status.fault_summary",
+      "display_name": "PCS Fault Status Summary",
+      "category": "faults",
+      "is_key_signal": true
+    },
+    "1798": {
+      "normalized_name": "pcs_1.grid.grid_connected_summary",
+      "display_name": "PCS Grid-Connected Status Summary",
+      "category": "grid_mode",
+      "is_key_signal": true
+    },
+    "1800": {
+      "normalized_name": "pcs_1.grid.off_grid_summary",
+      "display_name": "PCS Off-Grid Status Summary",
+      "category": "grid_mode",
+      "is_key_signal": true
+    },
+    "1806": {
+      "normalized_name": "pcs_1.safety.emergency_stop",
+      "display_name": "PCS Emergency Stop",
+      "category": "safety",
+      "is_key_signal": true
+    },
+    "1834": {
+      "normalized_name": "pcs_1.communication.bms_online",
+      "display_name": "BMS Online Status at PCS",
+      "category": "communication",
+      "is_key_signal": true
+    },
+    "1836": {
+      "normalized_name": "pcs_1.communication.pcs_online",
+      "display_name": "PCS Online Status",
+      "category": "communication",
+      "is_key_signal": true
+    },
+    "1838": {
+      "normalized_name": "pcs_1.communication.liquid_cooling_online",
+      "display_name": "Liquid Cooling Online Status at PCS",
+      "category": "communication",
+      "is_key_signal": true
+    },
+    "1842": {
+      "normalized_name": "pcs_1.safety.fire_protection_status",
+      "display_name": "Fire Protection Status at PCS",
+      "category": "safety",
+      "is_key_signal": true
+    },
+    "1844": {
+      "normalized_name": "pcs_1.safety.water_ingress_alarm",
+      "display_name": "PCS Water Ingress Alarm",
+      "category": "safety",
+      "is_key_signal": true
+    },
+    "1856": {
+      "normalized_name": "pcs_1.battery.system_status",
+      "display_name": "Battery System Status at PCS",
+      "category": "status",
+      "is_key_signal": true
+    },
+    "1868": {
+      "normalized_name": "pcs_1.communication.online",
+      "display_name": "PCS Communication Online",
+      "category": "communication",
+      "is_key_signal": true
+    },
+    "1882": {
+      "normalized_name": "pcs_1.mode.remote_local_setting",
+      "display_name": "PCS Remote/Local Setting Readback",
+      "category": "mode",
+      "is_key_signal": false
+    },
+    "1890": {
+      "normalized_name": "pcs_1.status.running",
+      "display_name": "PCS Running Status",
+      "category": "status",
+      "is_key_signal": true
+    },
+    "1892": {
+      "normalized_name": "pcs_1.status.total_fault",
+      "display_name": "PCS Total Fault Status",
+      "category": "faults",
+      "is_key_signal": true
+    },
+    "1894": {
+      "normalized_name": "pcs_1.status.total_alarm",
+      "display_name": "PCS Total Alarm Status",
+      "category": "alarms",
+      "is_key_signal": true
+    },
+    "1896": {
+      "normalized_name": "pcs_1.mode.remote_local_status",
+      "display_name": "PCS Remote/Local Status",
+      "category": "mode",
+      "is_key_signal": true
+    },
+    "1898": {
+      "normalized_name": "pcs_1.safety.emergency_stop_input",
+      "display_name": "PCS Emergency Stop Input Status",
+      "category": "safety",
+      "is_key_signal": true
+    },
+    "1900": {
+      "normalized_name": "pcs_1.grid.grid_connected",
+      "display_name": "PCS Grid-Connected Status",
+      "category": "grid_mode",
+      "is_key_signal": true
+    },
+    "1902": {
+      "normalized_name": "pcs_1.grid.vf_off_grid",
+      "display_name": "PCS VF Off-Grid Status",
+      "category": "grid_mode",
+      "is_key_signal": true
+    },
+    "1908": {
+      "normalized_name": "pcs_1.ac.a_phase_voltage_v",
+      "display_name": "PCS A-Phase Voltage",
+      "category": "ac_measurements",
+      "is_key_signal": false
+    },
+    "1910": {
+      "normalized_name": "pcs_1.ac.b_phase_voltage_v",
+      "display_name": "PCS B-Phase Voltage",
+      "category": "ac_measurements",
+      "is_key_signal": false
+    },
+    "1912": {
+      "normalized_name": "pcs_1.ac.c_phase_voltage_v",
+      "display_name": "PCS C-Phase Voltage",
+      "category": "ac_measurements",
+      "is_key_signal": false
+    },
+    "1914": {
+      "normalized_name": "pcs_1.ac.a_phase_current_a",
+      "display_name": "PCS A-Phase Current",
+      "category": "ac_measurements",
+      "is_key_signal": false
+    },
+    "1916": {
+      "normalized_name": "pcs_1.ac.b_phase_current_a",
+      "display_name": "PCS B-Phase Current",
+      "category": "ac_measurements",
+      "is_key_signal": false
+    },
+    "1918": {
+      "normalized_name": "pcs_1.ac.c_phase_current_a",
+      "display_name": "PCS C-Phase Current",
+      "category": "ac_measurements",
+      "is_key_signal": false
+    },
+    "1920": {
+      "normalized_name": "pcs_1.ac.grid_frequency_hz",
+      "display_name": "PCS Grid Frequency",
+      "category": "ac_measurements",
+      "is_key_signal": true
+    },
+    "1928": {
+      "normalized_name": "pcs_1.ac.total_active_power_kw",
+      "display_name": "PCS Total Active Power",
+      "category": "power_energy",
+      "is_key_signal": true
+    },
+    "1936": {
+      "normalized_name": "pcs_1.ac.total_reactive_power_kvar",
+      "display_name": "PCS Total Reactive Power",
+      "category": "power_energy",
+      "is_key_signal": true
+    },
+    "1952": {
+      "normalized_name": "pcs_1.ac.total_power_factor",
+      "display_name": "PCS Total Power Factor",
+      "category": "ac_measurements",
+      "is_key_signal": true
+    },
+    "1954": {
+      "normalized_name": "pcs_1.dc.power_kw",
+      "display_name": "PCS DC Power",
+      "category": "dc_measurements",
+      "is_key_signal": true
+    },
+    "1956": {
+      "normalized_name": "pcs_1.dc.voltage_v",
+      "display_name": "PCS DC Voltage",
+      "category": "dc_measurements",
+      "is_key_signal": true
+    },
+    "1958": {
+      "normalized_name": "pcs_1.dc.current_a",
+      "display_name": "PCS DC Current",
+      "category": "dc_measurements",
+      "is_key_signal": true
+    },
+    "1960": {
+      "normalized_name": "pcs_1.thermal.heatsink_temperature_c",
+      "display_name": "PCS Heatsink Temperature",
+      "category": "thermal",
+      "is_key_signal": true
+    },
+    "1992": {
+      "normalized_name": "pcs_1.derating.flag",
+      "display_name": "PCS Derating Flag",
+      "category": "limits",
+      "is_key_signal": true
+    },
+    "2000": {
+      "normalized_name": "pcs_1.insulation.leakage_current_a",
+      "display_name": "PCS Leakage Current",
+      "category": "insulation",
+      "is_key_signal": true
+    },
+    "2002": {
+      "normalized_name": "pcs_1.insulation.resistance",
+      "display_name": "PCS Insulation Resistance",
+      "category": "insulation",
+      "is_key_signal": true
+    },
+    "2038": {
+      "normalized_name": "pcs_1.mode.running_mode_selection",
+      "display_name": "PCS Running Mode Selection",
+      "category": "mode",
+      "is_key_signal": false
+    },
+    "2044": {
+      "normalized_name": "pcs_1.setpoint.active_power_kw",
+      "display_name": "PCS Active Power Setpoint Readback",
+      "category": "setpoints_readback",
+      "is_key_signal": true
+    },
+    "2046": {
+      "normalized_name": "pcs_1.setpoint.reactive_power_kvar",
+      "display_name": "PCS Reactive Power Setpoint Readback",
+      "category": "setpoints_readback",
+      "is_key_signal": false
+    },
+    "2048": {
+      "normalized_name": "pcs_1.grid.mode_setting_readback",
+      "display_name": "PCS Grid On/Off Setting Readback",
+      "category": "grid_mode",
+      "is_key_signal": false
+    },
+    "2102": {
+      "normalized_name": "pcs_1.insulation.leakage_current_threshold_a",
+      "display_name": "Leakage Current Threshold Setting",
+      "category": "insulation",
+      "is_key_signal": false
+    },
+    "2104": {
+      "normalized_name": "pcs_1.insulation.resistance_threshold",
+      "display_name": "Insulation Resistance Threshold Setting",
+      "category": "insulation",
+      "is_key_signal": false
+    },
+    "2288": {
+      "normalized_name": "utility_meter.communication.online",
+      "display_name": "Utility Meter Communication Status",
+      "category": "communication",
+      "is_key_signal": true
+    },
+    "2296": {
+      "normalized_name": "utility_meter.ac.ab_line_voltage_v",
+      "display_name": "Meter AB Line Voltage",
+      "category": "ac_measurements",
+      "is_key_signal": true
+    },
+    "2298": {
+      "normalized_name": "utility_meter.ac.bc_line_voltage_v",
+      "display_name": "Meter BC Line Voltage",
+      "category": "ac_measurements",
+      "is_key_signal": true
+    },
+    "2300": {
+      "normalized_name": "utility_meter.ac.ca_line_voltage_v",
+      "display_name": "Meter CA Line Voltage",
+      "category": "ac_measurements",
+      "is_key_signal": true
+    },
+    "2302": {
+      "normalized_name": "utility_meter.ac.a_phase_current_a",
+      "display_name": "Meter A-Phase Current",
+      "category": "ac_measurements",
+      "is_key_signal": false
+    },
+    "2304": {
+      "normalized_name": "utility_meter.ac.b_phase_current_a",
+      "display_name": "Meter B-Phase Current",
+      "category": "ac_measurements",
+      "is_key_signal": false
+    },
+    "2306": {
+      "normalized_name": "utility_meter.ac.c_phase_current_a",
+      "display_name": "Meter C-Phase Current",
+      "category": "ac_measurements",
+      "is_key_signal": false
+    },
+    "2316": {
+      "normalized_name": "utility_meter.power.total_active_power_kw",
+      "display_name": "Meter Total Active Power",
+      "category": "power_energy",
+      "is_key_signal": true
+    },
+    "2324": {
+      "normalized_name": "utility_meter.power.total_reactive_power_kvar",
+      "display_name": "Meter Total Reactive Power",
+      "category": "power_energy",
+      "is_key_signal": true
+    },
+    "2332": {
+      "normalized_name": "utility_meter.power.total_apparent_power_kva",
+      "display_name": "Meter Total Apparent Power",
+      "category": "power_energy",
+      "is_key_signal": true
+    },
+    "2340": {
+      "normalized_name": "utility_meter.power.total_power_factor",
+      "display_name": "Meter Total Power Factor",
+      "category": "power_energy",
+      "is_key_signal": true
+    },
+    "2342": {
+      "normalized_name": "utility_meter.ac.frequency_hz",
+      "display_name": "Meter Frequency",
+      "category": "ac_measurements",
+      "is_key_signal": true
+    },
+    "2386": {
+      "normalized_name": "utility_meter.insulation.leakage_current_a",
+      "display_name": "Meter Leakage Current",
+      "category": "insulation",
+      "is_key_signal": true
+    },
+    "2388": {
+      "normalized_name": "utility_meter.energy.total_active_kwh",
+      "display_name": "Meter Total Active Energy",
+      "category": "power_energy",
+      "is_key_signal": true
+    },
+    "2394": {
+      "normalized_name": "utility_meter.alarms.overvoltage",
+      "display_name": "Meter Overvoltage Alarm",
+      "category": "alarms",
+      "is_key_signal": true
+    },
+    "2398": {
+      "normalized_name": "utility_meter.alarms.overcurrent",
+      "display_name": "Meter Overcurrent Alarm",
+      "category": "alarms",
+      "is_key_signal": true
+    },
+    "2422": {
+      "normalized_name": "utility_meter.alarms.phase_sequence_error",
+      "display_name": "Meter Phase Sequence Error Alarm",
+      "category": "alarms",
+      "is_key_signal": true
+    },
+    "2426": {
+      "normalized_name": "fire_protection.communication.online",
+      "display_name": "Fire Protection Communication Status",
+      "category": "communication",
+      "is_key_signal": true
+    },
+    "2438": {
+      "normalized_name": "fire_protection.alarm.co",
+      "display_name": "CO Fire Alarm",
+      "category": "alarms",
+      "is_key_signal": true
+    },
+    "2440": {
+      "normalized_name": "fire_protection.alarm.temperature",
+      "display_name": "Temperature Fire Alarm",
+      "category": "alarms",
+      "is_key_signal": true
+    },
+    "2448": {
+      "normalized_name": "fire_protection.sensor.temperature_c",
+      "display_name": "Fire System Temperature",
+      "category": "thermal",
+      "is_key_signal": true
+    },
+    "2460": {
+      "normalized_name": "fire_protection.status.fault",
+      "display_name": "Fire Protection Fault Summary",
+      "category": "faults",
+      "is_key_signal": true
+    },
+    "2462": {
+      "normalized_name": "fire_protection.status.fire_alarm",
+      "display_name": "Fire Alarm Summary",
+      "category": "alarms",
+      "is_key_signal": true
+    },
+    "2472": {
+      "normalized_name": "liquid_cooling.communication.online",
+      "display_name": "Liquid Cooling Online Status",
+      "category": "communication",
+      "is_key_signal": true
+    },
+    "2474": {
+      "normalized_name": "liquid_cooling.status.start_stop",
+      "display_name": "Liquid Cooling Start/Stop Status",
+      "category": "status",
+      "is_key_signal": true
+    },
+    "2486": {
+      "normalized_name": "liquid_cooling.mode.working",
+      "display_name": "Liquid Cooling Working Mode",
+      "category": "mode",
+      "is_key_signal": true
+    },
+    "2488": {
+      "normalized_name": "liquid_cooling.setpoint.cooling_temperature_c",
+      "display_name": "Cooling Setpoint Temperature",
+      "category": "thermal",
+      "is_key_signal": false
+    },
+    "2490": {
+      "normalized_name": "liquid_cooling.setpoint.heating_temperature_c",
+      "display_name": "Heating Setpoint Temperature",
+      "category": "thermal",
+      "is_key_signal": false
+    },
+    "2504": {
+      "normalized_name": "liquid_cooling.mode.monitoring",
+      "display_name": "Liquid Cooling Monitoring Mode",
+      "category": "mode",
+      "is_key_signal": true
+    },
+    "2506": {
+      "normalized_name": "liquid_cooling.temperature.inlet_water_c",
+      "display_name": "Inlet Water Temperature",
+      "category": "thermal",
+      "is_key_signal": true
+    },
+    "2508": {
+      "normalized_name": "liquid_cooling.temperature.outlet_water_c",
+      "display_name": "Outlet Water Temperature",
+      "category": "thermal",
+      "is_key_signal": true
+    },
+    "2514": {
+      "normalized_name": "liquid_cooling.pressure.inlet_water",
+      "display_name": "Inlet Water Pressure",
+      "category": "pressure",
+      "is_key_signal": true
+    },
+    "2516": {
+      "normalized_name": "liquid_cooling.pressure.outlet_water",
+      "display_name": "Outlet Water Pressure",
+      "category": "pressure",
+      "is_key_signal": true
+    },
+    "2524": {
+      "normalized_name": "liquid_cooling.mode.unit_working",
+      "display_name": "Cooling Unit Working Mode",
+      "category": "mode",
+      "is_key_signal": true
+    },
+    "2526": {
+      "normalized_name": "liquid_cooling.mode.unit_control",
+      "display_name": "Cooling Unit Control Mode",
+      "category": "mode",
+      "is_key_signal": true
+    },
+    "2540": {
+      "normalized_name": "liquid_cooling.alarms.smoke",
+      "display_name": "Liquid Cooling Smoke Alarm",
+      "category": "alarms",
+      "is_key_signal": true
+    },
+    "2542": {
+      "normalized_name": "liquid_cooling.alarms.water_ingress",
+      "display_name": "Liquid Cooling Water Ingress Alarm",
+      "category": "alarms",
+      "is_key_signal": true
+    },
+    "2544": {
+      "normalized_name": "liquid_cooling.alarms.low_water_flow",
+      "display_name": "Liquid Cooling Low Water Flow Alarm",
+      "category": "alarms",
+      "is_key_signal": true
+    },
+    "2694": {
+      "normalized_name": "liquid_cooling.compressor.system_a_frequency_hz",
+      "display_name": "System A Compressor Frequency",
+      "category": "compressor",
+      "is_key_signal": false
+    },
+    "2696": {
+      "normalized_name": "liquid_cooling.compressor.system_b_frequency_hz",
+      "display_name": "System B Compressor Frequency",
+      "category": "compressor",
+      "is_key_signal": false
+    },
+    "2698": {
+      "normalized_name": "remote_status.mode.remote",
+      "display_name": "Remote Mode Readback",
+      "category": "mode",
+      "is_key_signal": true
+    },
+    "2700": {
+      "normalized_name": "remote_status.mode.control",
+      "display_name": "Remote Control Mode Readback",
+      "category": "mode",
+      "is_key_signal": true
+    },
+    "2702": {
+      "normalized_name": "remote_status.soc.limit_enable",
+      "display_name": "Remote SOC Limit Enable Readback",
+      "category": "soc_soh",
+      "is_key_signal": true
+    },
+    "2704": {
+      "normalized_name": "remote_status.soc.charge_cutoff_percent",
+      "display_name": "Remote Charge Cutoff SOC",
+      "category": "soc_soh",
+      "is_key_signal": true
+    },
+    "2706": {
+      "normalized_name": "remote_status.soc.discharge_cutoff_percent",
+      "display_name": "Remote Discharge Cutoff SOC",
+      "category": "soc_soh",
+      "is_key_signal": true
+    },
+    "2810": {
+      "normalized_name": "dehumidifier.communication.online",
+      "display_name": "Dehumidifier Online Status",
+      "category": "communication",
+      "is_key_signal": true
+    },
+    "2832": {
+      "normalized_name": "dehumidifier.status.dehumidification",
+      "display_name": "Dehumidification Status",
+      "category": "status",
+      "is_key_signal": true
+    },
+    "2834": {
+      "normalized_name": "dehumidifier.temperature.current_c",
+      "display_name": "Dehumidifier Current Temperature",
+      "category": "thermal",
+      "is_key_signal": true
+    },
+    "2836": {
+      "normalized_name": "dehumidifier.humidity.current_percent",
+      "display_name": "Dehumidifier Current Humidity",
+      "category": "humidity",
+      "is_key_signal": true
+    },
+    "2838": {
+      "normalized_name": "dehumidifier.alarms.status",
+      "display_name": "Dehumidifier Alarm Status",
+      "category": "alarms",
+      "is_key_signal": true
+    },
+    "1804": {
+      "normalized_name": "pcs_1.status.fault_reset_readback_summary",
+      "display_name": "PCS Fault Reset Readback Summary"
+    }
+  }
+}

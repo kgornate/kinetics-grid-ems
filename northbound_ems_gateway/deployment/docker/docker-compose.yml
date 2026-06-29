@@ -1,0 +1,10 @@
+services:
+  nb-ems-gateway:
+    build:
+      context: ../..
+      dockerfile: deployment/docker/Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../../runtime:/app/runtime
+    command: ["python", "-m", "nb_ems_gateway.main", "--config", "configs/development.json", "--mock"]

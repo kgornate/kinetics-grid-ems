@@ -1,0 +1,16 @@
+[Unit]
+Description=NorthBound EMS Gateway
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/northbound_ems_gateway
+Environment=PYTHONPATH=/opt/northbound_ems_gateway/src
+ExecStart=/usr/bin/python3 -m nb_ems_gateway.main --config configs/actual_site.json
+Restart=always
+RestartSec=5
+User=root
+
+[Install]
+WantedBy=multi-user.target
