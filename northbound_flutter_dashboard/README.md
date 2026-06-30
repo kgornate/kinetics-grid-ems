@@ -194,3 +194,31 @@ It does not call the old SSE endpoint:
 ```
 
 Details: `docs/v0_8_network_timeouts.md`.
+
+## v0.9 gateway login/auth update
+
+v0.9 adds a login screen for the NorthBound Gateway v0.6 authentication API.
+
+The app now starts on a login page and supports both connection profiles:
+
+```text
+Local eth0:   http://192.168.10.2:8000
+Cloudflare:  https://ems-api.unityess.cloud
+```
+
+The login flow is:
+
+```text
+POST /api/auth/login
+Authorization: Bearer <access_token> on all protected REST APIs
+/ws/telemetry?token=<access_token> for WebSocket telemetry
+```
+
+The two configured gateway roles are:
+
+```text
+customer_admin
+internal_admin
+```
+
+The Flutter UI uses the returned token for dashboard, asset details, alarms, logs, storage/historian, runtime config helper APIs, and WebSocket connection. If the gateway returns `401 Unauthorized`, the app returns to the login page.

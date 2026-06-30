@@ -83,5 +83,27 @@
     "default_query_limit": 200,
     "retention_days": 30,
     "export_max_rows": 5000
+  },
+  "auth": {
+    "enabled": true,
+    "token_expiry_minutes": 480,
+    "jwt_secret": "northbound-dev-change-this-jwt-secret",
+    "jwt_secret_env": "NB_EMS_JWT_SECRET",
+    "users": [
+      {
+        "username": "customer",
+        "display_name": "Customer Admin",
+        "role": "customer_admin",
+        "password_hash": "nbems_pbkdf2_sha256$210000$X3VuNWdYUFTMT5ZGVvFRwVrO$vnVo87tdggfeqXQuLLDK9Lm0DwnRV7kt0W9Je-hzqvk",
+        "enabled": true
+      },
+      {
+        "username": "internal",
+        "display_name": "Unity ESS Internal",
+        "role": "internal_admin",
+        "password_hash": "nbems_pbkdf2_sha256$210000$n8vPnKeW9CEUJPwRv00-7Bn3$lI3uDC3NmMEsxgMJG2PVek9IPp4lUh1vFk5KT3hPCK8",
+        "enabled": true
+      }
+    ]
   }
 }

@@ -1,6 +1,6 @@
 name: northbound_flutter_dashboard
-version: 0.8.0+8
-description: NorthBound EMS Gateway dashboard with operator asset fields, historian, gateway events, storage, and asset-specific UI views.
+version: 0.9.0+9
+description: NorthBound EMS Gateway dashboard with API login/auth, operator asset fields, historian, gateway events, storage, and asset-specific UI views.
 publish_to: 'none'
 
 environment:

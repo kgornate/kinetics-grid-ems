@@ -119,3 +119,109 @@ No charge/discharge writes
   - `/api/assets/bms_1/telemetry?compact=true`
   - `/api/assets/bms_1/telemetry?compact=true&page=1&page_size=100`
   - `/api/assets/bms_1/telemetry?key_only=true`
+
+## v0.6 authentication update
+
+v0.6 adds gateway-enforced login/authentication for both local eth0 access and Cloudflare remote access.
+
+### Default demo users
+
+These passwords are for initial integration testing only. Change them before customer handover.
+
+```text
+Customer account:
+  username: customer
+  password: Customer@123
+  role: customer_admin
+
+Internal account:
+  username: internal
+  password: Internal@123
+  role: internal_admin
+```
+
+### Login flow used by Flutter and IT web
+
+```bash
+curl -X POST http://192.168.10.2:8000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"customer","password":"Customer@123"}'
+```
+
+The response contains an access token:
+
+```json
+{
+  "access_token": "...",
+  "token_type": "bearer",
+  "expires_in_sec": 28800,
+  "username": "customer",
+  "role": "customer_admin",
+  "display_name": "Customer Admin"
+}
+```
+
+Every protected API request must include the token:
+
+```bash
+curl http://192.168.10.2:8000/api/health \
+  -H "Authorization: Bearer <access_token>"
+```
+
+The same flow works through Cloudflare:
+
+```bash
+curl -X POST https://ems-api.unityess.cloud/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"customer","password":"Customer@123"}'
+```
+
+### WebSocket telemetry with token
+
+```text
+ws://192.168.10.2:8000/ws/telemetry?token=<access_token>
+wss://ems-api.unityess.cloud/ws/telemetry?token=<access_token>
+```
+
+### Role model
+
+```text
+customer_admin:
+  - monitoring APIs
+  - logs/events APIs
+  - storage and internal diagnostics APIs
+  - customer-safe runtime config update APIs
+
+internal_admin:
+  - full internal/engineering access
+  - intended for commissioning, debugging, and future command/control APIs
+```
+
+### Runtime config APIs
+
+```text
+GET  /api/config/runtime
+POST /api/config/runtime
+```
+
+Example:
+
+```bash
+curl -X POST http://192.168.10.2:8000/api/config/runtime \
+  -H "Authorization: Bearer <access_token>" \
+  -H "Content-Type: application/json" \
+  -d '{"section":"storage","values":{"retention_days":14,"snapshot_interval_sec":60}}'
+```
+
+These updates are runtime updates. They are logged in gateway events for audit/debugging. Persisting them back to a site JSON config can be added later if needed.
+
+### Changing passwords
+
+Generate a new password hash:
+
+```bash
+cd northbound_ems_gateway
+PYTHONPATH=src python3 tools/generate_password_hash.py
+```
+
+Then replace the corresponding `auth.users[].password_hash` value in the selected config JSON. Also change `auth.jwt_secret` or set `NB_EMS_JWT_SECRET` in the service environment before deployment.

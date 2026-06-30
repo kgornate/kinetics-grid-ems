@@ -16,7 +16,7 @@ class DependencyContainer:
         storage=SQLiteStore(config.storage) if config.storage.enabled else None
         c=cls(config,register_map,AssetManager(register_map),storage,EventLogger(storage,config.logging.min_severity,config.logging.enabled),None,None,[]) # type: ignore
         c.health_engine=HealthEngine(c); c.alarm_engine=AlarmEngine(c)
-        c.event_logger.info('gateway_boot','NorthBound EMS Gateway booted',{'version':'0.5.0','register_points':register_map.point_count,'commands_enabled':config.api.commands_enabled},source='gateway')
+        c.event_logger.info('gateway_boot','NorthBound EMS Gateway booted',{'version':'0.6.0-auth','register_points':register_map.point_count,'commands_enabled':config.api.commands_enabled,'auth_enabled':config.auth.enabled},source='gateway')
         if storage:
             h=storage.health(); c.event_logger.info('storage_health','Storage initialized',h,source='storage')
         return c

@@ -9,6 +9,8 @@ flutter pub get
 flutter run -d windows
 ```
 
+
+
 ## Generate missing platform folders
 
 ```powershell

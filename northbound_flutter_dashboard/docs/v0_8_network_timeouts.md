@@ -65,3 +65,13 @@ Cloudflare must use `wss://`, while local eth0 uses `ws://`.
 ## Notes about logsBaseUrl
 
 NorthBound v0.5 exposes `/api/logs` and `/api/storage` through the main REST API on port 8000. Therefore, the default `logsBaseUrl` is the same as `restBaseUrl` for both local eth0 and Cloudflare. If a later deployment exposes the same v0.5 log routes on a separate log domain, only `logsBaseUrl` needs to be changed.
+
+
+
+Customer:
+username: customer
+password: Customer@123
+
+Internal:
+username: internal
+password: Internal@123

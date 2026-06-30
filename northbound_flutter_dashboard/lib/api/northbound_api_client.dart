@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../models/alarm_record.dart';
+import '../models/auth_session.dart';
 import '../models/api_result.dart';
 import '../models/asset_summary.dart';
 import '../models/log_filter_options.dart';
@@ -121,11 +122,32 @@ class NorthboundApiClient {
     required this.restBaseUrl,
     required this.logsBaseUrl,
     required this.httpTimeout,
+    this.accessToken,
+    this.onUnauthorized,
   });
 
   final String restBaseUrl;
   final String logsBaseUrl;
   final Duration httpTimeout;
+  String? accessToken;
+  final void Function()? onUnauthorized;
+
+  void setAccessToken(String? token) {
+    accessToken = token;
+  }
+
+  Map<String, String> _headers() {
+    final token = accessToken?.trim();
+    return {
+      'Accept': 'application/json',
+      if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
+    };
+  }
+
+  Map<String, String> _jsonHeaders() => {
+        ..._headers(),
+        'Content-Type': 'application/json',
+      };
 
   String _baseForPath(String path) {
     // NorthBound v0.5 exposes /api/logs on the main REST API. The profile
@@ -141,6 +163,34 @@ class NorthboundApiClient {
   }
 
   String urlFor(String path, [Map<String, String>? query]) => _uri(path, query).toString();
+
+
+  Future<ApiResult<AuthSession>> login({required String username, required String password}) async {
+    try {
+      final uri = _uri('/api/auth/login');
+      final response = await http
+          .post(
+            uri,
+            headers: _jsonHeaders(),
+            body: jsonEncode({'username': username, 'password': password}),
+          )
+          .timeout(httpTimeout);
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        return ApiResult.failure('Login failed: HTTP ${response.statusCode}: ${response.body}');
+      }
+      final decoded = jsonDecode(response.body);
+      if (decoded is! Map) return const ApiResult.failure('Login response is not a JSON object');
+      final session = AuthSession.fromJson(Map<String, dynamic>.from(decoded));
+      if (session.accessToken.isEmpty) return const ApiResult.failure('Login response did not include access token');
+      setAccessToken(session.accessToken);
+      return ApiResult.success(session);
+    } catch (e) {
+      return ApiResult.failure('Login request failed after ${httpTimeout.inSeconds}s: $e');
+    }
+  }
+
+  Future<ApiResult<Map<String, dynamic>>> getMe() async => _getJson('/api/auth/me');
+
 
   Future<ApiResult<Map<String, dynamic>>> getHealth() async => _getJson('/api/health');
 
@@ -229,6 +279,35 @@ class NorthboundApiClient {
 
   String logExportUrl(LogQuery query) => urlFor('/api/logs/export.csv', query.toQuery(includeLimit: false));
 
+
+  Future<ApiResult<Map<String, dynamic>>> getRuntimeConfig() async => _getJson('/api/config/runtime');
+
+  Future<ApiResult<Map<String, dynamic>>> updateRuntimeConfig({required String section, required Map<String, dynamic> values}) async {
+    try {
+      final uri = _uri('/api/config/runtime');
+      final response = await http
+          .post(
+            uri,
+            headers: _jsonHeaders(),
+            body: jsonEncode({'section': section, 'values': values}),
+          )
+          .timeout(httpTimeout);
+      if (response.statusCode == 401) {
+        onUnauthorized?.call();
+        return ApiResult.failure('Unauthorized. Please login again.');
+      }
+      if (response.statusCode == 403) return ApiResult.failure('Forbidden for current login role.');
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        return ApiResult.failure('HTTP ${response.statusCode}: ${response.body}');
+      }
+      final decoded = jsonDecode(response.body);
+      if (decoded is! Map) return const ApiResult.failure('Response is not a JSON object');
+      return ApiResult.success(Map<String, dynamic>.from(decoded));
+    } catch (e) {
+      return ApiResult.failure('Config update failed after ${httpTimeout.inSeconds}s: $e');
+    }
+  }
+
   Future<ApiResult<Map<String, dynamic>>> getSnapshots({String? assetId, int limit = 20}) async {
     final query = <String, String>{'limit': limit.toString()};
     if (assetId != null && assetId.trim().isNotEmpty) query['asset_id'] = assetId.trim();
@@ -242,7 +321,14 @@ class NorthboundApiClient {
   Future<ApiResult<Map<String, dynamic>>> _getJson(String path, [Map<String, String>? query]) async {
     try {
       final uri = _uri(path, query);
-      final response = await http.get(uri).timeout(httpTimeout);
+      final response = await http.get(uri, headers: _headers()).timeout(httpTimeout);
+      if (response.statusCode == 401) {
+        onUnauthorized?.call();
+        return ApiResult.failure('Unauthorized. Please login again.');
+      }
+      if (response.statusCode == 403) {
+        return ApiResult.failure('Forbidden for current login role.');
+      }
       if (response.statusCode < 200 || response.statusCode >= 300) {
         return ApiResult.failure('HTTP ${response.statusCode}: ${response.body}');
       }

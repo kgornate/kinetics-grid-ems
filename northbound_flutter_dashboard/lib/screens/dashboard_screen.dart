@@ -6,6 +6,7 @@ import '../api/northbound_api_client.dart';
 import '../api/telemetry_ws_client.dart';
 import '../config/app_config.dart';
 import '../models/asset_summary.dart';
+import '../models/auth_session.dart';
 import '../models/signal_preview.dart';
 import '../models/storage_status.dart';
 import '../utils/key_signal_parser.dart';
@@ -24,13 +25,17 @@ class DashboardScreen extends StatefulWidget {
     required this.apiClient,
     required this.wsClient,
     required this.activeProfile,
+    required this.authSession,
     required this.onProfileChanged,
+    required this.onLogout,
   });
 
   final NorthboundApiClient apiClient;
   final TelemetryWsClient wsClient;
   final ApiProfile activeProfile;
+  final AuthSession authSession;
   final void Function(ApiProfile profile) onProfileChanged;
+  final VoidCallback onLogout;
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -208,6 +213,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ),
           ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Center(child: Chip(label: Text('${widget.authSession.displayName} • ${widget.authSession.role}'))),
+          ),
+          IconButton(
+            tooltip: 'Logout',
+            icon: const Icon(Icons.logout),
+            onPressed: widget.onLogout,
+          ),
           IconButton(
             tooltip: 'Refresh',
             icon: const Icon(Icons.refresh),
@@ -234,6 +248,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 StatusChip(label: 'Alarms: $alarmCount', good: alarmCount == 0),
                 StatusChip(label: _storageLabel(), good: storageStatus?.canWrite == true, icon: Icons.storage),
                 Chip(label: Text(_connectionLabel(widget.activeProfile))),
+                Chip(label: Text('Login: ${widget.authSession.role}')),
                 if (lastWsFrame != null) Chip(label: Text('Last WS: ${lastWsFrame!.toLocal()}')),
                 if (nextRetryInSec != null) Chip(label: Text('Retry in ${nextRetryInSec}s')),
               ],

@@ -2,6 +2,25 @@ from __future__ import annotations
 from typing import Literal
 from pydantic import BaseModel, Field
 
+class AuthUserConfig(BaseModel):
+    username: str
+    display_name: str = ""
+    role: Literal["customer_admin","internal_admin"]
+    password_hash: str | None = None
+    password_hash_env: str | None = None
+    enabled: bool = True
+
+class AuthConfig(BaseModel):
+    enabled: bool = False
+    token_expiry_minutes: int = 480
+    jwt_secret: str | None = "northbound-dev-change-this-jwt-secret"
+    jwt_secret_env: str = "NB_EMS_JWT_SECRET"
+    users: list[AuthUserConfig] = Field(default_factory=list)
+
+    @property
+    def allowed_roles(self) -> set[str]:
+        return {"customer_admin", "internal_admin"}
+
 class GatewayConfig(BaseModel):
     id: str = "northbound_ems_gateway_1"
     name: str = "NorthBound EMS Gateway"
@@ -99,3 +118,4 @@ class AppConfig(BaseModel):
     storage: StorageConfig = Field(default_factory=StorageConfig)
     server_upload: ServerUploadConfig = Field(default_factory=ServerUploadConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
+    auth: AuthConfig = Field(default_factory=AuthConfig)

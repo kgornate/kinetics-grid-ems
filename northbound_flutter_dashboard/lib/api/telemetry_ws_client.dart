@@ -24,9 +24,10 @@ class WsStatusSnapshot {
 }
 
 class TelemetryWsClient {
-  TelemetryWsClient({required this.wsUrl});
+  TelemetryWsClient({required this.wsUrl, this.authToken});
 
   final String wsUrl;
+  final String? authToken;
   WebSocketChannel? _channel;
   StreamSubscription? _socketSubscription;
   Timer? _reconnectTimer;
@@ -50,7 +51,7 @@ class TelemetryWsClient {
     _emitStatus('connecting');
 
     try {
-      _channel = WebSocketChannel.connect(Uri.parse(wsUrl));
+      _channel = WebSocketChannel.connect(_effectiveUri());
       _emitStatus('connected');
       _socketSubscription = _channel!.stream.listen(
         _handleMessage,
@@ -129,12 +130,19 @@ class TelemetryWsClient {
     _channel = null;
   }
 
+  Uri _effectiveUri() {
+    final uri = Uri.parse(wsUrl);
+    final token = authToken?.trim();
+    if (token == null || token.isEmpty) return uri;
+    return uri.replace(queryParameters: {...uri.queryParameters, 'token': token});
+  }
+
   void _emitStatus(String state, {String? lastError, int? nextRetryInSec}) {
     if (_statusController.isClosed) return;
     _statusController.add(
       WsStatusSnapshot(
         state: state,
-        url: wsUrl,
+        url: _effectiveUri().toString(),
         lastError: lastError,
         retryCount: _retryCount,
         nextRetryInSec: nextRetryInSec,
