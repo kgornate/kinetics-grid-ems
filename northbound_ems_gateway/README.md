@@ -1,177 +1,111 @@
-# NorthBound EMS Gateway
+# NorthBound EMS Gateway v0.5
 
-Read-only monitoring bridge for an existing Chinese EMS north-bound Modbus TCP protocol.
+Read-only NorthBound EMS Gateway for the China-supplied EMS Modbus TCP register map.
 
-## Purpose
+v0.5 includes all previous v0.4 features and adds SD-card-safe storage protection.
 
-This gateway runs on FRDM-i.MX93 and reads the existing EMS local north-bound register table over Modbus TCP. It converts raw vendor registers into clean local assets, telemetry, health, alarms, logs, and APIs.
+## Included features
 
-Version 1 is intentionally **read-only**:
+- Read-only northbound Modbus TCP polling
+- 1421-point protocol dictionary generated from the supplied north-bound register sheet
+- Asset APIs on port 8000
+- WebSocket telemetry on `/ws/telemetry`
+- SQLite historian
+- HTTPS REST server upload from v0.3
+- Kinetics-style logs and filters from v0.4
+- Separate logs API on port 7000
+- v0.5 storage protection for external SD card logging
 
-- no Modbus write calls
-- no command API routes
-- no PCS/BMS start/stop control
-- no charge/discharge control logic
-- no remote schedule writes
+## Default storage path
 
-## Network intent
-
-- `eth1`: field-side network to the existing Chinese EMS Modbus TCP server.
-- `eth0`: application-side network for local Flutter dashboard and/or server/cloud upload.
-- `wifi`: optional commissioning/debug/backup uplink.
-
-The Chinese EMS Modbus TCP details from the protocol sheet are:
-
-- Port: `515`
-- Unit ID: `1`
-- Point type: `Float`
-- Register quantity per point: `2`
-- Register address range: `0` to `2840`
-
-The EMS IP address is site-specific and must be configured in `configs/actual_site.json`.
-
-## Quick start in mock mode
-
-```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-python scripts/generate_register_map.py --input data/protocol_sources/china_ems_northbound_register_table.xlsx --output data/register_maps/china_ems_northbound_v1.json
-python -m nb_ems_gateway.main --config configs/development.json --mock
-```
-
-Then open:
+v0.5 expects logs/history on the external SD card:
 
 ```text
-http://127.0.0.1:8000/api/health
-http://127.0.0.1:8000/api/assets
-http://127.0.0.1:8000/api/alarms
-http://127.0.0.1:8000/api/registers/map
+/mnt/ems-logs/northbound_ems_gateway/nb_ems_gateway.db
 ```
 
-## Real EMS mode
-
-Update `configs/actual_site.json`:
-
-```json
-{
-  "existing_ems": {
-    "host": "192.168.1.100",
-    "port": 515,
-    "unit_id": 1,
-    "register_function": "holding_registers"
-  }
-}
-```
-
-Then run:
+Before starting the gateway, confirm:
 
 ```bash
-python -m nb_ems_gateway.main --config configs/actual_site.json
+df -h /mnt/ems-logs
+findmnt /mnt/ems-logs
 ```
 
-## Safety policy
+## Run on i.MX93
 
-`ReadOnlyModbusClient` does not implement public write methods. Any future write feature must be developed as a separate milestone with allowlists, interlocks, audit logs, and readback verification.
+```bash
+cd ~/kinetics-grid-ems/northbound_ems_gateway_v0_5_storage_protection
+PYTHONPATH=src python3 -m nb_ems_gateway.main --config configs/development.json --mock
+```
 
-## v0.2 read-only milestone update
-
-This package now includes the Milestone 4 and Milestone 5 read-only foundation:
-
-- Asset-wise telemetry API for `existing_ems`, `bms_1`, `pcs_1`, `utility_meter`, `fire_protection`, `liquid_cooling`, `dehumidifier`, `io_module`, and `remote_status`.
-- Dashboard-grade key signals and categories in the generated register map.
-- Curated normalization file at `data/normalization/curated_signal_map.json`.
-- SQLite local historian for asset snapshots, telemetry points, and gateway events.
-- Storage APIs for latest snapshots and point history.
-- Read-only WebSocket telemetry stream at `/ws/telemetry`.
-
-The gateway remains strictly read-only. Command routes and Modbus write operations are still intentionally absent.
-
-### Important read-only API endpoints
+## Main APIs
 
 ```text
 GET /api/health
 GET /api/assets
-GET /api/assets/{asset_id}
-GET /api/assets/{asset_id}/telemetry
-GET /api/assets/{asset_id}/telemetry?category=soc_soh
-GET /api/assets/{asset_id}/key-signals
 GET /api/telemetry
 GET /api/telemetry/key-signals
+GET /api/assets/{asset_id}/telemetry
 GET /api/alarms
-GET /api/registers/map
-GET /api/registers/raw?asset_id=bms_1&key_only=true
-GET /api/storage/status
-GET /api/storage/snapshots?asset_id=bms_1&limit=10
-GET /api/storage/points?asset_id=bms_1&signal_name=soc.display_percent&limit=100
 WS  /ws/telemetry
 ```
 
-### Current milestone status
+## Logs and filters
+
+Available on both port 8000 and port 7000:
 
 ```text
-Milestone 1: Done - protocol dictionary generated from Excel.
-Milestone 2: Set aside for now - full fake TCP Modbus server can be completed later.
-Milestone 3: Pending - requires real Chinese EMS IP/network access.
-Milestone 4: Done for read-only API foundation - asset telemetry, key signals, categories, register filters.
-Milestone 5: Done for local logging foundation - SQLite snapshots, point history, event log, dashboard-ready APIs.
+GET  /api/logs
+GET  /api/logs?severity=warning
+GET  /api/logs?event_type=poll_point_failed
+GET  /api/logs?source=server_upload
+GET  /api/logs?asset_id=bms_1
+GET  /api/logs?search=upload
+GET  /api/logs/summary
+GET  /api/logs/filters
+GET  /api/logs/export.csv
+POST /api/logs/test
 ```
 
-## v0.3 HTTPS REST server upload update
-
-This package adds a configurable background server uploader. It sends read-only normalized telemetry, gateway health, and alarms to a backend server over HTTPS REST. This does not enable Modbus writes or any PCS/BMS/EMS control command.
-
-Default intended upload interface for v0.3:
+## Storage protection APIs
 
 ```text
-mlan0 = Wi-Fi server upload/uplink
+GET  /api/storage/health
+GET  /api/storage/status
+POST /api/storage/cleanup
+POST /api/storage/vacuum
+GET  /api/storage/snapshots
+GET  /api/storage/points
 ```
 
-To switch server upload from Wi-Fi to Ethernet later, change only this config field:
+## v0.5 storage config
 
 ```json
-"server_upload": {
-  "network_interface": "eth0"
-}
-```
-
-The server uploader config is:
-
-```json
-"server_upload": {
+"storage": {
   "enabled": true,
-  "transport": "https_rest",
-  "endpoint_url": "https://your-server.example.com/api/v1/gateway/telemetry",
-  "api_key": "YOUR_TOKEN",
-  "network_interface": "mlan0",
-  "source_ip": null,
-  "bind_to_interface_source_ip": true,
-  "upload_interval_sec": 10,
-  "timeout_sec": 5,
-  "payload_mode": "key_signals",
-  "buffer_when_offline": true,
-  "max_queue_size": 1000,
-  "verify_tls": true
+  "type": "sqlite",
+  "path": "/mnt/ems-logs/northbound_ems_gateway/nb_ems_gateway.db",
+  "required_mount_path": "/mnt/ems-logs",
+  "fail_if_mount_missing": true,
+  "min_free_space_mb": 512,
+  "max_db_size_mb": 2048,
+  "retention_days": 7,
+  "store_mode": "key_signals",
+  "snapshot_interval_sec": 30,
+  "cleanup_on_startup": true,
+  "vacuum_after_cleanup": false
 }
 ```
 
-New server upload diagnostics APIs:
+This means the gateway will not silently write history to the root filesystem if `/mnt/ems-logs` is not mounted.
+
+## Safety
+
+The gateway remains read-only with respect to the Chinese EMS.
 
 ```text
-GET  /api/server-upload/status
-POST /api/server-upload/upload-once
-```
-
-`POST /api/server-upload/upload-once` only pushes one read-only telemetry snapshot to the configured backend. It does not write to the Chinese EMS.
-
-A Wi-Fi upload template is provided at:
-
-```text
-configs/server_upload_wifi_template.json
-```
-
-More details are in:
-
-```text
-docs/server_upload_https.md
+No Modbus writes
+No control commands
+No PCS/BMS start-stop
+No charge/discharge writes
 ```

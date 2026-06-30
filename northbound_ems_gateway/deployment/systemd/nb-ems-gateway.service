@@ -1,16 +1,16 @@
 [Unit]
-Description=NorthBound EMS Gateway
+Description=NorthBound EMS Gateway v0.5
 After=network-online.target
 Wants=network-online.target
+RequiresMountsFor=/mnt/ems-logs
 
 [Service]
 Type=simple
-WorkingDirectory=/opt/northbound_ems_gateway
-Environment=PYTHONPATH=/opt/northbound_ems_gateway/src
-ExecStart=/usr/bin/python3 -m nb_ems_gateway.main --config configs/actual_site.json
+WorkingDirectory=/root/kinetics-grid-ems/northbound_ems_gateway_v0_5_storage_protection
+Environment=PYTHONPATH=src
+ExecStart=/usr/bin/python3 -m nb_ems_gateway.main --config configs/development.json
 Restart=always
 RestartSec=5
-User=root
 
 [Install]
 WantedBy=multi-user.target

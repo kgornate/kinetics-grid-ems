@@ -1,25 +1,10 @@
-from __future__ import annotations
-
 import asyncio
-
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-
-router = APIRouter()
-
-
-@router.websocket("/ws/telemetry")
-async def telemetry_websocket(websocket: WebSocket) -> None:
-    await websocket.accept()
+from fastapi import APIRouter, WebSocket
+router=APIRouter()
+@router.websocket('/ws/telemetry')
+async def ws(websocket: WebSocket):
+    await websocket.accept(); c=websocket.app.state.container
     try:
         while True:
-            container = websocket.app.state.container
-            await websocket.send_json(
-                {
-                    "gateway_id": container.config.gateway.id,
-                    "mode": container.config.gateway.mode,
-                    "assets": container.asset_manager.telemetry_snapshot(),
-                }
-            )
-            await asyncio.sleep(1.0)
-    except WebSocketDisconnect:
-        return
+            await websocket.send_json({'assets':c.asset_manager.snapshot(key_only=True)}); await asyncio.sleep(2)
+    except Exception: return

@@ -13,7 +13,7 @@ class SignalTile extends StatelessWidget {
       child: ListTile(
         dense: true,
         title: Text(signal.displayName),
-        subtitle: Text('${signal.name} • ${signal.category} • quality=${signal.quality}'),
+        subtitle: Text('${signal.name} - ${signal.category} - quality=${signal.quality}'),
         trailing: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 220),
           child: Text(

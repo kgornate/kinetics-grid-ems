@@ -1,42 +1,27 @@
 from __future__ import annotations
-
+import json
 from dataclasses import dataclass
-from typing import Iterable
-
-from .register_point import RegisterPoint
-
+from pathlib import Path
+from typing import Any
 
 @dataclass(frozen=True)
-class RegisterMap:
-    name: str
-    version: str
-    source_file: str | None
-    points: tuple[RegisterPoint, ...]
-
-    @property
-    def point_count(self) -> int:
-        return len(self.points)
-
-    @property
-    def min_address(self) -> int | None:
-        return min((p.address for p in self.points), default=None)
-
-    @property
-    def max_address(self) -> int | None:
-        return max((p.address + p.register_qty - 1 for p in self.points), default=None)
-
-    def by_entity(self, entity_name: str) -> list[RegisterPoint]:
-        return [p for p in self.points if p.entity_name == entity_name]
-
-    def by_asset(self, asset_id: str) -> list[RegisterPoint]:
-        return [p for p in self.points if p.asset_id == asset_id]
-
-    def by_poll_group(self, poll_group: str) -> list[RegisterPoint]:
-        return [p for p in self.points if p.poll_group == poll_group]
-
-    def entities(self) -> list[str]:
-        return sorted({p.entity_name for p in self.points})
-
+class RegisterPoint:
+    id: str; asset_id: str; asset_display_name: str; address: int; register_qty: int
+    point_name: str; signal_name: str; point_type: str; unit: str=""; description: str=""
+    rw: int=0; factor: float=1.0; category: str="general"; key_signal: bool=False; entity_name: str=""
     @classmethod
-    def from_points(cls, name: str, version: str, points: Iterable[RegisterPoint], source_file: str | None = None) -> "RegisterMap":
-        return cls(name=name, version=version, source_file=source_file, points=tuple(points))
+    def from_dict(cls, data: dict[str, Any]) -> "RegisterPoint":
+        return cls(**{k:data.get(k) for k in cls.__dataclass_fields__})
+    def to_dict(self) -> dict[str, Any]: return self.__dict__.copy()
+
+@dataclass
+class RegisterMap:
+    name: str; version: str; points: list[RegisterPoint]; assets: list[dict[str,str]]; port: int=515; unit_id: int=1
+    @classmethod
+    def load(cls, path: str | Path) -> "RegisterMap":
+        d=json.loads(Path(path).read_text())
+        return cls(d.get('name','register_map'),d.get('version','unknown'),[RegisterPoint.from_dict(p) for p in d.get('points',[])],d.get('assets',[]),int(d.get('port',515)),int(d.get('unit_id',1)))
+    @property
+    def point_count(self) -> int: return len(self.points)
+    def to_dict(self) -> dict[str,Any]:
+        return {'name':self.name,'version':self.version,'point_count':self.point_count,'port':self.port,'unit_id':self.unit_id,'assets':self.assets,'points':[p.to_dict() for p in self.points]}

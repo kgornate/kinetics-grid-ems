@@ -25,8 +25,8 @@ class TelemetrySignal {
     final json = raw is Map ? Map<String, dynamic>.from(raw) : <String, dynamic>{};
     return TelemetrySignal(
       name: key,
-      displayName: json['display_name']?.toString() ?? key,
-      value: json['value'],
+      displayName: json['display_name']?.toString() ?? json['point_name']?.toString() ?? key,
+      value: json['value'] ?? raw,
       unit: json['unit']?.toString(),
       quality: json['quality']?.toString() ?? 'unknown',
       category: json['category']?.toString() ?? 'general',
@@ -37,12 +37,8 @@ class TelemetrySignal {
   }
 
   String get valueText {
-    if (enumText != null && enumText!.isNotEmpty) {
-      return '$value ($enumText)';
-    }
-    if (unit != null && unit!.isNotEmpty) {
-      return '$value $unit';
-    }
+    if (enumText != null && enumText!.isNotEmpty) return '$value ($enumText)';
+    if (unit != null && unit!.isNotEmpty) return '$value $unit';
     return value?.toString() ?? '-';
   }
 }

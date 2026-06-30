@@ -40,14 +40,14 @@ class _AssetTelemetryScreenState extends State<AssetTelemetryScreen> {
       loading = false;
       if (result.isSuccess) {
         raw = result.data;
-        final telemetry = result.data?['telemetry'];
+        final telemetry = result.data?['telemetry'] ?? result.data?['key_signals'];
         if (telemetry is Map) {
           signals = telemetry.entries
               .map((entry) => TelemetrySignal.fromEntry(entry.key.toString(), entry.value))
               .toList()
-            ..sort((a, b) => a.category == b.category
-                ? a.displayName.compareTo(b.displayName)
-                : a.category.compareTo(b.category));
+            ..sort((a, b) => a.category == b.category ? a.displayName.compareTo(b.displayName) : a.category.compareTo(b.category));
+        } else {
+          signals = [];
         }
       } else {
         error = result.error;

@@ -1,39 +1,33 @@
 from __future__ import annotations
-
+from typing import Literal
 from pydantic import BaseModel, Field
 
-
 class GatewayConfig(BaseModel):
-    id: str = "northbound_ems_gateway"
+    id: str = "northbound_ems_gateway_1"
     name: str = "NorthBound EMS Gateway"
     mode: str = "read_only"
-
 
 class NetworkConfig(BaseModel):
     field_interface: str = "eth1"
     application_interface: str = "eth0"
 
-
 class ExistingEMSConfig(BaseModel):
     protocol: str = "modbus_tcp"
-    host: str
+    host: str = "127.0.0.1"
     port: int = 515
     unit_id: int = 1
     register_function: str = "holding_registers"
     timeout_sec: float = 2.0
     retries: int = 2
 
-
 class RegisterMapConfig(BaseModel):
     path: str = "data/register_maps/china_ems_northbound_v1.json"
-
 
 class DecodingConfig(BaseModel):
     data_type: str = "float32"
     registers_per_point: int = 2
-    byte_order: str = "ABCD"
+    byte_order: Literal["ABCD","CDAB","BADC","DCBA"] = "ABCD"
     apply_factor: bool = True
-
 
 class PollingConfig(BaseModel):
     enabled: bool = True
@@ -42,18 +36,29 @@ class PollingConfig(BaseModel):
     slow_interval_sec: float = 10.0
     max_registers_per_read: int = 120
 
-
 class APIConfig(BaseModel):
     host: str = "0.0.0.0"
     port: int = 8000
     commands_enabled: bool = False
 
+class LogsAPIConfig(BaseModel):
+    enabled: bool = True
+    host: str = "0.0.0.0"
+    port: int = 7000
 
 class StorageConfig(BaseModel):
     enabled: bool = True
     type: str = "sqlite"
-    path: str = "runtime/nb_ems_gateway.db"
-
+    path: str = "/mnt/ems-logs/northbound_ems_gateway/nb_ems_gateway.db"
+    required_mount_path: str | None = "/mnt/ems-logs"
+    fail_if_mount_missing: bool = True
+    min_free_space_mb: int = 512
+    max_db_size_mb: int = 2048
+    retention_days: int = 7
+    store_mode: Literal["key_signals","full_snapshot"] = "key_signals"
+    snapshot_interval_sec: float = 30.0
+    cleanup_on_startup: bool = True
+    vacuum_after_cleanup: bool = False
 
 class ServerUploadConfig(BaseModel):
     enabled: bool = False
@@ -70,20 +75,27 @@ class ServerUploadConfig(BaseModel):
     max_queue_size: int = 1000
     verify_tls: bool = True
 
+class LoggingConfig(BaseModel):
+    enabled: bool = True
+    min_severity: str = "debug"
+    store_access_logs: bool = True
+    store_poll_events: bool = True
+    store_server_upload_events: bool = True
+    store_telemetry_quality_events: bool = True
+    max_query_limit: int = 1000
+    default_query_limit: int = 200
+    retention_days: int = 30
+    export_max_rows: int = 5000
 
 class AppConfig(BaseModel):
     gateway: GatewayConfig = Field(default_factory=GatewayConfig)
     network: NetworkConfig = Field(default_factory=NetworkConfig)
-    existing_ems: ExistingEMSConfig
+    existing_ems: ExistingEMSConfig = Field(default_factory=ExistingEMSConfig)
     register_map: RegisterMapConfig = Field(default_factory=RegisterMapConfig)
     decoding: DecodingConfig = Field(default_factory=DecodingConfig)
     polling: PollingConfig = Field(default_factory=PollingConfig)
     api: APIConfig = Field(default_factory=APIConfig)
+    logs_api: LogsAPIConfig = Field(default_factory=LogsAPIConfig)
     storage: StorageConfig = Field(default_factory=StorageConfig)
     server_upload: ServerUploadConfig = Field(default_factory=ServerUploadConfig)
-
-    def assert_read_only(self) -> None:
-        if self.gateway.mode != "read_only":
-            raise ValueError("Version 1 supports only gateway.mode='read_only'.")
-        if self.api.commands_enabled:
-            raise ValueError("Command APIs are disabled in read-only Version 1.")
+    logging: LoggingConfig = Field(default_factory=LoggingConfig)

@@ -54,7 +54,7 @@ class _AlarmsScreenState extends State<AlarmsScreen> {
             Card(
               child: ListTile(
                 leading: const Icon(Icons.warning),
-                title: Text('${alarm.severity.toUpperCase()} • ${alarm.assetId}'),
+                title: Text('${alarm.severity.toUpperCase()} - ${alarm.assetId}'),
                 subtitle: Text('${alarm.message}\n${alarm.timestampUtc}'),
                 isThreeLine: true,
               ),

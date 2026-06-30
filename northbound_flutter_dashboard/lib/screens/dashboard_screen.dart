@@ -43,33 +43,36 @@ class _DashboardScreenState extends State<DashboardScreen> {
   String? error;
   bool loading = false;
   Timer? refreshTimer;
+
   StreamSubscription? wsSub;
+  StreamSubscription? wsStatusSub;
   int wsFrames = 0;
   DateTime? lastWsFrame;
+  String wsStatus = 'disconnected';
+  String? wsError;
+  int? nextRetryInSec;
 
   @override
   void initState() {
     super.initState();
     refreshAll();
     refreshTimer = Timer.periodic(const Duration(seconds: 3), (_) => refreshAll());
-    widget.wsClient.connect();
-    wsSub = widget.wsClient.stream.listen((event) {
-      setState(() {
-        wsFrames++;
-        lastWsFrame = DateTime.now();
-        keySignals = event;
-        final parsed = KeySignalParser.byAsset(event);
-        if (parsed.isNotEmpty) keySignalsByAsset = parsed;
-      });
-    }, onError: (e) {
-      setState(() => error = 'WebSocket error: $e');
-    });
+    _connectWebSocket(resetCounter: true);
+  }
+
+  @override
+  void didUpdateWidget(covariant DashboardScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.wsUrl != widget.wsUrl || oldWidget.wsClient != widget.wsClient) {
+      _connectWebSocket(resetCounter: true);
+    }
   }
 
   @override
   void dispose() {
     refreshTimer?.cancel();
     wsSub?.cancel();
+    wsStatusSub?.cancel();
     super.dispose();
   }
 
@@ -90,11 +93,64 @@ class _DashboardScreenState extends State<DashboardScreen> {
       if (assetResult.isSuccess) assets = assetResult.data ?? [];
       if (keyResult.isSuccess) {
         keySignals = keyResult.data;
-        keySignalsByAsset = KeySignalParser.byAsset(keyResult.data);
+        final parsed = KeySignalParser.byAsset(keyResult.data);
+        if (parsed.isNotEmpty) keySignalsByAsset = parsed;
       }
       if (alarmResult.isSuccess) alarmCount = alarmResult.data?.length ?? 0;
       error = healthResult.error ?? assetResult.error ?? keyResult.error ?? alarmResult.error;
     });
+  }
+
+  void _connectWebSocket({bool resetCounter = false}) {
+    wsSub?.cancel();
+    wsStatusSub?.cancel();
+
+    if (mounted) {
+      setState(() {
+        wsStatus = 'connecting';
+        wsError = null;
+        nextRetryInSec = null;
+        if (resetCounter) {
+          wsFrames = 0;
+          lastWsFrame = null;
+        }
+      });
+    }
+
+    // Subscribe before connect so the first frame/status cannot be missed.
+    wsSub = widget.wsClient.stream.listen(
+      (event) {
+        if (!mounted) return;
+        setState(() {
+          wsFrames++;
+          lastWsFrame = DateTime.now();
+          wsStatus = 'connected';
+          wsError = null;
+          nextRetryInSec = null;
+          keySignals = event;
+          final parsed = KeySignalParser.byAsset(event);
+          if (parsed.isNotEmpty) keySignalsByAsset = parsed;
+        });
+      },
+      onError: (e) {
+        if (!mounted) return;
+        setState(() {
+          wsStatus = 'error';
+          wsError = e.toString();
+        });
+      },
+    );
+
+    wsStatusSub = widget.wsClient.statusStream.listen((status) {
+      if (!mounted) return;
+      setState(() {
+        wsStatus = status.state;
+        wsError = status.lastError;
+        nextRetryInSec = status.nextRetryInSec;
+      });
+    });
+
+    widget.wsClient.connect();
   }
 
   @override
@@ -105,6 +161,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
       appBar: AppBar(
         title: const Text('NorthBound EMS Dashboard'),
         actions: [
+          IconButton(
+            tooltip: 'Reconnect WebSocket',
+            icon: const Icon(Icons.link),
+            onPressed: () => _connectWebSocket(resetCounter: true),
+          ),
           IconButton(
             tooltip: 'Alarms',
             icon: Badge(
@@ -146,16 +207,30 @@ class _DashboardScreenState extends State<DashboardScreen> {
               runSpacing: 8,
               children: [
                 StatusChip(label: good ? 'Gateway OK' : 'Check gateway', good: good),
-                StatusChip(label: 'Read-only', good: true),
-                StatusChip(label: 'WS frames: $wsFrames', good: wsFrames > 0),
+                const StatusChip(label: 'Read-only', good: true),
+                StatusChip(
+                  label: 'WS $wsStatus: $wsFrames',
+                  good: wsStatus == 'connected' && wsFrames > 0,
+                  icon: _wsIcon(),
+                ),
                 StatusChip(label: 'Alarms: $alarmCount', good: alarmCount == 0),
                 Chip(label: Text(_connectionLabel(widget.apiBaseUrl))),
                 if (lastWsFrame != null) Chip(label: Text('Last WS: ${lastWsFrame!.toLocal()}')),
+                if (nextRetryInSec != null) Chip(label: Text('Retry in ${nextRetryInSec}s')),
               ],
             ),
             const SizedBox(height: 12),
             if (loading) const LinearProgressIndicator(),
             if (error != null) Card(child: ListTile(leading: const Icon(Icons.error), title: Text(error!))),
+            if (wsError != null)
+              Card(
+                child: ListTile(
+                  leading: const Icon(Icons.error_outline),
+                  title: const Text('WebSocket issue'),
+                  subtitle: Text(wsError!),
+                  trailing: TextButton(onPressed: () => _connectWebSocket(resetCounter: true), child: const Text('Reconnect')),
+                ),
+              ),
             _healthPanel(),
             const SizedBox(height: 16),
             Row(
@@ -192,7 +267,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
             const SizedBox(height: 16),
             ExpansionTile(
-              title: const Text('Raw key-signal payload'),
+              title: const Text('Raw key-signal / WebSocket payload'),
               children: [JsonViewer(data: keySignals ?? {})],
             ),
           ],
@@ -201,13 +276,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  IconData _wsIcon() {
+    switch (wsStatus) {
+      case 'connected':
+        return Icons.link;
+      case 'connecting':
+      case 'reconnecting':
+        return Icons.sync;
+      case 'error':
+        return Icons.error;
+      default:
+        return Icons.link_off;
+    }
+  }
+
   List<SignalPreview> _previewSignalsFor(AssetSummary asset) {
     final parsed = keySignalsByAsset[asset.assetId];
     if (parsed != null && parsed.isNotEmpty) return parsed;
     if (asset.keySignals.isEmpty) return const [];
-    return asset.keySignals.entries
-        .map((entry) => SignalPreview.fromEntry(entry.key.toString(), entry.value))
-        .toList();
+    return asset.keySignals.entries.map((entry) => SignalPreview.fromEntry(entry.key.toString(), entry.value)).toList();
   }
 
   Widget _healthPanel() {

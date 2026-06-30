@@ -5,11 +5,8 @@ class KeySignalParser {
 
   static Map<String, List<SignalPreview>> byAsset(Map<String, dynamic>? payload) {
     if (payload == null || payload.isEmpty) return const {};
-
     final result = <String, List<SignalPreview>>{};
 
-    // Most likely response shape:
-    // { "assets": { "bms_1": { "key_signals": {...} } } }
     final assets = payload['assets'];
     if (assets is Map) {
       for (final entry in assets.entries) {
@@ -28,8 +25,6 @@ class KeySignalParser {
       }
     }
 
-    // Alternative response shape:
-    // { "bms_1": { "soc.display_percent": {...} }, "pcs_1": {...} }
     if (result.isEmpty) {
       for (final entry in payload.entries) {
         final key = entry.key;
@@ -45,7 +40,6 @@ class KeySignalParser {
   static List<SignalPreview> _extractSignalsFromAny(dynamic raw) {
     if (raw is! Map) return const [];
     final map = Map<String, dynamic>.from(raw);
-
     final candidate = map['key_signals'] ?? map['signals'] ?? map['telemetry'] ?? map['data'] ?? map;
     if (candidate is! Map) return const [];
 
@@ -55,7 +49,6 @@ class KeySignalParser {
       if (_reservedSignalKeys.contains(key)) continue;
       signals.add(SignalPreview.fromEntry(key, entry.value));
     }
-
     signals.sort((a, b) => _priorityScore(a.name).compareTo(_priorityScore(b.name)));
     return signals;
   }
@@ -71,6 +64,7 @@ class KeySignalParser {
     'alarms',
     'schema_version',
     'network',
+    'mode',
   };
 
   static const _reservedSignalKeys = {
@@ -79,6 +73,7 @@ class KeySignalParser {
     'online',
     'last_update_utc',
     'signal_count',
+    'good_signal_count',
     'bad_signal_count',
   };
 
@@ -87,13 +82,14 @@ class KeySignalParser {
     if (n.contains('soc')) return 0;
     if (n.contains('soh')) return 1;
     if (n.contains('active_power') || n.contains('power_kw')) return 2;
-    if (n.contains('voltage')) return 3;
-    if (n.contains('current')) return 4;
-    if (n.contains('frequency')) return 5;
-    if (n.contains('temperature') || n.contains('temp')) return 6;
-    if (n.contains('insulation')) return 7;
-    if (n.contains('status')) return 8;
-    if (n.contains('alarm') || n.contains('fault')) return 9;
+    if (n.contains('dc_power')) return 3;
+    if (n.contains('voltage')) return 4;
+    if (n.contains('current')) return 5;
+    if (n.contains('frequency')) return 6;
+    if (n.contains('temperature') || n.contains('temp')) return 7;
+    if (n.contains('insulation')) return 8;
+    if (n.contains('status')) return 9;
+    if (n.contains('alarm') || n.contains('fault')) return 10;
     return 100;
   }
 }

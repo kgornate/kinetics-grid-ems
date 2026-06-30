@@ -46,10 +46,10 @@
   "storage": {
     "enabled": true,
     "type": "sqlite",
-    "path": "/mnt/ems-logs/northbound_ems_gateway/nb_ems_gateway.db",
-    "required_mount_path": "/mnt/ems-logs",
-    "fail_if_mount_missing": true,
-    "min_free_space_mb": 512,
+    "path": "runtime/nb_ems_gateway.db",
+    "required_mount_path": null,
+    "fail_if_mount_missing": false,
+    "min_free_space_mb": 1,
     "max_db_size_mb": 2048,
     "retention_days": 7,
     "store_mode": "key_signals",
@@ -58,7 +58,7 @@
     "vacuum_after_cleanup": false
   },
   "server_upload": {
-    "enabled": true,
+    "enabled": false,
     "transport": "https_rest",
     "endpoint_url": "https://CHANGE_ME_SERVER_HOST/api/v1/gateway/telemetry",
     "api_key": "CHANGE_ME_API_TOKEN",

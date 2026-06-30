@@ -17,11 +17,11 @@ class AlarmRecord {
 
   factory AlarmRecord.fromJson(Map<String, dynamic> json) {
     return AlarmRecord(
-      alarmId: json['alarm_id']?.toString() ?? 'alarm',
+      alarmId: json['alarm_id']?.toString() ?? json['id']?.toString() ?? 'alarm',
       severity: json['severity']?.toString() ?? 'info',
       assetId: json['asset_id']?.toString() ?? 'unknown',
-      message: json['message']?.toString() ?? '',
-      timestampUtc: json['timestamp_utc']?.toString() ?? '',
+      message: json['message']?.toString() ?? json['description']?.toString() ?? '',
+      timestampUtc: json['timestamp_utc']?.toString() ?? json['timestamp']?.toString() ?? '',
       sourceSignal: json['source_signal']?.toString(),
     );
   }

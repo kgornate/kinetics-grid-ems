@@ -16,9 +16,7 @@ class NorthboundApiClient {
     return Uri.parse('$cleanBase$path').replace(queryParameters: query);
   }
 
-  Future<ApiResult<Map<String, dynamic>>> getHealth() async {
-    return _getJson('/api/health');
-  }
+  Future<ApiResult<Map<String, dynamic>>> getHealth() async => _getJson('/api/health');
 
   Future<ApiResult<List<AssetSummary>>> getAssets() async {
     final result = await _getJson('/api/assets');
@@ -28,40 +26,28 @@ class NorthboundApiClient {
 
     if (rawAssets is List) {
       return ApiResult.success(
-        rawAssets
-            .whereType<Map>()
-            .map((item) => AssetSummary.fromJson(Map<String, dynamic>.from(item)))
-            .toList(),
+        rawAssets.whereType<Map>().map((item) => AssetSummary.fromJson(Map<String, dynamic>.from(item))).toList(),
       );
     }
 
     if (rawAssets is Map) {
       return ApiResult.success(
-        rawAssets.entries
-            .where((entry) => entry.value is Map)
-            .map((entry) {
-              final item = Map<String, dynamic>.from(entry.value as Map);
-              item.putIfAbsent('asset_id', () => entry.key.toString());
-              return AssetSummary.fromJson(item);
-            })
-            .toList(),
+        rawAssets.entries.where((entry) => entry.value is Map).map((entry) {
+          final item = Map<String, dynamic>.from(entry.value as Map);
+          item.putIfAbsent('asset_id', () => entry.key.toString());
+          return AssetSummary.fromJson(item);
+        }).toList(),
       );
     }
 
     return const ApiResult.failure('Invalid /api/assets response: assets must be a list or map');
   }
 
-  Future<ApiResult<Map<String, dynamic>>> getKeySignals() async {
-    return _getJson('/api/telemetry/key-signals');
-  }
+  Future<ApiResult<Map<String, dynamic>>> getKeySignals() async => _getJson('/api/telemetry/key-signals');
 
   Future<ApiResult<Map<String, dynamic>>> getAssetTelemetry(String assetId, {String? category}) async {
     final query = category == null || category.isEmpty ? null : {'category': category};
     return _getJson('/api/assets/$assetId/telemetry', query);
-  }
-
-  Future<ApiResult<Map<String, dynamic>>> getAssetKeySignals(String assetId) async {
-    return _getJson('/api/assets/$assetId/key-signals');
   }
 
   Future<ApiResult<List<AlarmRecord>>> getAlarms() async {
@@ -69,22 +55,15 @@ class NorthboundApiClient {
     if (!result.isSuccess) return ApiResult.failure(result.error ?? 'Failed to read alarms');
     final data = result.data ?? {};
     final rawAlarms = data['alarms'];
-    if (rawAlarms is! List) return const ApiResult.failure('Invalid /api/alarms response: alarms is not a list');
-    return ApiResult.success(
-      rawAlarms
-          .whereType<Map>()
-          .map((item) => AlarmRecord.fromJson(Map<String, dynamic>.from(item)))
-          .toList(),
-    );
+    if (rawAlarms is List) {
+      return ApiResult.success(
+        rawAlarms.whereType<Map>().map((item) => AlarmRecord.fromJson(Map<String, dynamic>.from(item))).toList(),
+      );
+    }
+    return const ApiResult.success([]);
   }
 
-  Future<ApiResult<Map<String, dynamic>>> getStorageStatus() async {
-    return _getJson('/api/storage/status');
-  }
-
-  Future<ApiResult<Map<String, dynamic>>> getRegisterMap() async {
-    return _getJson('/api/registers/map');
-  }
+  Future<ApiResult<Map<String, dynamic>>> getStorageStatus() async => _getJson('/api/storage/status');
 
   Future<ApiResult<Map<String, dynamic>>> _getJson(String path, [Map<String, String>? query]) async {
     try {

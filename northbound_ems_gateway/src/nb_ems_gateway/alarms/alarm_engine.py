@@ -1,36 +1,12 @@
 from __future__ import annotations
-
-from nb_ems_gateway.assets.asset_manager import AssetManager
-from .alarm import Alarm
-from .bms_alarm_rules import evaluate_bms_alarms
-from .cooling_alarm_rules import evaluate_cooling_alarms
-from .fire_alarm_rules import evaluate_fire_alarms
-from .io_alarm_rules import evaluate_io_alarms
-from .pcs_alarm_rules import evaluate_pcs_alarms
-
-
+from typing import Any
 class AlarmEngine:
-    def __init__(self, asset_manager: AssetManager) -> None:
-        self.asset_manager = asset_manager
-
-    def evaluate(self) -> list[Alarm]:
-        snapshot = self.asset_manager.telemetry_snapshot()
-        alarms: list[Alarm] = []
-        if "bms_1" in snapshot:
-            alarms.extend(evaluate_bms_alarms(snapshot["bms_1"]))
-        if "pcs_1" in snapshot:
-            alarms.extend(evaluate_pcs_alarms(snapshot["pcs_1"]))
-        if "fire_protection" in snapshot:
-            alarms.extend(evaluate_fire_alarms(snapshot["fire_protection"]))
-        if "liquid_cooling" in snapshot:
-            alarms.extend(evaluate_cooling_alarms(snapshot["liquid_cooling"]))
-        if "io_module" in snapshot:
-            alarms.extend(evaluate_io_alarms(snapshot["io_module"]))
-        return alarms
-
-    def snapshot(self) -> dict:
-        alarms = self.evaluate()
-        return {
-            "count": len(alarms),
-            "alarms": [alarm.to_dict() for alarm in alarms],
-        }
+    def __init__(self, container: Any) -> None: self.container=container
+    def snapshot(self)->dict[str,Any]:
+        alarms=[]
+        for asset in self.container.asset_manager.snapshot().values():
+            for sig in asset.get('signals',{}).values():
+                name=(sig.get('display_name') or sig.get('name') or '').lower(); val=sig.get('value')
+                if ('fault' in name or 'alarm' in name) and isinstance(val,(int,float)) and val != 0:
+                    alarms.append({'asset_id':asset['asset_id'],'signal_name':sig['name'],'display_name':sig['display_name'],'value':val,'severity':'warning'})
+        return {'active_count':len(alarms),'items':alarms}

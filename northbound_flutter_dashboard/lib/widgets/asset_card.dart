@@ -29,36 +29,22 @@ class AssetCard extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  Icon(
-                    asset.online ? Icons.check_circle : Icons.cancel,
-                    color: asset.online ? Colors.green : Colors.red,
-                  ),
+                  Icon(asset.online ? Icons.check_circle : Icons.cancel, color: asset.online ? Colors.green : Colors.red),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: Text(
-                      asset.displayName,
-                      style: Theme.of(context).textTheme.titleMedium,
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                    child: Text(asset.displayName, style: Theme.of(context).textTheme.titleMedium, overflow: TextOverflow.ellipsis),
                   ),
                 ],
               ),
               const SizedBox(height: 4),
               Text(
-                asset.assetType == null ? asset.assetId : '${asset.assetId} • ${asset.assetType}',
+                asset.assetType == null ? asset.assetId : '${asset.assetId} - ${asset.assetType}',
                 style: Theme.of(context).textTheme.bodySmall,
                 overflow: TextOverflow.ellipsis,
               ),
               const SizedBox(height: 10),
               if (preview.isEmpty)
-                Expanded(
-                  child: Center(
-                    child: Text(
-                      'No key signals yet',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ),
-                )
+                Expanded(child: Center(child: Text('No key signals yet', style: Theme.of(context).textTheme.bodySmall)))
               else
                 Expanded(
                   child: Column(
@@ -77,12 +63,8 @@ class AssetCard extends StatelessWidget {
                 runSpacing: 4,
                 children: [
                   _MiniBadge(label: 'Signals ${asset.signalCount}'),
-                  _MiniBadge(
-                    label: 'Bad ${asset.badSignalCount}',
-                    isWarning: asset.badSignalCount > 0,
-                  ),
-                  if (asset.lastUpdateUtc != null)
-                    _MiniBadge(label: 'Updated ${_shortTime(asset.lastUpdateUtc!)}'),
+                  _MiniBadge(label: 'Bad ${asset.badSignalCount}', isWarning: asset.badSignalCount > 0),
+                  if (asset.lastUpdateUtc != null) _MiniBadge(label: 'Updated ${_shortTime(asset.lastUpdateUtc!)}'),
                 ],
               ),
             ],
@@ -108,11 +90,7 @@ class _PreviewRow extends StatelessWidget {
     return Row(
       children: [
         Expanded(
-          child: Text(
-            signal.displayName,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
+          child: Text(signal.displayName, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.bodySmall),
         ),
         const SizedBox(width: 8),
         Flexible(

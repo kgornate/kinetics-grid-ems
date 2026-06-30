@@ -40,30 +40,6 @@ class AssetSummary {
     );
   }
 
-  AssetSummary copyWith({
-    String? assetId,
-    String? displayName,
-    bool? online,
-    int? signalCount,
-    int? badSignalCount,
-    String? lastUpdateUtc,
-    Map<String, dynamic>? keySignals,
-    String? assetType,
-    String? description,
-  }) {
-    return AssetSummary(
-      assetId: assetId ?? this.assetId,
-      displayName: displayName ?? this.displayName,
-      online: online ?? this.online,
-      signalCount: signalCount ?? this.signalCount,
-      badSignalCount: badSignalCount ?? this.badSignalCount,
-      lastUpdateUtc: lastUpdateUtc ?? this.lastUpdateUtc,
-      keySignals: keySignals ?? this.keySignals,
-      assetType: assetType ?? this.assetType,
-      description: description ?? this.description,
-    );
-  }
-
   static int _asInt(dynamic value) {
     if (value is int) return value;
     if (value is num) return value.toInt();

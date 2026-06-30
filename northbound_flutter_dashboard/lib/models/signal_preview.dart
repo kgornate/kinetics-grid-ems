@@ -22,7 +22,7 @@ class SignalPreview {
       final json = Map<String, dynamic>.from(raw);
       return SignalPreview(
         name: key,
-        displayName: json['display_name']?.toString() ?? _titleFromKey(key),
+        displayName: json['display_name']?.toString() ?? json['point_name']?.toString() ?? _titleFromKey(key),
         value: json['value'],
         unit: json['unit']?.toString(),
         quality: json['quality']?.toString(),
@@ -30,11 +30,7 @@ class SignalPreview {
         enumText: json['enum_text']?.toString(),
       );
     }
-    return SignalPreview(
-      name: key,
-      displayName: _titleFromKey(key),
-      value: raw,
-    );
+    return SignalPreview(name: key, displayName: _titleFromKey(key), value: raw);
   }
 
   String get valueText {
@@ -45,16 +41,11 @@ class SignalPreview {
     return '$valuePart$unitPart$enumPart';
   }
 
-  bool get goodQuality {
-    final q = quality?.toLowerCase() ?? '';
-    return q.isEmpty || q == 'good' || q == 'ok' || q == 'valid';
-  }
-
   static String _titleFromKey(String key) {
     return key
         .split(RegExp(r'[._]'))
         .where((part) => part.isNotEmpty)
-        .map((part) => '${part[0].toUpperCase()}${part.substring(1)}')
+        .map((part) => part.isEmpty ? part : '${part[0].toUpperCase()}${part.substring(1)}')
         .join(' ');
   }
 

@@ -33,11 +33,12 @@ class _NorthboundDashboardAppState extends State<NorthboundDashboardApp> {
   }
 
   void updateConfig(String apiBaseUrl, String wsUrl) {
+    final oldWsClient = wsClient;
     setState(() {
-      wsClient.dispose();
       config = config.copyWith(apiBaseUrl: apiBaseUrl, wsUrl: wsUrl);
       _buildClients();
     });
+    oldWsClient.dispose();
   }
 
   @override

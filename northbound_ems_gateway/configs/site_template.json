@@ -10,7 +10,7 @@
   },
   "existing_ems": {
     "protocol": "modbus_tcp",
-    "host": "CHANGE_ME_EMS_LOCAL_IP",
+    "host": "127.0.0.1",
     "port": 515,
     "unit_id": 1,
     "register_function": "holding_registers",
@@ -38,10 +38,24 @@
     "port": 8000,
     "commands_enabled": false
   },
+  "logs_api": {
+    "enabled": true,
+    "host": "0.0.0.0",
+    "port": 7000
+  },
   "storage": {
     "enabled": true,
     "type": "sqlite",
-    "path": "runtime/nb_ems_gateway.db"
+    "path": "/mnt/ems-logs/northbound_ems_gateway/nb_ems_gateway.db",
+    "required_mount_path": "/mnt/ems-logs",
+    "fail_if_mount_missing": true,
+    "min_free_space_mb": 512,
+    "max_db_size_mb": 2048,
+    "retention_days": 7,
+    "store_mode": "key_signals",
+    "snapshot_interval_sec": 30,
+    "cleanup_on_startup": true,
+    "vacuum_after_cleanup": false
   },
   "server_upload": {
     "enabled": false,
@@ -57,5 +71,17 @@
     "buffer_when_offline": true,
     "max_queue_size": 1000,
     "verify_tls": true
+  },
+  "logging": {
+    "enabled": true,
+    "min_severity": "debug",
+    "store_access_logs": true,
+    "store_poll_events": true,
+    "store_server_upload_events": true,
+    "store_telemetry_quality_events": true,
+    "max_query_limit": 1000,
+    "default_query_limit": 200,
+    "retention_days": 30,
+    "export_max_rows": 5000
   }
 }
