@@ -5,6 +5,116 @@ import 'package:http/http.dart' as http;
 import '../models/alarm_record.dart';
 import '../models/api_result.dart';
 import '../models/asset_summary.dart';
+import '../models/log_filter_options.dart';
+import '../models/log_record.dart';
+import '../models/storage_status.dart';
+
+class LogQuery {
+  const LogQuery({
+    this.severity,
+    this.eventType,
+    this.source,
+    this.assetId,
+    this.fromTime,
+    this.toTime,
+    this.search,
+    this.limit = 100,
+    this.offset = 0,
+    this.order = 'desc',
+  });
+
+  final String? severity;
+  final String? eventType;
+  final String? source;
+  final String? assetId;
+  final String? fromTime;
+  final String? toTime;
+  final String? search;
+  final int limit;
+  final int offset;
+  final String order;
+
+  Map<String, String> toQuery({bool includeLimit = true}) {
+    final q = <String, String>{
+      'order': order,
+      if (includeLimit) 'limit': limit.toString(),
+      if (offset > 0) 'offset': offset.toString(),
+    };
+    void add(String key, String? value) {
+      final v = value?.trim();
+      if (v != null && v.isNotEmpty) q[key] = v;
+    }
+
+    add('severity', severity);
+    add('event_type', eventType);
+    add('source', source);
+    add('asset_id', assetId);
+    add('from_time', fromTime);
+    add('to_time', toTime);
+    add('search', search);
+    return q;
+  }
+
+  LogQuery copyWith({
+    String? severity,
+    String? eventType,
+    String? source,
+    String? assetId,
+    String? fromTime,
+    String? toTime,
+    String? search,
+    int? limit,
+    int? offset,
+    String? order,
+    bool clearSeverity = false,
+    bool clearEventType = false,
+    bool clearSource = false,
+    bool clearAssetId = false,
+    bool clearFromTime = false,
+    bool clearToTime = false,
+    bool clearSearch = false,
+  }) {
+    return LogQuery(
+      severity: clearSeverity ? null : severity ?? this.severity,
+      eventType: clearEventType ? null : eventType ?? this.eventType,
+      source: clearSource ? null : source ?? this.source,
+      assetId: clearAssetId ? null : assetId ?? this.assetId,
+      fromTime: clearFromTime ? null : fromTime ?? this.fromTime,
+      toTime: clearToTime ? null : toTime ?? this.toTime,
+      search: clearSearch ? null : search ?? this.search,
+      limit: limit ?? this.limit,
+      offset: offset ?? this.offset,
+      order: order ?? this.order,
+    );
+  }
+}
+
+class LogQueryResult {
+  const LogQueryResult({required this.total, required this.limit, required this.offset, required this.items});
+
+  final int total;
+  final int limit;
+  final int offset;
+  final List<LogRecord> items;
+
+  factory LogQueryResult.fromJson(Map<String, dynamic> json) {
+    final rawItems = json['items'];
+    return LogQueryResult(
+      total: _asInt(json['total']),
+      limit: _asInt(json['limit']),
+      offset: _asInt(json['offset']),
+      items: rawItems is List
+          ? rawItems.whereType<Map>().map((item) => LogRecord.fromJson(Map<String, dynamic>.from(item))).toList()
+          : const [],
+    );
+  }
+
+  static int _asInt(dynamic value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse(value?.toString() ?? '') ?? 0;
+  }
+}
 
 class NorthboundApiClient {
   NorthboundApiClient({required this.baseUrl});
@@ -15,6 +125,8 @@ class NorthboundApiClient {
     final cleanBase = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
     return Uri.parse('$cleanBase$path').replace(queryParameters: query);
   }
+
+  String urlFor(String path, [Map<String, String>? query]) => _uri(path, query).toString();
 
   Future<ApiResult<Map<String, dynamic>>> getHealth() async => _getJson('/api/health');
 
@@ -63,7 +175,48 @@ class NorthboundApiClient {
     return const ApiResult.success([]);
   }
 
-  Future<ApiResult<Map<String, dynamic>>> getStorageStatus() async => _getJson('/api/storage/status');
+  Future<ApiResult<StorageStatus>> getStorageStatus() async {
+    final result = await _getJson('/api/storage/status');
+    if (!result.isSuccess) return ApiResult.failure(result.error ?? 'Failed to read storage status');
+    return ApiResult.success(StorageStatus.fromJson(result.data ?? {}));
+  }
+
+  Future<ApiResult<StorageStatus>> getStorageHealth() async {
+    final result = await _getJson('/api/storage/health');
+    if (!result.isSuccess) return ApiResult.failure(result.error ?? 'Failed to read storage health');
+    return ApiResult.success(StorageStatus.fromJson(result.data ?? {}));
+  }
+
+  Future<ApiResult<LogFilterOptions>> getLogFilterOptions() async {
+    final result = await _getJson('/api/logs/filters');
+    if (!result.isSuccess) return ApiResult.failure(result.error ?? 'Failed to read log filter options');
+    return ApiResult.success(LogFilterOptions.fromJson(result.data ?? {}));
+  }
+
+  Future<ApiResult<Map<String, dynamic>>> getLogSummary({String? fromTime, String? toTime}) async {
+    final query = <String, String>{};
+    if (fromTime != null && fromTime.trim().isNotEmpty) query['from_time'] = fromTime.trim();
+    if (toTime != null && toTime.trim().isNotEmpty) query['to_time'] = toTime.trim();
+    return _getJson('/api/logs/summary', query.isEmpty ? null : query);
+  }
+
+  Future<ApiResult<LogQueryResult>> getLogs(LogQuery query) async {
+    final result = await _getJson('/api/logs', query.toQuery());
+    if (!result.isSuccess) return ApiResult.failure(result.error ?? 'Failed to query logs');
+    return ApiResult.success(LogQueryResult.fromJson(result.data ?? {}));
+  }
+
+  String logExportUrl(LogQuery query) => urlFor('/api/logs/export.csv', query.toQuery(includeLimit: false));
+
+  Future<ApiResult<Map<String, dynamic>>> getSnapshots({String? assetId, int limit = 20}) async {
+    final query = <String, String>{'limit': limit.toString()};
+    if (assetId != null && assetId.trim().isNotEmpty) query['asset_id'] = assetId.trim();
+    return _getJson('/api/storage/snapshots', query);
+  }
+
+  Future<ApiResult<Map<String, dynamic>>> getPoints({required String assetId, required String signalName, int limit = 100}) async {
+    return _getJson('/api/storage/points', {'asset_id': assetId, 'signal_name': signalName, 'limit': limit.toString()});
+  }
 
   Future<ApiResult<Map<String, dynamic>>> _getJson(String path, [Map<String, String>? query]) async {
     try {

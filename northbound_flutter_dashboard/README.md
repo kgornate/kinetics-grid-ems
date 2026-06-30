@@ -1,6 +1,6 @@
 # NorthBound Flutter Dashboard
 
-**Version:** 0.3.0
+**Version:** 0.4.0
 
 Read-only Flutter dashboard for the NorthBound EMS Gateway.
 
@@ -45,3 +45,38 @@ flutter run -d chrome
 ```
 
 The app is read-only. It does not call any command/write/control APIs.
+
+
+## v0.4 Logs, Filters, Storage, and UI Polish
+
+v0.4 adds a Kinetics-style logs/history workflow for the NorthBound EMS Gateway v0.5 storage APIs.
+
+New screens:
+
+```text
+Logs & Filters
+Storage / Historian
+Enhanced Asset Detail
+```
+
+The Logs screen uses:
+
+```text
+GET /api/logs
+GET /api/logs/summary
+GET /api/logs/filters
+GET /api/logs/export.csv
+```
+
+The Storage screen uses:
+
+```text
+GET /api/storage/status
+GET /api/storage/health
+```
+
+The asset detail page now has a cleaner hero/status area, metric cards, category chips, search, and raw JSON view.
+
+The dashboard remains read-only. It does not call Modbus write, PCS/BMS control, or command APIs.
+
+More details: `docs/v0_4_logs_and_ui.md`.

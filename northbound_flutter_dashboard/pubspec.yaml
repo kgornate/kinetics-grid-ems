@@ -1,6 +1,6 @@
 name: northbound_flutter_dashboard
-version: 0.3.0+3
-description: Local and remote Flutter dashboard for the NorthBound EMS Gateway.
+version: 0.4.0+4
+description: Local and remote Flutter dashboard for the NorthBound EMS Gateway with logs, filters, and storage views.
 publish_to: 'none'
 
 environment:

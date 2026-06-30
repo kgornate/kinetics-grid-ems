@@ -6,13 +6,16 @@ import '../api/northbound_api_client.dart';
 import '../api/telemetry_ws_client.dart';
 import '../models/asset_summary.dart';
 import '../models/signal_preview.dart';
+import '../models/storage_status.dart';
 import '../utils/key_signal_parser.dart';
 import '../widgets/asset_card.dart';
 import '../widgets/json_viewer.dart';
 import '../widgets/status_chip.dart';
 import 'alarms_screen.dart';
 import 'asset_telemetry_screen.dart';
+import 'logs_screen.dart';
 import 'settings_screen.dart';
+import 'storage_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({
@@ -40,6 +43,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Map<String, List<SignalPreview>> keySignalsByAsset = const {};
   List<AssetSummary> assets = [];
   int alarmCount = 0;
+  StorageStatus? storageStatus;
   String? error;
   bool loading = false;
   Timer? refreshTimer;
@@ -85,6 +89,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final assetResult = await widget.apiClient.getAssets();
     final keyResult = await widget.apiClient.getKeySignals();
     final alarmResult = await widget.apiClient.getAlarms();
+    final storageResult = await widget.apiClient.getStorageStatus();
 
     if (!mounted) return;
     setState(() {
@@ -97,7 +102,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
         if (parsed.isNotEmpty) keySignalsByAsset = parsed;
       }
       if (alarmResult.isSuccess) alarmCount = alarmResult.data?.length ?? 0;
-      error = healthResult.error ?? assetResult.error ?? keyResult.error ?? alarmResult.error;
+      if (storageResult.isSuccess) storageStatus = storageResult.data;
+      error = healthResult.error ?? assetResult.error ?? keyResult.error ?? alarmResult.error ?? storageResult.error;
     });
   }
 
@@ -167,6 +173,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
             onPressed: () => _connectWebSocket(resetCounter: true),
           ),
           IconButton(
+            tooltip: 'Logs & Filters',
+            icon: const Icon(Icons.article_outlined),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => LogsScreen(apiClient: widget.apiClient)),
+            ),
+          ),
+          IconButton(
+            tooltip: 'Storage / Historian',
+            icon: const Icon(Icons.storage),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => StorageScreen(apiClient: widget.apiClient)),
+            ),
+          ),
+          IconButton(
             tooltip: 'Alarms',
             icon: Badge(
               isLabelVisible: alarmCount > 0,
@@ -214,6 +234,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   icon: _wsIcon(),
                 ),
                 StatusChip(label: 'Alarms: $alarmCount', good: alarmCount == 0),
+                StatusChip(label: _storageLabel(), good: storageStatus?.canWrite == true, icon: Icons.storage),
                 Chip(label: Text(_connectionLabel(widget.apiBaseUrl))),
                 if (lastWsFrame != null) Chip(label: Text('Last WS: ${lastWsFrame!.toLocal()}')),
                 if (nextRetryInSec != null) Chip(label: Text('Retry in ${nextRetryInSec}s')),
@@ -317,12 +338,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 Text('Bad: ${health!['bad_signal_count']}'),
                 Text('Alarms: $alarmCount'),
                 Text('Commands: ${health!['commands_enabled']}'),
+                Text('Storage: ${storageStatus?.canWrite == true ? 'writable' : 'check'}'),
               ],
             ),
           ],
         ),
       ),
     );
+  }
+
+  String _storageLabel() {
+    if (storageStatus == null) return 'Storage: unknown';
+    if (storageStatus!.canWrite) return 'Storage: OK';
+    return 'Storage: check';
   }
 
   static int _asInt(dynamic value) {

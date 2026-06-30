@@ -1,15 +1,5 @@
 # Run Commands
 
-## Replace/update project
-
-Unzip this package over your existing `northbound_flutter_dashboard` folder or copy the `lib/`, `pubspec.yaml`, and `docs/` contents into the existing project.
-
-If platform folders are missing, run:
-
-```powershell
-flutter create --platforms=windows,web .
-```
-
 ## Windows desktop
 
 ```powershell
@@ -19,31 +9,33 @@ flutter pub get
 flutter run -d windows
 ```
 
-## Browser
+## Generate missing platform folders
 
 ```powershell
-flutter run -d chrome
+flutter create --platforms=windows,web .
+flutter pub get
+flutter run -d windows
 ```
 
-## WebSocket verification outside Flutter
+## Local eth0 profile
 
-```powershell
-py -m pip install websockets
+```text
+API: http://192.168.10.2:8000
+WS:  ws://192.168.10.2:8000/ws/telemetry
 ```
 
+## Cloudflare profile
+
+```text
+API: https://ems-api.unityess.cloud
+WS:  wss://ems-api.unityess.cloud/ws/telemetry
+```
+
+## Test logs API from PC
+
 ```powershell
-@'
-import asyncio
-import websockets
-
-async def main():
-    url = "ws://192.168.10.2:8000/ws/telemetry"
-    print("Connecting:", url)
-    async with websockets.connect(url) as ws:
-        for i in range(5):
-            msg = await asyncio.wait_for(ws.recv(), timeout=10)
-            print("FRAME", i + 1, msg[:500])
-
-asyncio.run(main())
-'@ | py -
+curl "http://192.168.10.2:8000/api/logs/summary"
+curl "http://192.168.10.2:8000/api/logs/filters"
+curl "http://192.168.10.2:8000/api/logs?limit=20"
+curl "http://192.168.10.2:8000/api/storage/status"
 ```
