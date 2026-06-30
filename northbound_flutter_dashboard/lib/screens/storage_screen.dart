@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../api/northbound_api_client.dart';
 import '../models/storage_status.dart';
+import '../utils/value_formatters.dart';
 import '../widgets/json_viewer.dart';
 import '../widgets/metric_card.dart';
 
@@ -58,7 +59,9 @@ class _StorageScreenState extends State<StorageScreen> {
               const SizedBox(height: 12),
               _metricGrid(s),
               const SizedBox(height: 12),
-              _detailsCard(s),
+              _detailsTable(s),
+              const SizedBox(height: 12),
+              _tablesCard(s),
               const SizedBox(height: 12),
               ExpansionTile(title: const Text('Raw storage status JSON'), children: [JsonViewer(data: s.raw)]),
             ],
@@ -83,46 +86,77 @@ class _StorageScreenState extends State<StorageScreen> {
     final cards = [
       MetricCard(title: 'Write Status', value: s.canWrite ? 'Writable' : 'Blocked', icon: Icons.edit_note, good: s.canWrite),
       MetricCard(title: 'Mount', value: s.mountOk ? 'OK' : 'Missing', icon: Icons.sd_storage, good: s.mountOk),
-      MetricCard(title: 'DB Size', value: '${s.dbSizeMb ?? '-'} MB', icon: Icons.data_object),
-      MetricCard(title: 'Free Space', value: '${s.freeSpaceMb ?? '-'} MB', icon: Icons.storage),
+      MetricCard(title: 'DB Size', value: ValueFormatters.bytesFromMb(s.dbSizeMb), icon: Icons.data_object),
+      MetricCard(title: 'Free Space', value: ValueFormatters.bytesFromMb(s.freeSpaceMb), icon: Icons.storage),
+      MetricCard(title: 'Disk Used', value: s.usedPercent == null ? '-' : '${s.usedPercent} %', icon: Icons.pie_chart),
       MetricCard(title: 'Retention', value: '${s.retentionDays ?? '-'} days', icon: Icons.history),
-      MetricCard(title: 'Snapshot Interval', value: '${s.snapshotIntervalSec ?? '-'} sec', icon: Icons.timer),
     ];
     return LayoutBuilder(
       builder: (context, constraints) {
-        final crossAxisCount = constraints.maxWidth > 1100 ? 3 : constraints.maxWidth > 720 ? 2 : 1;
+        final crossAxisCount = constraints.maxWidth > 1250 ? 3 : constraints.maxWidth > 760 ? 2 : 1;
         return GridView.count(
           crossAxisCount: crossAxisCount,
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          childAspectRatio: constraints.maxWidth > 720 ? 3.0 : 4.5,
+          childAspectRatio: constraints.maxWidth > 760 ? 3.0 : 4.5,
           children: cards,
         );
       },
     );
   }
 
-  Widget _detailsCard(StorageStatus s) {
+  Widget _detailsTable(StorageStatus s) {
+    final rows = <MapEntry<String, String>>[
+      MapEntry('Database path', s.path),
+      MapEntry('Store mode', s.storeMode ?? '-'),
+      MapEntry('Database size', ValueFormatters.bytesFromMb(s.dbSizeMb)),
+      MapEntry('Free disk space', ValueFormatters.bytesFromMb(s.freeSpaceMb)),
+      MapEntry('Used disk percent', s.usedPercent == null ? '-' : '${s.usedPercent} %'),
+      MapEntry('Snapshot interval', s.snapshotIntervalSec == null ? '-' : '${s.snapshotIntervalSec} sec'),
+      MapEntry('Retention', s.retentionDays == null ? '-' : '${s.retentionDays} days'),
+      MapEntry('Skipped writes', '${s.skippedWriteCount ?? 0}'),
+      MapEntry('Last skip reason', s.lastSkipReason ?? '-'),
+    ];
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Tables', style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 8),
+            Text('Storage details', style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 12),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: DataTable(
+                columns: const [DataColumn(label: Text('Field')), DataColumn(label: Text('Value'))],
+                rows: [for (final row in rows) DataRow(cells: [DataCell(Text(row.key)), DataCell(SelectableText(row.value))])],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _tablesCard(StorageStatus s) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('SQLite table counts', style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 12),
             if (s.tables.isEmpty)
               const Text('No table counts available')
             else
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [for (final e in s.tables.entries) Chip(label: Text('${e.key}: ${e.value}'))],
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: DataTable(
+                  columns: const [DataColumn(label: Text('Table')), DataColumn(label: Text('Rows'))],
+                  rows: [for (final e in s.tables.entries) DataRow(cells: [DataCell(Text(e.key)), DataCell(Text(e.value.toString()))])],
+                ),
               ),
-            const SizedBox(height: 16),
-            Text('Configuration', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 8),
-            SelectableText('Path: ${s.path}\nMode: ${s.storeMode ?? '-'}\nSkipped writes: ${s.skippedWriteCount ?? 0}\nLast skip reason: ${s.lastSkipReason ?? '-'}'),
           ],
         ),
       ),

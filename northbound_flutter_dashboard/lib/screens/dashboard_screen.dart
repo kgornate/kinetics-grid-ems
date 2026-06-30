@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../api/northbound_api_client.dart';
 import '../api/telemetry_ws_client.dart';
+import '../config/app_config.dart';
 import '../models/asset_summary.dart';
 import '../models/signal_preview.dart';
 import '../models/storage_status.dart';
@@ -22,16 +23,14 @@ class DashboardScreen extends StatefulWidget {
     super.key,
     required this.apiClient,
     required this.wsClient,
-    required this.onConfigChanged,
-    required this.apiBaseUrl,
-    required this.wsUrl,
+    required this.activeProfile,
+    required this.onProfileChanged,
   });
 
   final NorthboundApiClient apiClient;
   final TelemetryWsClient wsClient;
-  final void Function(String apiBaseUrl, String wsUrl) onConfigChanged;
-  final String apiBaseUrl;
-  final String wsUrl;
+  final ApiProfile activeProfile;
+  final void Function(ApiProfile profile) onProfileChanged;
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -67,7 +66,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void didUpdateWidget(covariant DashboardScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.wsUrl != widget.wsUrl || oldWidget.wsClient != widget.wsClient) {
+    if (oldWidget.activeProfile.wsUrl != widget.activeProfile.wsUrl || oldWidget.wsClient != widget.wsClient) {
       _connectWebSocket(resetCounter: true);
     }
   }
@@ -203,9 +202,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
             onPressed: () => Navigator.of(context).push(
               MaterialPageRoute(
                 builder: (_) => SettingsScreen(
-                  apiBaseUrl: widget.apiBaseUrl,
-                  wsUrl: widget.wsUrl,
-                  onApply: widget.onConfigChanged,
+                  activeProfile: widget.activeProfile,
+                  onApply: widget.onProfileChanged,
                 ),
               ),
             ),
@@ -235,7 +233,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
                 StatusChip(label: 'Alarms: $alarmCount', good: alarmCount == 0),
                 StatusChip(label: _storageLabel(), good: storageStatus?.canWrite == true, icon: Icons.storage),
-                Chip(label: Text(_connectionLabel(widget.apiBaseUrl))),
+                Chip(label: Text(_connectionLabel(widget.activeProfile))),
                 if (lastWsFrame != null) Chip(label: Text('Last WS: ${lastWsFrame!.toLocal()}')),
                 if (nextRetryInSec != null) Chip(label: Text('Retry in ${nextRetryInSec}s')),
               ],
@@ -339,6 +337,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 Text('Alarms: $alarmCount'),
                 Text('Commands: ${health!['commands_enabled']}'),
                 Text('Storage: ${storageStatus?.canWrite == true ? 'writable' : 'check'}'),
+                Text('HTTP timeout: ${widget.activeProfile.httpTimeout.inSeconds}s'),
               ],
             ),
           ],
@@ -359,7 +358,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return int.tryParse(value?.toString() ?? '') ?? 0;
   }
 
-  static String _connectionLabel(String url) {
-    return url.contains('ems-api.unityess.cloud') ? 'Cloudflare' : 'Local eth0';
+  static String _connectionLabel(ApiProfile profile) {
+    return '${profile.name} • HTTP ${profile.httpTimeout.inSeconds}s';
   }
 }

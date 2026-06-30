@@ -59,11 +59,18 @@ class SQLiteStore:
         return {'enabled':True,'type':'sqlite','path':str(self.path),'required_mount_path':mount_path,'mount_ok':mount_ok,'can_write':len(reasons)==0,'reasons':reasons,'free_space_mb':free_mb,'total_space_mb':total_mb,'used_percent':used_pct,'db_size_mb':db_mb,'min_free_space_mb':self.config.min_free_space_mb,'max_db_size_mb':self.config.max_db_size_mb,'store_mode':self.config.store_mode,'snapshot_interval_sec':self.config.snapshot_interval_sec,'retention_days':self.config.retention_days,'skipped_write_count':self.skipped_write_count,'last_skip_reason':self.last_skip_reason}
 
     def status(self) -> dict[str,Any]:
-        h=self.health(); tables={}
+        h=self.health(); tables={}; table_errors={}
         if hasattr(self,'conn'):
             for t in ['telemetry_snapshots','telemetry_points','gateway_events']:
-                tables[t]=self.conn.execute(f'SELECT COUNT(*) FROM {t}').fetchone()[0]
+                try:
+                    row=self.conn.execute(f'SELECT COUNT(*) FROM {t}').fetchone()
+                    tables[t]=int(row[0]) if row and row[0] is not None else 0
+                except Exception as exc:
+                    tables[t]=None
+                    table_errors[t]=str(exc)
         h['tables']=tables
+        if table_errors:
+            h['table_errors']=table_errors
         return h
 
     def _can_write(self) -> bool:

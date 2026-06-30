@@ -117,12 +117,26 @@ class LogQueryResult {
 }
 
 class NorthboundApiClient {
-  NorthboundApiClient({required this.baseUrl});
+  NorthboundApiClient({
+    required this.restBaseUrl,
+    required this.logsBaseUrl,
+    required this.httpTimeout,
+  });
 
-  final String baseUrl;
+  final String restBaseUrl;
+  final String logsBaseUrl;
+  final Duration httpTimeout;
+
+  String _baseForPath(String path) {
+    // NorthBound v0.5 exposes /api/logs on the main REST API. The profile
+    // still keeps logsBaseUrl configurable for sites that later route logs
+    // through a separate tunnel/domain.
+    final selected = path.startsWith('/api/logs') ? logsBaseUrl : restBaseUrl;
+    return selected.endsWith('/') ? selected.substring(0, selected.length - 1) : selected;
+  }
 
   Uri _uri(String path, [Map<String, String>? query]) {
-    final cleanBase = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
+    final cleanBase = _baseForPath(path);
     return Uri.parse('$cleanBase$path').replace(queryParameters: query);
   }
 
@@ -134,7 +148,11 @@ class NorthboundApiClient {
     final result = await _getJson('/api/assets');
     if (!result.isSuccess) return ApiResult.failure(result.error ?? 'Failed to read assets');
     final data = result.data ?? {};
-    final rawAssets = data['assets'];
+
+    // Gateway v0.5 returns {"items": [...]}. Older builds returned
+    // {"assets": [...]} or {"assets": {"asset_id": {...}}}. Support all
+    // shapes so UI cards do not disappear when backend payload naming changes.
+    final rawAssets = data['assets'] ?? data['items'] ?? data['data'];
 
     if (rawAssets is List) {
       return ApiResult.success(
@@ -152,7 +170,7 @@ class NorthboundApiClient {
       );
     }
 
-    return const ApiResult.failure('Invalid /api/assets response: assets must be a list or map');
+    return ApiResult.failure('Invalid /api/assets response: expected assets/items list or map, got ${rawAssets.runtimeType}');
   }
 
   Future<ApiResult<Map<String, dynamic>>> getKeySignals() async => _getJson('/api/telemetry/key-signals');
@@ -166,7 +184,10 @@ class NorthboundApiClient {
     final result = await _getJson('/api/alarms');
     if (!result.isSuccess) return ApiResult.failure(result.error ?? 'Failed to read alarms');
     final data = result.data ?? {};
-    final rawAlarms = data['alarms'];
+
+    // Gateway v0.5 returns {"active_count": n, "items": [...]}. Older
+    // builds returned {"alarms": [...]}. Support both shapes.
+    final rawAlarms = data['alarms'] ?? data['items'] ?? data['active_alarms'];
     if (rawAlarms is List) {
       return ApiResult.success(
         rawAlarms.whereType<Map>().map((item) => AlarmRecord.fromJson(Map<String, dynamic>.from(item))).toList(),
@@ -220,7 +241,8 @@ class NorthboundApiClient {
 
   Future<ApiResult<Map<String, dynamic>>> _getJson(String path, [Map<String, String>? query]) async {
     try {
-      final response = await http.get(_uri(path, query)).timeout(const Duration(seconds: 5));
+      final uri = _uri(path, query);
+      final response = await http.get(uri).timeout(httpTimeout);
       if (response.statusCode < 200 || response.statusCode >= 300) {
         return ApiResult.failure('HTTP ${response.statusCode}: ${response.body}');
       }
@@ -228,7 +250,7 @@ class NorthboundApiClient {
       if (decoded is! Map) return const ApiResult.failure('Response is not a JSON object');
       return ApiResult.success(Map<String, dynamic>.from(decoded));
     } catch (e) {
-      return ApiResult.failure(e.toString());
+      return ApiResult.failure('Request failed after ${httpTimeout.inSeconds}s: $e');
     }
   }
 }

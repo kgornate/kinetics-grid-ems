@@ -17,7 +17,7 @@ class NorthboundDashboardApp extends StatefulWidget {
 }
 
 class _NorthboundDashboardAppState extends State<NorthboundDashboardApp> {
-  AppConfig config = AppConfig.localEth0;
+  ApiProfile activeProfile = ApiProfile.localEth0;
   late NorthboundApiClient apiClient;
   late TelemetryWsClient wsClient;
 
@@ -28,14 +28,18 @@ class _NorthboundDashboardAppState extends State<NorthboundDashboardApp> {
   }
 
   void _buildClients() {
-    apiClient = NorthboundApiClient(baseUrl: config.apiBaseUrl);
-    wsClient = TelemetryWsClient(wsUrl: config.wsUrl);
+    apiClient = NorthboundApiClient(
+      restBaseUrl: activeProfile.restBaseUrl,
+      logsBaseUrl: activeProfile.logsBaseUrl,
+      httpTimeout: activeProfile.httpTimeout,
+    );
+    wsClient = TelemetryWsClient(wsUrl: activeProfile.wsUrl);
   }
 
-  void updateConfig(String apiBaseUrl, String wsUrl) {
+  void updateProfile(ApiProfile profile) {
     final oldWsClient = wsClient;
     setState(() {
-      config = config.copyWith(apiBaseUrl: apiBaseUrl, wsUrl: wsUrl);
+      activeProfile = profile;
       _buildClients();
     });
     oldWsClient.dispose();
@@ -65,9 +69,8 @@ class _NorthboundDashboardAppState extends State<NorthboundDashboardApp> {
       home: DashboardScreen(
         apiClient: apiClient,
         wsClient: wsClient,
-        apiBaseUrl: config.apiBaseUrl,
-        wsUrl: config.wsUrl,
-        onConfigChanged: updateConfig,
+        activeProfile: activeProfile,
+        onProfileChanged: updateProfile,
       ),
     );
   }

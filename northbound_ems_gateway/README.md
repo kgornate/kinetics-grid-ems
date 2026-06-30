@@ -109,3 +109,13 @@ No control commands
 No PCS/BMS start-stop
 No charge/discharge writes
 ```
+
+
+## v0.5.1 hotfix
+
+- Hardens `/api/health` when storage count/status inspection hits a transient SQLite issue.
+- Makes `/api/assets` return `items`, `assets`, and `count` for frontend compatibility.
+- Adds Cloudflare-friendly asset detail options:
+  - `/api/assets/bms_1/telemetry?compact=true`
+  - `/api/assets/bms_1/telemetry?compact=true&page=1&page_size=100`
+  - `/api/assets/bms_1/telemetry?key_only=true`

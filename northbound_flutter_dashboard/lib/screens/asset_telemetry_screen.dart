@@ -3,9 +3,13 @@ import 'package:flutter/material.dart';
 import '../api/northbound_api_client.dart';
 import '../models/asset_summary.dart';
 import '../models/telemetry_signal.dart';
+import '../utils/asset_field_strategy.dart';
+import '../widgets/asset_group_section.dart';
+import '../widgets/io_status_grid.dart';
 import '../widgets/json_viewer.dart';
 import '../widgets/metric_card.dart';
-import '../widgets/signal_tile.dart';
+import '../widgets/operator_signal_table.dart';
+import '../widgets/signal_metric_card.dart';
 
 class AssetTelemetryScreen extends StatefulWidget {
   const AssetTelemetryScreen({super.key, required this.apiClient, required this.asset});
@@ -21,10 +25,15 @@ class _AssetTelemetryScreenState extends State<AssetTelemetryScreen> {
   Map<String, dynamic>? raw;
   List<TelemetrySignal> signals = [];
   String? selectedCategory;
+  String selectedView = 'operator';
   String search = '';
+  String qualityFilter = 'all';
+  bool faultAlarmOnly = false;
   String? error;
   bool loading = false;
   final searchController = TextEditingController();
+
+  late final AssetUiProfile profile = AssetFieldStrategy.forAsset(widget.asset.assetId);
 
   @override
   void initState() {
@@ -49,12 +58,19 @@ class _AssetTelemetryScreenState extends State<AssetTelemetryScreen> {
       loading = false;
       if (result.isSuccess) {
         raw = result.data;
-        final telemetry = result.data?['telemetry'] ?? result.data?['signals'] ?? result.data?['key_signals'];
+        final telemetry = result.data?['signals'] ?? result.data?['telemetry'] ?? result.data?['key_signals'];
         if (telemetry is Map) {
           signals = telemetry.entries
               .map((entry) => TelemetrySignal.fromEntry(entry.key.toString(), entry.value))
               .toList()
-            ..sort((a, b) => a.category == b.category ? a.displayName.compareTo(b.displayName) : a.category.compareTo(b.category));
+            ..sort((a, b) {
+              final c = a.category.compareTo(b.category);
+              if (c != 0) return c;
+              final aa = a.address ?? 99999999;
+              final bb = b.address ?? 99999999;
+              if (aa != bb) return aa.compareTo(bb);
+              return a.displayName.compareTo(b.displayName);
+            });
         } else {
           signals = [];
         }
@@ -66,8 +82,13 @@ class _AssetTelemetryScreenState extends State<AssetTelemetryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final categories = signals.map((s) => s.category).toSet().toList()..sort();
+    final allCategories = signals.map((s) => s.category).toSet().toList()..sort();
     final filtered = _filteredSignals();
+    final primary = profile.primarySignals(signals).where(_signalMatchesActiveFiltersExceptSearch).toList();
+    final grouped = profile.groupedSignals(filtered);
+    final faultSignals = signals.where(_isFaultAlarmSignal).toList();
+    final ioLikeSignals = widget.asset.assetId.contains('io') ? filtered : const <TelemetrySignal>[];
+
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.asset.displayName),
@@ -84,20 +105,49 @@ class _AssetTelemetryScreenState extends State<AssetTelemetryScreen> {
             const SizedBox(height: 12),
             if (loading) const LinearProgressIndicator(),
             if (error != null) Card(child: ListTile(leading: const Icon(Icons.error), title: Text(error!))),
-            _filterPanel(categories),
+            if (primary.isNotEmpty) ...[
+              _sectionHeader('Important operator values', '${primary.length} priority fields'),
+              const SizedBox(height: 8),
+              _signalCardGrid(primary.take(12).toList(), compact: true),
+              const SizedBox(height: 12),
+            ],
+            if (faultSignals.isNotEmpty) ...[
+              _faultAlarmPanel(faultSignals),
+              const SizedBox(height: 12),
+            ],
+            _filterPanel(allCategories),
             const SizedBox(height: 12),
             Row(
               children: [
-                Text('Telemetry Signals', style: Theme.of(context).textTheme.headlineSmall),
+                Text('Asset Data', style: Theme.of(context).textTheme.headlineSmall),
                 const SizedBox(width: 8),
                 Chip(label: Text('${filtered.length}/${signals.length} shown')),
+                const Spacer(),
+                SegmentedButton<String>(
+                  segments: const [
+                    ButtonSegment(value: 'operator', label: Text('Operator'), icon: Icon(Icons.dashboard_customize)),
+                    ButtonSegment(value: 'cards', label: Text('Cards'), icon: Icon(Icons.grid_view)),
+                    ButtonSegment(value: 'table', label: Text('Table'), icon: Icon(Icons.table_rows)),
+                  ],
+                  selected: {selectedView},
+                  onSelectionChanged: (v) => setState(() => selectedView = v.first),
+                ),
               ],
             ),
             const SizedBox(height: 8),
-            if (filtered.isEmpty)
-              const Card(child: ListTile(leading: Icon(Icons.search_off), title: Text('No matching signals')))
+            if (ioLikeSignals.isNotEmpty && selectedView == 'operator') ...[
+              Text('Digital I/O style view', style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 8),
+              IoStatusGrid(signals: ioLikeSignals),
+              const SizedBox(height: 12),
+            ],
+            if (selectedView == 'table')
+              OperatorSignalTable(signals: filtered)
+            else if (selectedView == 'cards')
+              _signalCardGrid(filtered)
             else
-              for (final signal in filtered) SignalTile(signal: signal),
+              for (var i = 0; i < grouped.length; i++)
+                AssetGroupSection(group: grouped[i], initiallyExpanded: i < 2),
             const SizedBox(height: 16),
             ExpansionTile(title: const Text('Raw asset payload'), children: [JsonViewer(data: raw ?? {})]),
           ],
@@ -107,30 +157,43 @@ class _AssetTelemetryScreenState extends State<AssetTelemetryScreen> {
   }
 
   Widget _assetHero() {
+    final color = widget.asset.online ? Colors.green : Colors.red;
     return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(18),
+      clipBehavior: Clip.antiAlias,
+      child: IntrinsicHeight(
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            CircleAvatar(
-              radius: 28,
-              backgroundColor: widget.asset.online ? Colors.green.withOpacity(0.14) : Colors.red.withOpacity(0.14),
-              foregroundColor: widget.asset.online ? Colors.green : Colors.red,
-              child: Icon(widget.asset.online ? Icons.check_circle : Icons.cancel, size: 30),
-            ),
-            const SizedBox(width: 16),
+            Container(width: 8, color: color),
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(widget.asset.displayName, style: Theme.of(context).textTheme.headlineSmall),
-                  const SizedBox(height: 4),
-                  SelectableText(widget.asset.assetId),
-                  if (widget.asset.description != null) Text(widget.asset.description!),
-                ],
+              child: Padding(
+                padding: const EdgeInsets.all(18),
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 30,
+                      backgroundColor: color.withOpacity(0.14),
+                      foregroundColor: color,
+                      child: Icon(profile.icon, size: 30),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(profile.title, style: Theme.of(context).textTheme.headlineSmall),
+                          const SizedBox(height: 4),
+                          SelectableText('${widget.asset.displayName} • ${widget.asset.assetId}'),
+                          const SizedBox(height: 6),
+                          Text(profile.operatorPurpose),
+                        ],
+                      ),
+                    ),
+                    Chip(label: Text(widget.asset.online ? 'ONLINE' : 'OFFLINE')),
+                  ],
+                ),
               ),
             ),
-            Chip(label: Text(widget.asset.online ? 'ONLINE' : 'OFFLINE')),
           ],
         ),
       ),
@@ -138,23 +201,25 @@ class _AssetTelemetryScreenState extends State<AssetTelemetryScreen> {
   }
 
   Widget _metricStrip() {
-    final good = signals.where((s) => s.quality.toLowerCase() == 'good').length;
-    final bad = signals.where((s) => s.quality.toLowerCase() != 'good').length;
-    final categories = signals.map((s) => s.category).toSet().length;
+    final good = signals.where((s) => s.isGood).length;
+    final bad = signals.length - good;
+    final cats = signals.map((s) => s.category).toSet().length;
+    final faults = signals.where(_isFaultAlarmSignal).length;
+    final cards = [
+      MetricCard(title: 'Configured Signals', value: widget.asset.signalCount.toString(), icon: Icons.sensors),
+      MetricCard(title: 'Loaded Fields', value: signals.length.toString(), icon: Icons.list_alt),
+      MetricCard(title: 'Categories', value: cats.toString(), icon: Icons.category),
+      MetricCard(title: 'Good / Bad', value: '$good / $bad', icon: Icons.health_and_safety, good: bad == 0),
+      MetricCard(title: 'Fault/Alarm Fields', value: faults.toString(), icon: Icons.warning_amber, good: faults == 0),
+    ];
     return LayoutBuilder(
       builder: (context, constraints) {
-        final cards = [
-          MetricCard(title: 'Configured Signals', value: widget.asset.signalCount.toString(), icon: Icons.sensors),
-          MetricCard(title: 'Loaded Signals', value: signals.length.toString(), icon: Icons.list_alt),
-          MetricCard(title: 'Good Quality', value: good.toString(), icon: Icons.check_circle, good: bad == 0),
-          MetricCard(title: 'Categories', value: categories.toString(), icon: Icons.category),
-        ];
-        final crossAxisCount = constraints.maxWidth > 1100 ? 4 : constraints.maxWidth > 760 ? 2 : 1;
+        final crossAxisCount = constraints.maxWidth > 1250 ? 5 : constraints.maxWidth > 920 ? 3 : constraints.maxWidth > 620 ? 2 : 1;
         return GridView.count(
           crossAxisCount: crossAxisCount,
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          childAspectRatio: constraints.maxWidth > 760 ? 3.1 : 4.5,
+          childAspectRatio: constraints.maxWidth > 620 ? 3.1 : 4.5,
           children: cards,
         );
       },
@@ -164,37 +229,47 @@ class _AssetTelemetryScreenState extends State<AssetTelemetryScreen> {
   Widget _filterPanel(List<String> categories) {
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Text('Field filters', style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 10),
             Wrap(
               spacing: 8,
               runSpacing: 8,
               children: [
-                ChoiceChip(
-                  label: const Text('All'),
-                  selected: selectedCategory == null,
-                  onSelected: (_) {
-                    setState(() => selectedCategory = null);
-                    refresh();
-                  },
-                ),
+                ChoiceChip(label: const Text('All categories'), selected: selectedCategory == null, onSelected: (_) { setState(() => selectedCategory = null); refresh(); }),
                 for (final c in categories)
-                  ChoiceChip(
-                    label: Text(c),
-                    selected: selectedCategory == c,
-                    onSelected: (_) {
-                      setState(() => selectedCategory = c);
-                      refresh();
-                    },
+                  ChoiceChip(label: Text(c), selected: selectedCategory == c, onSelected: (_) { setState(() => selectedCategory = c); refresh(); }),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 12,
+              runSpacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                SizedBox(
+                  width: 240,
+                  child: DropdownButtonFormField<String>(
+                    value: qualityFilter,
+                    decoration: const InputDecoration(labelText: 'Quality'),
+                    items: const [
+                      DropdownMenuItem(value: 'all', child: Text('All quality')),
+                      DropdownMenuItem(value: 'good', child: Text('Good only')),
+                      DropdownMenuItem(value: 'bad', child: Text('Bad / not-good only')),
+                    ],
+                    onChanged: (v) => setState(() => qualityFilter = v ?? 'all'),
                   ),
+                ),
+                FilterChip(label: const Text('Fault/alarm fields only'), selected: faultAlarmOnly, onSelected: (v) => setState(() => faultAlarmOnly = v)),
               ],
             ),
             const SizedBox(height: 10),
             TextField(
               controller: searchController,
-              decoration: const InputDecoration(prefixIcon: Icon(Icons.search), labelText: 'Search signal name, display name, category, or value'),
+              decoration: const InputDecoration(prefixIcon: Icon(Icons.search), labelText: 'Search field, value, category, quality, address, description'),
               onChanged: (value) => setState(() => search = value.trim().toLowerCase()),
             ),
           ],
@@ -203,11 +278,77 @@ class _AssetTelemetryScreenState extends State<AssetTelemetryScreen> {
     );
   }
 
+  Widget _faultAlarmPanel(List<TelemetrySignal> faultSignals) {
+    final active = faultSignals.where((s) => !s.isGood || _numericNonZero(s)).toList();
+    return Card(
+      child: ExpansionTile(
+        initiallyExpanded: active.isNotEmpty,
+        leading: Icon(active.isEmpty ? Icons.verified : Icons.warning_amber),
+        title: Text(active.isEmpty ? 'Fault/alarm fields present, no obvious active issue' : 'Fault/alarm attention fields'),
+        subtitle: Text('${faultSignals.length} fault/alarm-related fields, ${active.length} need attention'),
+        childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+        children: [
+          _signalCardGrid((active.isEmpty ? faultSignals : active).take(8).toList(), compact: true),
+        ],
+      ),
+    );
+  }
+
+  Widget _sectionHeader(String title, String subtitle) {
+    return Row(
+      children: [
+        Text(title, style: Theme.of(context).textTheme.titleLarge),
+        const SizedBox(width: 8),
+        Chip(label: Text(subtitle)),
+      ],
+    );
+  }
+
+  Widget _signalCardGrid(List<TelemetrySignal> data, {bool compact = false}) {
+    if (data.isEmpty) {
+      return const Card(child: ListTile(leading: Icon(Icons.search_off), title: Text('No matching fields')));
+    }
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        final crossAxisCount = width > 1380 ? 4 : width > 1000 ? 3 : width > 680 ? 2 : 1;
+        return GridView.count(
+          crossAxisCount: crossAxisCount,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          childAspectRatio: compact ? 2.1 : 1.65,
+          children: [for (final signal in data) SignalMetricCard(signal: signal, compact: compact)],
+        );
+      },
+    );
+  }
+
   List<TelemetrySignal> _filteredSignals() {
-    if (search.isEmpty) return signals;
     return signals.where((signal) {
-      final text = '${signal.name} ${signal.displayName} ${signal.category} ${signal.valueText} ${signal.quality}'.toLowerCase();
-      return text.contains(search);
+      if (!_signalMatchesActiveFiltersExceptSearch(signal)) return false;
+      final s = search.trim().toLowerCase();
+      if (s.isEmpty) return true;
+      final text = '${signal.name} ${signal.displayName} ${signal.category} ${signal.valueText} ${signal.quality} ${signal.address} ${signal.description ?? ''}'.toLowerCase();
+      return text.contains(s);
     }).toList();
+  }
+
+  bool _signalMatchesActiveFiltersExceptSearch(TelemetrySignal signal) {
+    if (selectedCategory != null && signal.category != selectedCategory) return false;
+    if (qualityFilter == 'good' && !signal.isGood) return false;
+    if (qualityFilter == 'bad' && signal.isGood) return false;
+    if (faultAlarmOnly && !_isFaultAlarmSignal(signal)) return false;
+    return true;
+  }
+
+  bool _isFaultAlarmSignal(TelemetrySignal signal) {
+    final text = '${signal.name} ${signal.displayName} ${signal.category} ${signal.description ?? ''}'.toLowerCase();
+    return text.contains('fault') || text.contains('alarm') || text.contains('warning') || text.contains('emergency') || signal.category.toLowerCase().contains('fault');
+  }
+
+  bool _numericNonZero(TelemetrySignal signal) {
+    final v = signal.value;
+    if (v is num) return v != 0;
+    return false;
   }
 }
