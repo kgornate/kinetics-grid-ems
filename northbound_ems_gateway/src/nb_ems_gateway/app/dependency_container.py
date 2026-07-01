@@ -10,13 +10,13 @@ from nb_ems_gateway.logging.event_logger import EventLogger
 from nb_ems_gateway.storage.sqlite_store import SQLiteStore
 @dataclass
 class DependencyContainer:
-    config: AppConfig; register_map: RegisterMap; asset_manager: AssetManager; storage: SQLiteStore|None; event_logger: EventLogger; health_engine: HealthEngine; alarm_engine: AlarmEngine; latest_poll_errors: list[str]; server_upload_service: Any|None=None
+    config: AppConfig; register_map: RegisterMap; asset_manager: AssetManager; storage: SQLiteStore|None; event_logger: EventLogger; health_engine: HealthEngine; alarm_engine: AlarmEngine; latest_poll_errors: list[str]; server_upload_service: Any|None=None; register_reader: Any|None=None
     @classmethod
     def create(cls, *, config: AppConfig, register_map: RegisterMap)->'DependencyContainer':
         storage=SQLiteStore(config.storage) if config.storage.enabled else None
         c=cls(config,register_map,AssetManager(register_map),storage,EventLogger(storage,config.logging.min_severity,config.logging.enabled),None,None,[]) # type: ignore
         c.health_engine=HealthEngine(c); c.alarm_engine=AlarmEngine(c)
-        c.event_logger.info('gateway_boot','NorthBound EMS Gateway booted',{'version':'0.6.0-auth','register_points':register_map.point_count,'commands_enabled':config.api.commands_enabled,'auth_enabled':config.auth.enabled},source='gateway')
+        c.event_logger.info('gateway_boot','NorthBound EMS Gateway booted',{'version':'0.7.0-ems-commands','register_points':register_map.point_count,'commands_enabled':config.api.commands_enabled,'auth_enabled':config.auth.enabled},source='gateway')
         if storage:
             h=storage.health(); c.event_logger.info('storage_health','Storage initialized',h,source='storage')
         return c

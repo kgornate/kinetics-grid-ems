@@ -224,3 +224,48 @@ To disable the NorthBound log section on login, edit `/etc/nb_ems_gateway.conf`:
 ```bash
 SHOW_NB_LOG_ON_LOGIN="0"
 ```
+
+
+PYTHONPATH=src python3 -m nb_ems_gateway.main --config configs/development.json --mock
+
+Yes, exactly.
+
+After the NorthBound Gateway is running as a systemd service, you can run:
+
+journalctl -u nb-ems-gateway.service -f
+
+and you will see the continuous live logs from the gateway, similar to what you see when you manually run:
+
+PYTHONPATH=src python3 -m nb_ems_gateway.main --config configs/development.json --mock
+
+The difference is only where the process is running.
+
+When you run manually, the Python process is attached directly to your terminal, so logs print there.
+
+When systemd runs it automatically after boot, the Python process runs in the background, so logs go into systemd journal. journalctl -u nb-ems-gateway.service -f attaches your terminal to that journal stream.
+
+So after boot, do this:
+
+systemctl status nb-ems-gateway.service --no-pager
+journalctl -u nb-ems-gateway.service -f
+
+You should see lines like:
+
+NorthBound EMS Gateway
+  mode: read_only
+  mock: True
+  EMS: 127.0.0.1:515, unit=1
+  register points: 1421
+  API: http://0.0.0.0:8000
+Polling scheduler started for groups: ['default', 'fast', 'slow']
+Uvicorn running on http://0.0.0.0:8000
+
+To stop watching logs, press:
+
+CTRL + C
+
+This will only stop the log viewing command. It will not stop the gateway service.
+
+To stop the actual gateway service, that would be:
+
+systemctl stop nb-ems-gateway.service

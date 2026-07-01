@@ -2,7 +2,7 @@
   "gateway": {
     "id": "northbound_ems_gateway_1",
     "name": "NorthBound EMS Gateway",
-    "mode": "read_only"
+    "mode": "ems_read_write"
   },
   "network": {
     "field_interface": "eth1",
@@ -36,7 +36,7 @@
   "api": {
     "host": "0.0.0.0",
     "port": 8000,
-    "commands_enabled": false
+    "commands_enabled": true
   },
   "logs_api": {
     "enabled": true,

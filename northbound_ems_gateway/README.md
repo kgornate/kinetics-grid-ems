@@ -225,3 +225,45 @@ PYTHONPATH=src python3 tools/generate_password_hash.py
 ```
 
 Then replace the corresponding `auth.users[].password_hash` value in the selected config JSON. Also change `auth.jwt_secret` or set `NB_EMS_JWT_SECRET` in the service environment before deployment.
+
+## v0.7 EMS command/write update
+
+v0.7 adds controlled Modbus write exposure only for the EMS asset command/register area.
+
+### Scope
+
+```text
+Allowed asset: ems_system
+Allowed registers: R/W = 1 in china_ems_northbound_v1.json
+Allowed role: internal_admin only
+Customer role: read-only dashboard/API access, no command APIs
+```
+
+The current register map contains 93 EMS writable/register command points. These are exposed for commissioning through authenticated HTTP APIs and can be used by the Flutter internal command panel.
+
+### Command APIs
+
+```text
+GET  /api/commands/ems/registers
+POST /api/commands/ems/write
+POST /api/commands/ems/batch
+```
+
+Example write:
+
+```bash
+curl -X POST http://192.168.10.2:8000/api/commands/ems/write \
+  -H "Authorization: Bearer <internal_admin_token>" \
+  -H "Content-Type: application/json" \
+  -d '{"signal_name":"remote_mode","value":1,"readback":true,"note":"commissioning test"}'
+```
+
+The gateway applies inverse scaling before writing. For normal values, the HTTP payload should use the engineering value shown to the operator. After write, the gateway can read back the same register and returns raw registers, decoded readback value, register address, point id, and audit user.
+
+### Safety and audit
+
+- API writes are blocked unless `api.commands_enabled=true`.
+- Backend hard-filters to `asset_id=ems_system` and `rw=1`.
+- Customer users receive `403 Forbidden` for all EMS command APIs.
+- Successful and failed writes are logged as gateway events: `ems_command_write_success` / `ems_command_write_failed`.
+- Non-EMS assets such as BMS, PCS, cooling, fire, meter and I/O remain read-only through this command API.
