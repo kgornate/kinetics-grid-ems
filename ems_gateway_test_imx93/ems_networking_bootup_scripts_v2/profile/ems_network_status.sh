@@ -1,5 +1,5 @@
 #!/bin/sh
-# Show EMS network status after interactive login.
+# Show EMS gateway status after interactive login.
 case "$-" in
     *i*) ;;
     *) return 0 2>/dev/null || exit 0 ;;
@@ -8,53 +8,61 @@ esac
 CONFIG_FILE="/etc/ems_network.conf"
 [ -f "$CONFIG_FILE" ] && . "$CONFIG_FILE"
 
-echo ""
-echo "======================================"
-echo "EMS Gateway Network Status"
-echo "======================================"
+SHOW_NB_LOG_ON_LOGIN="${SHOW_NB_LOG_ON_LOGIN:-1}"
+
+printf '\n'
+printf '======================================\n'
+printf 'EMS Gateway Network Status\n'
+printf '======================================\n'
 
 if systemctl is-active ems-network-setup.service >/dev/null 2>&1; then
-    echo "Network service : ACTIVE"
+    printf 'Network service : ACTIVE\n'
 else
-    echo "Network service : NOT ACTIVE"
+    printf 'Network service : NOT ACTIVE\n'
 fi
 
 if systemctl is-active cloudflared >/dev/null 2>&1; then
-    echo "Cloudflare      : ACTIVE"
+    printf 'Cloudflare      : ACTIVE\n'
 else
-    echo "Cloudflare      : NOT ACTIVE"
+    printf 'Cloudflare      : NOT ACTIVE\n'
 fi
 
-echo ""
-echo "[Interface roles]"
-echo "eth1  : field-side Chinese EMS / external PCS"
-echo "eth0  : local PC/Flutter or LAN Ethernet internet"
-echo "mlan0 : Wi-Fi internet"
+if systemctl is-active nb-ems-gateway.service >/dev/null 2>&1; then
+    printf 'NorthBound GW   : ACTIVE\n'
+else
+    printf 'NorthBound GW   : NOT ACTIVE\n'
+fi
 
-echo ""
-echo "[Interfaces]"
+printf '\n[Interface roles]\n'
+printf 'eth1  : field-side Chinese EMS / external PCS\n'
+printf 'eth0  : local PC/Flutter or LAN Ethernet internet\n'
+printf 'mlan0 : Wi-Fi internet\n'
+
+printf '\n[Interfaces]\n'
 ip -br addr show eth0 2>/dev/null || true
 ip -br addr show eth1 2>/dev/null || true
 ip -br addr show mlan0 2>/dev/null || true
 
-echo ""
-echo "[Internet route used by Cloudflare]"
+printf '\n[Internet route used by Cloudflare]\n'
 ip route get 1.1.1.1 2>/dev/null || true
 
-echo ""
-echo "[Field target routes]"
+printf '\n[Field target routes]\n'
 for TARGET in ${FIELD_TARGET_IPS:-192.168.1.100 192.168.1.200}; do
     ip route get "$TARGET" 2>/dev/null || true
 done
 
-echo ""
-echo "[Local API checks]"
+printf '\n[Local API checks]\n'
 for PORT in ${LOCAL_API_PORT:-8000} ${LOCAL_LOGS_PORT:-7000}; do
     CODE="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 2 "http://127.0.0.1:$PORT/api/health" 2>/dev/null || echo 000)"
-    echo "127.0.0.1:$PORT /api/health -> HTTP $CODE"
+    printf '127.0.0.1:%s /api/health -> HTTP %s\n' "$PORT" "$CODE"
 done
 
-echo ""
-echo "Full network log: cat /var/log/ems_network_setup.log"
-echo "======================================"
-echo ""
+printf '\nFull network log      : cat /var/log/ems_network_setup.log\n'
+printf 'NorthBound start log  : cat /var/log/nb_ems_gateway_start.log\n'
+printf 'NorthBound live logs  : journalctl -u nb-ems-gateway.service -f\n'
+printf '======================================\n'
+
+# Print NorthBound details after login, similar to the network status banner.
+if [ "$SHOW_NB_LOG_ON_LOGIN" = "1" ] && [ -x /root/kinetics-grid-ems/ems_network_bootup/nb_ems_gateway_status.sh ]; then
+    /root/kinetics-grid-ems/ems_network_bootup/nb_ems_gateway_status.sh
+fi
