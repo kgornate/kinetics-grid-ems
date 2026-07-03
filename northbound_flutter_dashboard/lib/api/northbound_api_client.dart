@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 
 import '../models/alarm_record.dart';
 import '../models/auth_session.dart';
+import '../models/ems_command_register.dart';
 import '../models/api_result.dart';
 import '../models/asset_summary.dart';
 import '../models/log_filter_options.dart';
@@ -279,6 +280,48 @@ class NorthboundApiClient {
 
   String logExportUrl(LogQuery query) => urlFor('/api/logs/export.csv', query.toQuery(includeLimit: false));
 
+
+
+  Future<ApiResult<List<EmsCommandRegister>>> getEmsCommandRegisters() async {
+    final result = await _getJson('/api/commands/ems/registers');
+    if (!result.isSuccess) return ApiResult.failure(result.error ?? 'Failed to read EMS command registers');
+    final rawItems = result.data?['items'];
+    if (rawItems is! List) return const ApiResult.failure('Invalid EMS command register response: missing items list');
+    return ApiResult.success(
+      rawItems.whereType<Map>().map((item) => EmsCommandRegister.fromJson(Map<String, dynamic>.from(item))).toList(),
+    );
+  }
+
+  Future<ApiResult<Map<String, dynamic>>> writeEmsCommand({
+    required String signalName,
+    required double value,
+    bool readback = true,
+    String? note,
+  }) async {
+    try {
+      final uri = _uri('/api/commands/ems/write');
+      final body = <String, dynamic>{
+        'signal_name': signalName,
+        'value': value,
+        'readback': readback,
+        if (note != null && note.trim().isNotEmpty) 'note': note.trim(),
+      };
+      final response = await http.post(uri, headers: _jsonHeaders(), body: jsonEncode(body)).timeout(httpTimeout);
+      if (response.statusCode == 401) {
+        onUnauthorized?.call();
+        return ApiResult.failure('Unauthorized. Please login again.');
+      }
+      if (response.statusCode == 403) return ApiResult.failure('Forbidden for current login role or command APIs are disabled.');
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        return ApiResult.failure('HTTP ${response.statusCode}: ${response.body}');
+      }
+      final decoded = jsonDecode(response.body);
+      if (decoded is! Map) return const ApiResult.failure('Response is not a JSON object');
+      return ApiResult.success(Map<String, dynamic>.from(decoded));
+    } catch (e) {
+      return ApiResult.failure('EMS command write failed after ${httpTimeout.inSeconds}s: $e');
+    }
+  }
 
   Future<ApiResult<Map<String, dynamic>>> getRuntimeConfig() async => _getJson('/api/config/runtime');
 

@@ -16,6 +16,7 @@ import '../widgets/status_chip.dart';
 import 'alarms_screen.dart';
 import 'asset_telemetry_screen.dart';
 import 'logs_screen.dart';
+import 'ems_command_panel_screen.dart';
 import 'settings_screen.dart';
 import 'storage_screen.dart';
 
@@ -176,6 +177,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
             icon: const Icon(Icons.link),
             onPressed: () => _connectWebSocket(resetCounter: true),
           ),
+
+          if (widget.authSession.isInternalAdmin)
+            IconButton(
+              tooltip: 'EMS Command Panel',
+              icon: const Icon(Icons.tune),
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => EmsCommandPanelScreen(apiClient: widget.apiClient, authSession: widget.authSession)),
+              ),
+            ),
           IconButton(
             tooltip: 'Logs & Filters',
             icon: const Icon(Icons.article_outlined),
@@ -239,7 +249,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               runSpacing: 8,
               children: [
                 StatusChip(label: good ? 'Gateway OK' : 'Check gateway', good: good),
-                const StatusChip(label: 'Read-only', good: true),
+                StatusChip(label: widget.authSession.isInternalAdmin ? 'EMS write: internal' : 'Read-only', good: true),
                 StatusChip(
                   label: 'WS $wsStatus: $wsFrames',
                   good: wsStatus == 'connected' && wsFrames > 0,
