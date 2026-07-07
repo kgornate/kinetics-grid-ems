@@ -223,42 +223,19 @@ internal_admin
 
 The Flutter UI uses the returned token for dashboard, asset details, alarms, logs, storage/historian, runtime config helper APIs, and WebSocket connection. If the gateway returns `401 Unauthorized`, the app returns to the login page.
 
-## v1.0 EMS Command Panel update
 
-v1.0 adds an internal-only EMS Command Panel for the NorthBound Gateway EMS write APIs.
+## v1.0 multi-source control update
 
-Visible only when logged in as:
+This build supports the updated Northbound EMS Gateway backend with two independent Chinese EMS/BESS sources:
 
-```text
-internal_admin
+- `external_ems_1` at `192.168.100.151:502`
+- `external_ems_2` at `192.168.100.153:502`
+
+The dashboard now groups assets by source and adds internal-only screens for high-level control and raw EMS command register writes. Customer logins remain read-only.
+
+Run after unzipping:
+
+```bash
+flutter pub get
+flutter run -d windows
 ```
-
-Hidden for:
-
-```text
-customer_admin
-```
-
-The panel reads:
-
-```text
-GET /api/commands/ems/registers
-```
-
-and writes:
-
-```text
-POST /api/commands/ems/write
-```
-
-The UI supports:
-
-- list/search/filter of all EMS writable registers
-- register address, signal name, category, description and latest value display
-- numeric value entry
-- optional operator note
-- confirm-before-write dialog
-- optional readback after write
-- raw API response display for commissioning/debugging
-
-The backend still enforces the real security boundary. Even if the UI is modified, customer tokens cannot call the command APIs.

@@ -33,14 +33,27 @@ class NetworkConfig(BaseModel):
 class ExistingEMSConfig(BaseModel):
     protocol: str = "modbus_tcp"
     host: str = "127.0.0.1"
-    port: int = 515
+    port: int = 502
     unit_id: int = 1
     register_function: str = "holding_registers"
     timeout_sec: float = 2.0
     retries: int = 2
 
+class ExternalEMSUnitConfig(BaseModel):
+    source_id: str
+    display_name: str
+    host: str
+    port: int = 502
+    unit_id: int = 1
+    interface: str = "eth1"
+    protocol: str = "modbus_tcp"
+    register_function: str = "holding_registers"
+    timeout_sec: float = 2.0
+    retries: int = 2
+    enabled: bool = True
+
 class RegisterMapConfig(BaseModel):
-    path: str = "data/register_maps/china_ems_northbound_v1.json"
+    path: str = "data/register_maps/unity261pv_modbus_north_v1.json"
 
 class DecodingConfig(BaseModel):
     data_type: str = "float32"
@@ -106,10 +119,26 @@ class LoggingConfig(BaseModel):
     retention_days: int = 30
     export_max_rows: int = 5000
 
+class VoltageStabilizationConfig(BaseModel):
+    sample_interval_sec: float = 1.0
+    stable_window_sec: float = 10.0
+    tolerance_percent: float = 5.0
+    phase_imbalance_tolerance_percent: float = 5.0
+    timeout_sec: float = 60.0
+    minimum_valid_voltage: float = 10.0
+
+class ControlConfig(BaseModel):
+    enabled: bool = True
+    default_timeout_sec: float = 60.0
+    off_grid_inter_source_delay_sec: float = 0.0
+    use_mode_precondition_writes: bool = False
+    voltage_stabilization: VoltageStabilizationConfig = Field(default_factory=VoltageStabilizationConfig)
+
 class AppConfig(BaseModel):
     gateway: GatewayConfig = Field(default_factory=GatewayConfig)
     network: NetworkConfig = Field(default_factory=NetworkConfig)
     existing_ems: ExistingEMSConfig = Field(default_factory=ExistingEMSConfig)
+    external_ems_units: list[ExternalEMSUnitConfig] = Field(default_factory=list)
     register_map: RegisterMapConfig = Field(default_factory=RegisterMapConfig)
     decoding: DecodingConfig = Field(default_factory=DecodingConfig)
     polling: PollingConfig = Field(default_factory=PollingConfig)
@@ -119,3 +148,21 @@ class AppConfig(BaseModel):
     server_upload: ServerUploadConfig = Field(default_factory=ServerUploadConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
     auth: AuthConfig = Field(default_factory=AuthConfig)
+    control: ControlConfig = Field(default_factory=ControlConfig)
+
+    def active_external_sources(self) -> list[ExternalEMSUnitConfig]:
+        units = [u for u in self.external_ems_units if u.enabled]
+        if units:
+            return units
+        return [ExternalEMSUnitConfig(
+            source_id="existing_ems",
+            display_name="Existing EMS",
+            host=self.existing_ems.host,
+            port=self.existing_ems.port,
+            unit_id=self.existing_ems.unit_id,
+            interface=self.network.field_interface,
+            protocol=self.existing_ems.protocol,
+            register_function=self.existing_ems.register_function,
+            timeout_sec=self.existing_ems.timeout_sec,
+            retries=self.existing_ems.retries,
+        )]

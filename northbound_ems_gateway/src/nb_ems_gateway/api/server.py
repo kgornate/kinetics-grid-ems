@@ -14,12 +14,14 @@ from .routes_storage import router as storage_router
 from .routes_registers import router as registers_router
 from .routes_server_upload import router as server_upload_router
 from .routes_logs import router as logs_router
+from .routes_sources import router as sources_router
 from .routes_commands import router as commands_router
+from .routes_control import router as control_router
 from .routes_ws import router as ws_router
 
 
 def create_app(container) -> FastAPI:
-    app = FastAPI(title='NorthBound EMS Gateway', version='0.7.0-ems-commands')
+    app = FastAPI(title='NorthBound EMS Gateway', version='0.8.0-multi-source-control')
     app.state.container = container
 
     # The Flutter dashboard and the IT team's web client may be served from a
@@ -61,7 +63,9 @@ def create_app(container) -> FastAPI:
         server_upload_router,
         logs_router,
         config_router,
+        sources_router,
         commands_router,
+        control_router,
     ]:
         app.include_router(r, dependencies=protected_dependencies)
     app.include_router(ws_router)

@@ -77,6 +77,7 @@ class AssetCard extends StatelessWidget {
                       children: [
                         _MiniBadge(label: 'Signals ${asset.signalCount}'),
                         _MiniBadge(label: 'Bad ${asset.badSignalCount}', isWarning: asset.badSignalCount > 0),
+                        if (asset.sourceId != null) _MiniBadge(label: asset.sourceId!),
                         if (asset.lastUpdateUtc != null) _MiniBadge(label: 'Updated ${_shortTime(asset.lastUpdateUtc!)}'),
                       ],
                     ),

@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Request, HTTPException
 router=APIRouter()
 @router.get('/api/assets')
-def assets(request: Request)->dict:
-    items=request.app.state.container.asset_manager.asset_list()
-    return {'items':items,'assets':items,'count':len(items)}
+def assets(request: Request, source_id: str|None=None)->dict:
+    items=request.app.state.container.asset_manager.asset_list(source_id=source_id)
+    return {'items':items,'assets':items,'count':len(items),'source_id':source_id}
 @router.get('/api/assets/{asset_id}')
 def asset(request: Request, asset_id: str)->dict:
     s=request.app.state.container.asset_manager.snapshot(asset_id=asset_id)
@@ -16,7 +16,6 @@ def asset_telemetry(request: Request, asset_id: str, category: str|None=None, ke
     asset=s[asset_id]
     signals=asset.get('signals',{}) or {}
     total=len(signals)
-    # compact=true removes heavy raw_registers/description fields and is recommended for Cloudflare Flutter detail pages.
     if compact:
         signals={k:{kk:vv for kk,vv in v.items() if kk not in ['raw_registers','description']} for k,v in signals.items()}
         asset['signals']=signals

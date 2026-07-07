@@ -9,14 +9,16 @@ import '../models/asset_summary.dart';
 import '../models/auth_session.dart';
 import '../models/signal_preview.dart';
 import '../models/storage_status.dart';
+import '../models/source_summary.dart';
 import '../utils/key_signal_parser.dart';
 import '../widgets/asset_card.dart';
 import '../widgets/json_viewer.dart';
 import '../widgets/status_chip.dart';
 import 'alarms_screen.dart';
 import 'asset_telemetry_screen.dart';
+import 'control_panel_screen.dart';
+import 'command_registers_screen.dart';
 import 'logs_screen.dart';
-import 'ems_command_panel_screen.dart';
 import 'settings_screen.dart';
 import 'storage_screen.dart';
 
@@ -47,6 +49,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Map<String, dynamic>? keySignals;
   Map<String, List<SignalPreview>> keySignalsByAsset = const {};
   List<AssetSummary> assets = [];
+  List<SourceSummary> sources = [];
   int alarmCount = 0;
   StorageStatus? storageStatus;
   String? error;
@@ -92,6 +95,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     });
     final healthResult = await widget.apiClient.getHealth();
     final assetResult = await widget.apiClient.getAssets();
+    final sourceResult = await widget.apiClient.getSourceSummary();
     final keyResult = await widget.apiClient.getKeySignals();
     final alarmResult = await widget.apiClient.getAlarms();
     final storageResult = await widget.apiClient.getStorageStatus();
@@ -101,6 +105,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       loading = false;
       if (healthResult.isSuccess) health = healthResult.data;
       if (assetResult.isSuccess) assets = assetResult.data ?? [];
+      if (sourceResult.isSuccess) sources = sourceResult.data ?? [];
       if (keyResult.isSuccess) {
         keySignals = keyResult.data;
         final parsed = KeySignalParser.byAsset(keyResult.data);
@@ -108,7 +113,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       }
       if (alarmResult.isSuccess) alarmCount = alarmResult.data?.length ?? 0;
       if (storageResult.isSuccess) storageStatus = storageResult.data;
-      error = healthResult.error ?? assetResult.error ?? keyResult.error ?? alarmResult.error ?? storageResult.error;
+      error = healthResult.error ?? sourceResult.error ?? assetResult.error ?? keyResult.error ?? alarmResult.error ?? storageResult.error;
     });
   }
 
@@ -177,13 +182,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
             icon: const Icon(Icons.link),
             onPressed: () => _connectWebSocket(resetCounter: true),
           ),
-
           if (widget.authSession.isInternalAdmin)
             IconButton(
-              tooltip: 'EMS Command Panel',
+              tooltip: 'Control Panel',
               icon: const Icon(Icons.tune),
               onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => EmsCommandPanelScreen(apiClient: widget.apiClient, authSession: widget.authSession)),
+                MaterialPageRoute(builder: (_) => ControlPanelScreen(apiClient: widget.apiClient)),
+              ),
+            ),
+          if (widget.authSession.isInternalAdmin)
+            IconButton(
+              tooltip: 'EMS Command Registers',
+              icon: const Icon(Icons.edit_note),
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => CommandRegistersScreen(apiClient: widget.apiClient)),
               ),
             ),
           IconButton(
@@ -249,12 +261,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
               runSpacing: 8,
               children: [
                 StatusChip(label: good ? 'Gateway OK' : 'Check gateway', good: good),
-                StatusChip(label: widget.authSession.isInternalAdmin ? 'EMS write: internal' : 'Read-only', good: true),
+                const StatusChip(label: 'Read-only', good: true),
                 StatusChip(
                   label: 'WS $wsStatus: $wsFrames',
                   good: wsStatus == 'connected' && wsFrames > 0,
                   icon: _wsIcon(),
                 ),
+                StatusChip(label: 'Sources: ${sources.length}', good: sources.isEmpty ? true : sources.every((s) => s.online)),
                 StatusChip(label: 'Alarms: $alarmCount', good: alarmCount == 0),
                 StatusChip(label: _storageLabel(), good: storageStatus?.canWrite == true, icon: Icons.storage),
                 Chip(label: Text(_connectionLabel(widget.activeProfile))),
@@ -277,38 +290,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             _healthPanel(),
             const SizedBox(height: 16),
-            Row(
-              children: [
-                Text('Assets', style: Theme.of(context).textTheme.headlineSmall),
-                const SizedBox(width: 8),
-                Chip(label: Text('${assets.length} cards')),
-              ],
-            ),
-            const SizedBox(height: 8),
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final width = constraints.maxWidth;
-                final crossAxisCount = width > 1320 ? 4 : width > 920 ? 3 : width > 620 ? 2 : 1;
-                return GridView.count(
-                  crossAxisCount: crossAxisCount,
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  childAspectRatio: width > 620 ? 1.35 : 1.65,
-                  children: [
-                    for (final asset in assets)
-                      AssetCard(
-                        asset: asset,
-                        previewSignals: _previewSignalsFor(asset),
-                        onTap: () => Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => AssetTelemetryScreen(apiClient: widget.apiClient, asset: asset),
-                          ),
-                        ),
-                      ),
-                  ],
-                );
-              },
-            ),
+            _sourcesPanel(),
+            const SizedBox(height: 16),
+            _assetsBySourcePanel(),
             const SizedBox(height: 16),
             ExpansionTile(
               title: const Text('Raw key-signal / WebSocket payload'),
@@ -341,6 +325,134 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return asset.keySignals.entries.map((entry) => SignalPreview.fromEntry(entry.key.toString(), entry.value)).toList();
   }
 
+
+  Widget _sourcesPanel() {
+    if (sources.isEmpty) return const SizedBox.shrink();
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Text('External EMS Sources', style: Theme.of(context).textTheme.titleLarge),
+                const SizedBox(width: 8),
+                Chip(label: Text('${sources.length} sources')),
+              ],
+            ),
+            const SizedBox(height: 12),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final crossAxisCount = constraints.maxWidth > 900 ? 2 : 1;
+                return GridView.count(
+                  crossAxisCount: crossAxisCount,
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  childAspectRatio: constraints.maxWidth > 900 ? 4.2 : 4.6,
+                  children: [for (final source in sources) _sourceTile(source)],
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _sourceTile(SourceSummary source) {
+    final color = source.online && source.badSignalCount == 0 ? Colors.green : Colors.orange;
+    return Card(
+      elevation: 0,
+      color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.35),
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: color.withOpacity(0.14),
+          foregroundColor: color,
+          child: const Icon(Icons.dns),
+        ),
+        title: Text(source.displayName),
+        subtitle: Text('${source.sourceId} • ${source.host}:${source.port}\nAssets ${source.onlineAssetCount}/${source.assetCount}, signals ${source.signalCount}, bad ${source.badSignalCount}'),
+        isThreeLine: true,
+        trailing: Chip(label: Text(source.online ? 'ONLINE' : 'OFFLINE')),
+      ),
+    );
+  }
+
+  Widget _assetsBySourcePanel() {
+    final bySource = <String, List<AssetSummary>>{};
+    for (final asset in assets) {
+      bySource.putIfAbsent(asset.effectiveSourceId, () => []).add(asset);
+    }
+    final order = sources.map((s) => s.sourceId).toList();
+    for (final sourceId in bySource.keys) {
+      if (!order.contains(sourceId)) order.add(sourceId);
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text('Assets', style: Theme.of(context).textTheme.headlineSmall),
+            const SizedBox(width: 8),
+            Chip(label: Text('${assets.length} cards')),
+          ],
+        ),
+        const SizedBox(height: 8),
+        for (final sourceId in order)
+          if ((bySource[sourceId] ?? const <AssetSummary>[]).isNotEmpty) ...[
+            _assetSourceSection(sourceId, bySource[sourceId]!),
+            const SizedBox(height: 12),
+          ],
+      ],
+    );
+  }
+
+  Widget _assetSourceSection(String sourceId, List<AssetSummary> sourceAssets) {
+    final source = _sourceFor(sourceId);
+    final title = source?.displayName ?? sourceId;
+    return Card(
+      child: ExpansionTile(
+        initiallyExpanded: true,
+        leading: const Icon(Icons.account_tree),
+        title: Text(title),
+        subtitle: Text('${sourceAssets.length} assets • ${source?.host ?? sourceId}'),
+        childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+        children: [
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final width = constraints.maxWidth;
+              final crossAxisCount = width > 1320 ? 4 : width > 920 ? 3 : width > 620 ? 2 : 1;
+              return GridView.count(
+                crossAxisCount: crossAxisCount,
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                childAspectRatio: width > 620 ? 1.35 : 1.65,
+                children: [
+                  for (final asset in sourceAssets)
+                    AssetCard(
+                      asset: asset,
+                      previewSignals: _previewSignalsFor(asset),
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => AssetTelemetryScreen(apiClient: widget.apiClient, asset: asset)),
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  SourceSummary? _sourceFor(String sourceId) {
+    for (final source in sources) {
+      if (source.sourceId == sourceId) return source;
+    }
+    return null;
+  }
+
   Widget _healthPanel() {
     if (health == null) return const Card(child: ListTile(title: Text('No health data yet')));
     return Card(
@@ -356,6 +468,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               runSpacing: 8,
               children: [
                 Text('Mode: ${health!['gateway_mode']}'),
+                Text('Sources: ${health!['source_count'] ?? sources.length}'),
                 Text('Assets: ${health!['online_asset_count']}/${health!['asset_count']} online'),
                 Text('Signals: ${health!['total_signal_count']}'),
                 Text('Bad: ${health!['bad_signal_count']}'),

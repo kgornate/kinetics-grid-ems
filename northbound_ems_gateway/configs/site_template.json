@@ -10,15 +10,15 @@
   },
   "existing_ems": {
     "protocol": "modbus_tcp",
-    "host": "127.0.0.1",
-    "port": 515,
+    "host": "192.168.100.151",
+    "port": 502,
     "unit_id": 1,
     "register_function": "holding_registers",
     "timeout_sec": 2.0,
     "retries": 2
   },
   "register_map": {
-    "path": "data/register_maps/china_ems_northbound_v1.json"
+    "path": "data/register_maps/unity261pv_modbus_north_v1.json"
   },
   "decoding": {
     "data_type": "float32",
@@ -105,5 +105,47 @@
         "enabled": true
       }
     ]
+  },
+  "external_ems_units": [
+    {
+      "source_id": "external_ems_1",
+      "display_name": "Chinese EMS 1",
+      "host": "192.168.100.151",
+      "port": 502,
+      "unit_id": 1,
+      "interface": "eth1",
+      "protocol": "modbus_tcp",
+      "register_function": "holding_registers",
+      "timeout_sec": 2.0,
+      "retries": 2,
+      "enabled": true
+    },
+    {
+      "source_id": "external_ems_2",
+      "display_name": "Chinese EMS 2",
+      "host": "192.168.100.153",
+      "port": 502,
+      "unit_id": 1,
+      "interface": "eth1",
+      "protocol": "modbus_tcp",
+      "register_function": "holding_registers",
+      "timeout_sec": 2.0,
+      "retries": 2,
+      "enabled": true
+    }
+  ],
+  "control": {
+    "enabled": true,
+    "default_timeout_sec": 60.0,
+    "off_grid_inter_source_delay_sec": 0.0,
+    "use_mode_precondition_writes": false,
+    "voltage_stabilization": {
+      "sample_interval_sec": 1.0,
+      "stable_window_sec": 10.0,
+      "tolerance_percent": 5.0,
+      "phase_imbalance_tolerance_percent": 5.0,
+      "timeout_sec": 60.0,
+      "minimum_valid_voltage": 10.0
+    }
   }
 }

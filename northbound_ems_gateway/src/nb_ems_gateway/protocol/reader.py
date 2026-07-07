@@ -1,66 +1,106 @@
 from __future__ import annotations
-
 import math
 import random
 import time
-from typing import Protocol
+from typing import Protocol, Any
 
-from nb_ems_gateway.decoding.float_codec import encode_float32
 from nb_ems_gateway.dictionary.register_map import RegisterPoint
-
+from nb_ems_gateway.decoding.float_codec import decode_float32, encode_float32
 
 class RegisterReader(Protocol):
     def read_point(self, point: RegisterPoint) -> list[int]: ...
-    def write_point(self, point: RegisterPoint, registers: list[int]) -> None: ...
+    def write_point(self, point: RegisterPoint, value: float) -> list[int]: ...
+    def read_value(self, point: RegisterPoint, byte_order: str='ABCD') -> float: ...
+    def write_value(self, point: RegisterPoint, value: float, byte_order: str='ABCD') -> float: ...
     def close(self) -> None: ...
 
-
 class MockRegisterReader:
-    def __init__(self, byte_order: str = 'ABCD') -> None:
+    def __init__(self, byte_order: str='ABCD', source_id: str='mock') -> None:
         self.byte_order = byte_order
+        self.source_id = source_id
         self.started = time.time()
-        self._written_registers: dict[int, list[int]] = {}
+        self.values: dict[int, float] = {
+            4: 1.0,
+            10: 0.0,
+            12: 2.0,
+            20: 2.0,
+            22: 1.0,
+            40: 2.0,
+            42: 0.0,
+            44: 0.0,
+            146: 0.0,
+            164: 0.0,
+            180: 1.0,
+            346: 230.0,
+            348: 230.0,
+            350: 230.0,
+        }
 
     def read_point(self, point: RegisterPoint) -> list[int]:
-        if point.address in self._written_registers:
-            return list(self._written_registers[point.address])
-
-        t = time.time() - self.started
-        name = (point.point_name + ' ' + point.category).lower()
-        if 'soc' in name:
-            v = 55 + 5 * math.sin(t / 60)
-        elif 'soh' in name:
-            v = 98
-        elif 'voltage' in name:
-            v = 720 + 3 * math.sin(t / 30)
-        elif 'current' in name:
-            v = 12 * math.sin(t / 10)
-        elif 'power' in name:
-            v = 50 * math.sin(t / 20)
-        elif 'temp' in name:
-            v = 28 + 2 * math.sin(t / 45)
-        elif 'fault' in name or 'alarm' in name:
-            v = 0
-        elif 'status' in name or 'mode' in name or 'enable' in name:
-            v = 1
+        if point.address in self.values:
+            v = self.values[point.address]
         else:
-            v = float((point.address % 100) + random.random() * 0.01)
+            t = time.time() - self.started
+            name = (point.point_name + ' ' + point.category).lower()
+            if 'soc' in name:
+                v = 55 + 5 * math.sin(t / 60)
+            elif 'soh' in name:
+                v = 98
+            elif 'phase' in name and 'voltage' in name:
+                v = 230 + 0.5 * math.sin(t / 10)
+            elif 'voltage' in name:
+                v = 720 + 3 * math.sin(t / 30)
+            elif 'current' in name:
+                v = 12 * math.sin(t / 10)
+            elif 'power' in name:
+                v = 50 * math.sin(t / 20)
+            elif 'temp' in name:
+                v = 28 + 2 * math.sin(t / 45)
+            elif 'fault' in name or 'alarm' in name:
+                v = 0
+            elif 'status' in name or 'mode' in name or 'enable' in name:
+                v = 1
+            else:
+                v = float((point.address % 100) + random.random() * 0.01)
         return encode_float32(v, self.byte_order)
 
-    def write_point(self, point: RegisterPoint, registers: list[int]) -> None:
-        if len(registers) != point.register_qty:
-            raise ValueError(f'Expected {point.register_qty} registers for {point.signal_name}, got {len(registers)}')
-        self._written_registers[point.address] = list(registers)
+    def write_point(self, point: RegisterPoint, value: float) -> list[int]:
+        self.values[point.address] = float(value)
+        # Simulate vendor control behavior for command-line/mock testing.
+        if point.address == 164:
+            if int(value) == 1:
+                self.values[180] = 1.0
+            elif int(value) == 2:
+                self.values[180] = 0.0
+            self.values[164] = 0.0
+        elif point.address == 42:
+            self.values[146] = 2.0 if float(value) > 0 else 0.0
+            self.values[44] = 0.0 if float(value) > 0 else self.values.get(44, 0.0)
+        elif point.address == 44:
+            self.values[146] = 1.0 if float(value) > 0 else 0.0
+            self.values[42] = 0.0 if float(value) > 0 else self.values.get(42, 0.0)
+        elif point.address == 12:
+            self.values[146] = {2: 0.0, 3: 2.0, 4: 1.0}.get(int(value), self.values.get(146, 0.0))
+        return encode_float32(float(value), self.byte_order)
+
+    def read_value(self, point: RegisterPoint, byte_order: str='ABCD') -> float:
+        return decode_float32(self.read_point(point), byte_order or self.byte_order)
+
+    def write_value(self, point: RegisterPoint, value: float, byte_order: str='ABCD') -> float:
+        self.write_point(point, value)
+        return self.read_value(point, byte_order or self.byte_order)
 
     def close(self) -> None:
         pass
 
-
 class ModbusTcpRegisterReader:
-    def __init__(self, host: str, port: int, unit_id: int, timeout_sec: float, byte_order: str = 'ABCD') -> None:
+    def __init__(self, host: str, port: int, unit_id: int, timeout_sec: float, byte_order: str='ABCD', source_id: str='') -> None:
         from pymodbus.client import ModbusTcpClient
-
+        self.host = host
+        self.port = port
         self.unit_id = unit_id
+        self.byte_order = byte_order
+        self.source_id = source_id
         self.client = ModbusTcpClient(host=host, port=port, timeout=timeout_sec)
         self.client.connect()
 
@@ -70,30 +110,44 @@ class ModbusTcpRegisterReader:
         except TypeError:
             rr = self.client.read_holding_registers(point.address, point.register_qty, unit=self.unit_id)
         if rr is None or getattr(rr, 'isError', lambda: False)():
-            raise RuntimeError(f'Modbus read failed addr={point.address}')
+            raise RuntimeError(f'Modbus read failed source={self.source_id} host={self.host}:{self.port} addr={point.address}')
         return list(rr.registers)
 
-    def write_point(self, point: RegisterPoint, registers: list[int]) -> None:
-        if len(registers) != point.register_qty:
-            raise ValueError(f'Expected {point.register_qty} registers for {point.signal_name}, got {len(registers)}')
+    def write_point(self, point: RegisterPoint, value: float) -> list[int]:
+        registers = encode_float32(float(value), self.byte_order)
         try:
-            wr = self.client.write_registers(point.address, list(registers), slave=self.unit_id)
+            rr = self.client.write_registers(point.address, registers, slave=self.unit_id)
         except TypeError:
-            wr = self.client.write_registers(point.address, list(registers), unit=self.unit_id)
-        if wr is None or getattr(wr, 'isError', lambda: False)():
-            raise RuntimeError(f'Modbus write failed addr={point.address}')
+            rr = self.client.write_registers(point.address, registers, unit=self.unit_id)
+        if rr is None or getattr(rr, 'isError', lambda: False)():
+            raise RuntimeError(f'Modbus write failed source={self.source_id} host={self.host}:{self.port} addr={point.address}')
+        return registers
+
+    def read_value(self, point: RegisterPoint, byte_order: str='ABCD') -> float:
+        return decode_float32(self.read_point(point), byte_order or self.byte_order)
+
+    def write_value(self, point: RegisterPoint, value: float, byte_order: str='ABCD') -> float:
+        self.write_point(point, value)
+        return self.read_value(point, byte_order or self.byte_order)
 
     def close(self) -> None:
         self.client.close()
 
-
-def build_reader(config, mock: bool) -> RegisterReader:
+def build_reader_for_source(config: Any, source: Any, mock: bool) -> RegisterReader:
     if mock:
-        return MockRegisterReader(config.decoding.byte_order)
+        return MockRegisterReader(config.decoding.byte_order, getattr(source, 'source_id', 'mock'))
     return ModbusTcpRegisterReader(
-        config.existing_ems.host,
-        config.existing_ems.port,
-        config.existing_ems.unit_id,
-        config.existing_ems.timeout_sec,
-        config.decoding.byte_order,
+        host=source.host,
+        port=source.port,
+        unit_id=source.unit_id,
+        timeout_sec=source.timeout_sec,
+        byte_order=config.decoding.byte_order,
+        source_id=source.source_id,
     )
+
+def build_readers(config: Any, mock: bool) -> dict[str, RegisterReader]:
+    return {s.source_id: build_reader_for_source(config, s, mock) for s in config.active_external_sources()}
+
+# Backward-compatible helper kept for old imports/tests.
+def build_reader(config: Any, mock: bool) -> RegisterReader:
+    return build_reader_for_source(config, config.active_external_sources()[0], mock)

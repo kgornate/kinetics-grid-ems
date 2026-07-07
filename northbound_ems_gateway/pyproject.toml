@@ -1,7 +1,7 @@
 [project]
 name = "northbound-ems-gateway"
-version = "0.5.0"
-description = "Read-only NorthBound EMS Gateway with APIs, server upload, filtered logging, and SD-card-safe storage protection"
+version = "0.8.0"
+description = "NorthBound EMS Gateway with multi-source Modbus TCP polling and internal control APIs"
 requires-python = ">=3.10"
 dependencies = [
   "fastapi>=0.110",

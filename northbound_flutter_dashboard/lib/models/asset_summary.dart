@@ -9,6 +9,11 @@ class AssetSummary {
     this.keySignals = const {},
     this.assetType,
     this.description,
+    this.sourceId,
+    this.sourceDisplayName,
+    this.sourceHost,
+    this.sourcePort,
+    this.baseAssetId,
   });
 
   final String assetId;
@@ -20,6 +25,20 @@ class AssetSummary {
   final Map<String, dynamic> keySignals;
   final String? assetType;
   final String? description;
+  final String? sourceId;
+  final String? sourceDisplayName;
+  final String? sourceHost;
+  final int? sourcePort;
+  final String? baseAssetId;
+
+  String get effectiveSourceId {
+    if (sourceId != null && sourceId!.isNotEmpty) return sourceId!;
+    final parts = assetId.split('_');
+    if (parts.length >= 3 && parts[0] == 'external' && parts[1] == 'ems') {
+      return '${parts[0]}_${parts[1]}_${parts[2]}';
+    }
+    return 'default';
+  }
 
   factory AssetSummary.fromJson(Map<String, dynamic> json) {
     return AssetSummary(
@@ -37,6 +56,11 @@ class AssetSummary {
           : const {},
       assetType: json['asset_type']?.toString() ?? json['type']?.toString(),
       description: json['description']?.toString(),
+      sourceId: json['source_id']?.toString(),
+      sourceDisplayName: json['source_display_name']?.toString(),
+      sourceHost: json['source_host']?.toString(),
+      sourcePort: json.containsKey('source_port') ? _asInt(json['source_port']) : null,
+      baseAssetId: json['base_asset_id']?.toString(),
     );
   }
 

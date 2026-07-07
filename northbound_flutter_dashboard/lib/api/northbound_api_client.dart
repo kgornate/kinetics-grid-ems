@@ -4,12 +4,14 @@ import 'package:http/http.dart' as http;
 
 import '../models/alarm_record.dart';
 import '../models/auth_session.dart';
-import '../models/ems_command_register.dart';
 import '../models/api_result.dart';
 import '../models/asset_summary.dart';
 import '../models/log_filter_options.dart';
 import '../models/log_record.dart';
 import '../models/storage_status.dart';
+import '../models/source_summary.dart';
+import '../models/ems_command_register.dart';
+import '../models/control_command_result.dart';
 
 class LogQuery {
   const LogQuery({
@@ -195,44 +197,46 @@ class NorthboundApiClient {
 
   Future<ApiResult<Map<String, dynamic>>> getHealth() async => _getJson('/api/health');
 
+
+  Future<ApiResult<List<SourceSummary>>> getSources() async {
+    final result = await _getJson('/api/sources');
+    if (!result.isSuccess) return ApiResult.failure(result.error ?? 'Failed to read sources');
+    return _parseSourceList(result.data ?? {});
+  }
+
+  Future<ApiResult<List<SourceSummary>>> getSourceSummary() async {
+    final result = await _getJson('/api/sources/summary');
+    if (!result.isSuccess) return ApiResult.failure(result.error ?? 'Failed to read source summary');
+    return _parseSourceList(result.data ?? {});
+  }
+
+  Future<ApiResult<List<AssetSummary>>> getSourceAssets(String sourceId) async {
+    final result = await _getJson('/api/sources/$sourceId/assets');
+    if (!result.isSuccess) return ApiResult.failure(result.error ?? 'Failed to read assets for $sourceId');
+    return _parseAssetList(result.data ?? {});
+  }
+
+  Future<ApiResult<Map<String, dynamic>>> getSourceTelemetry(String sourceId) => _getJson('/api/sources/$sourceId/telemetry');
+
   Future<ApiResult<List<AssetSummary>>> getAssets() async {
     final result = await _getJson('/api/assets');
     if (!result.isSuccess) return ApiResult.failure(result.error ?? 'Failed to read assets');
-    final data = result.data ?? {};
-
-    // Gateway v0.5 returns {"items": [...]}. Older builds returned
-    // {"assets": [...]} or {"assets": {"asset_id": {...}}}. Support all
-    // shapes so UI cards do not disappear when backend payload naming changes.
-    final rawAssets = data['assets'] ?? data['items'] ?? data['data'];
-
-    if (rawAssets is List) {
-      return ApiResult.success(
-        rawAssets.whereType<Map>().map((item) => AssetSummary.fromJson(Map<String, dynamic>.from(item))).toList(),
-      );
-    }
-
-    if (rawAssets is Map) {
-      return ApiResult.success(
-        rawAssets.entries.where((entry) => entry.value is Map).map((entry) {
-          final item = Map<String, dynamic>.from(entry.value as Map);
-          item.putIfAbsent('asset_id', () => entry.key.toString());
-          return AssetSummary.fromJson(item);
-        }).toList(),
-      );
-    }
-
-    return ApiResult.failure('Invalid /api/assets response: expected assets/items list or map, got ${rawAssets.runtimeType}');
+    return _parseAssetList(result.data ?? {});
   }
 
-  Future<ApiResult<Map<String, dynamic>>> getKeySignals() async => _getJson('/api/telemetry/key-signals');
+  Future<ApiResult<Map<String, dynamic>>> getKeySignals({String? sourceId}) {
+    final query = sourceId == null || sourceId.trim().isEmpty ? null : {'source_id': sourceId.trim()};
+    return _getJson('/api/telemetry/key-signals', query);
+  }
 
   Future<ApiResult<Map<String, dynamic>>> getAssetTelemetry(String assetId, {String? category}) async {
     final query = category == null || category.isEmpty ? null : {'category': category};
     return _getJson('/api/assets/$assetId/telemetry', query);
   }
 
-  Future<ApiResult<List<AlarmRecord>>> getAlarms() async {
-    final result = await _getJson('/api/alarms');
+  Future<ApiResult<List<AlarmRecord>>> getAlarms({String? sourceId}) async {
+    final query = sourceId == null || sourceId.trim().isEmpty ? null : {'source_id': sourceId.trim()};
+    final result = await _getJson('/api/alarms', query);
     if (!result.isSuccess) return ApiResult.failure(result.error ?? 'Failed to read alarms');
     final data = result.data ?? {};
 
@@ -281,48 +285,6 @@ class NorthboundApiClient {
   String logExportUrl(LogQuery query) => urlFor('/api/logs/export.csv', query.toQuery(includeLimit: false));
 
 
-
-  Future<ApiResult<List<EmsCommandRegister>>> getEmsCommandRegisters() async {
-    final result = await _getJson('/api/commands/ems/registers');
-    if (!result.isSuccess) return ApiResult.failure(result.error ?? 'Failed to read EMS command registers');
-    final rawItems = result.data?['items'];
-    if (rawItems is! List) return const ApiResult.failure('Invalid EMS command register response: missing items list');
-    return ApiResult.success(
-      rawItems.whereType<Map>().map((item) => EmsCommandRegister.fromJson(Map<String, dynamic>.from(item))).toList(),
-    );
-  }
-
-  Future<ApiResult<Map<String, dynamic>>> writeEmsCommand({
-    required String signalName,
-    required double value,
-    bool readback = true,
-    String? note,
-  }) async {
-    try {
-      final uri = _uri('/api/commands/ems/write');
-      final body = <String, dynamic>{
-        'signal_name': signalName,
-        'value': value,
-        'readback': readback,
-        if (note != null && note.trim().isNotEmpty) 'note': note.trim(),
-      };
-      final response = await http.post(uri, headers: _jsonHeaders(), body: jsonEncode(body)).timeout(httpTimeout);
-      if (response.statusCode == 401) {
-        onUnauthorized?.call();
-        return ApiResult.failure('Unauthorized. Please login again.');
-      }
-      if (response.statusCode == 403) return ApiResult.failure('Forbidden for current login role or command APIs are disabled.');
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        return ApiResult.failure('HTTP ${response.statusCode}: ${response.body}');
-      }
-      final decoded = jsonDecode(response.body);
-      if (decoded is! Map) return const ApiResult.failure('Response is not a JSON object');
-      return ApiResult.success(Map<String, dynamic>.from(decoded));
-    } catch (e) {
-      return ApiResult.failure('EMS command write failed after ${httpTimeout.inSeconds}s: $e');
-    }
-  }
-
   Future<ApiResult<Map<String, dynamic>>> getRuntimeConfig() async => _getJson('/api/config/runtime');
 
   Future<ApiResult<Map<String, dynamic>>> updateRuntimeConfig({required String section, required Map<String, dynamic> values}) async {
@@ -359,6 +321,183 @@ class NorthboundApiClient {
 
   Future<ApiResult<Map<String, dynamic>>> getPoints({required String assetId, required String signalName, int limit = 100}) async {
     return _getJson('/api/storage/points', {'asset_id': assetId, 'signal_name': signalName, 'limit': limit.toString()});
+  }
+
+
+  Future<ApiResult<List<EmsCommandRegister>>> getEmsCommandRegisters({required String sourceId}) async {
+    final result = await _getJson('/api/commands/ems/registers', {'source_id': sourceId});
+    if (!result.isSuccess) return ApiResult.failure(result.error ?? 'Failed to read command registers');
+    final data = result.data ?? {};
+    final raw = data['items'] ?? data['registers'] ?? data['commands'] ?? data['data'];
+    if (raw is List) {
+      return ApiResult.success(raw.whereType<Map>().map((item) => EmsCommandRegister.fromJson(Map<String, dynamic>.from(item))).toList());
+    }
+    if (raw is Map) {
+      return ApiResult.success(raw.entries.where((entry) => entry.value is Map).map((entry) {
+        final item = Map<String, dynamic>.from(entry.value as Map);
+        item.putIfAbsent('signal_name', () => entry.key.toString());
+        return EmsCommandRegister.fromJson(item);
+      }).toList());
+    }
+    return const ApiResult.success([]);
+  }
+
+  Future<ApiResult<Map<String, dynamic>>> writeEmsRegister({
+    required String sourceId,
+    required String signalName,
+    required num value,
+    bool readback = true,
+    String? note,
+  }) {
+    return _postJson('/api/commands/ems/write', {
+      'source_id': sourceId,
+      'signal_name': signalName,
+      'value': value,
+      'readback': readback,
+      if (note != null && note.trim().isNotEmpty) 'note': note.trim(),
+    });
+  }
+
+  Future<ApiResult<ControlCommandResult>> setSourceGridMode({
+    required String sourceId,
+    required String targetMode,
+    bool readback = true,
+    int timeoutSec = 60,
+    String? note,
+  }) async {
+    final result = await _postJson('/api/control/sources/$sourceId/grid-mode', {
+      'target_mode': targetMode,
+      'readback': readback,
+      'timeout_sec': timeoutSec,
+      if (note != null && note.trim().isNotEmpty) 'note': note.trim(),
+    });
+    if (!result.isSuccess) return ApiResult.failure(result.error ?? 'Grid-mode command failed');
+    return ApiResult.success(ControlCommandResult.fromJson(result.data ?? {}));
+  }
+
+  Future<ApiResult<ControlCommandResult>> standbySource({required String sourceId, bool readback = true, String? note}) async {
+    final result = await _postJson('/api/control/sources/$sourceId/standby', {
+      'readback': readback,
+      if (note != null && note.trim().isNotEmpty) 'note': note.trim(),
+    });
+    if (!result.isSuccess) return ApiResult.failure(result.error ?? 'Standby command failed');
+    return ApiResult.success(ControlCommandResult.fromJson(result.data ?? {}));
+  }
+
+  Future<ApiResult<ControlCommandResult>> chargeSource({required String sourceId, required num powerKw, bool readback = true, String? note}) async {
+    final result = await _postJson('/api/control/sources/$sourceId/charge', {
+      'power_kw': powerKw,
+      'readback': readback,
+      if (note != null && note.trim().isNotEmpty) 'note': note.trim(),
+    });
+    if (!result.isSuccess) return ApiResult.failure(result.error ?? 'Charge command failed');
+    return ApiResult.success(ControlCommandResult.fromJson(result.data ?? {}));
+  }
+
+  Future<ApiResult<ControlCommandResult>> dischargeSource({required String sourceId, required num powerKw, bool readback = true, String? note}) async {
+    final result = await _postJson('/api/control/sources/$sourceId/discharge', {
+      'power_kw': powerKw,
+      'readback': readback,
+      if (note != null && note.trim().isNotEmpty) 'note': note.trim(),
+    });
+    if (!result.isSuccess) return ApiResult.failure(result.error ?? 'Discharge command failed');
+    return ApiResult.success(ControlCommandResult.fromJson(result.data ?? {}));
+  }
+
+  Future<ApiResult<ControlCommandResult>> setSiteGridMode({
+    required String targetMode,
+    List<String>? sourceIds,
+    List<String>? sourceOrder,
+    bool readback = true,
+    int timeoutSec = 60,
+    bool waitForVoltageStable = true,
+    String? note,
+  }) async {
+    final body = <String, dynamic>{
+      'target_mode': targetMode,
+      'readback': readback,
+      'timeout_sec': timeoutSec,
+      'wait_for_voltage_stable': waitForVoltageStable,
+      if (sourceIds != null && sourceIds.isNotEmpty) 'source_ids': sourceIds,
+      if (sourceOrder != null && sourceOrder.isNotEmpty) 'source_order': sourceOrder,
+      if (note != null && note.trim().isNotEmpty) 'note': note.trim(),
+    };
+    final result = await _postJson('/api/control/site/grid-mode', body);
+    if (!result.isSuccess) return ApiResult.failure(result.error ?? 'Site grid-mode command failed');
+    return ApiResult.success(ControlCommandResult.fromJson(result.data ?? {}));
+  }
+
+  Future<ApiResult<ControlCommandResult>> standbySite({required List<String> sourceIds, bool readback = true, String? note}) async {
+    final result = await _postJson('/api/control/site/standby', {
+      'source_ids': sourceIds,
+      'readback': readback,
+      if (note != null && note.trim().isNotEmpty) 'note': note.trim(),
+    });
+    if (!result.isSuccess) return ApiResult.failure(result.error ?? 'Site standby command failed');
+    return ApiResult.success(ControlCommandResult.fromJson(result.data ?? {}));
+  }
+
+  Future<ApiResult<ControlCommandResult>> setSitePower({
+    required String operation,
+    required num totalPowerKw,
+    required List<String> sourceIds,
+    String allocation = 'equal',
+    bool readback = true,
+    String? note,
+  }) async {
+    final result = await _postJson('/api/control/site/power', {
+      'operation': operation,
+      'total_power_kw': totalPowerKw,
+      'source_ids': sourceIds,
+      'allocation': allocation,
+      'readback': readback,
+      if (note != null && note.trim().isNotEmpty) 'note': note.trim(),
+    });
+    if (!result.isSuccess) return ApiResult.failure(result.error ?? 'Site power command failed');
+    return ApiResult.success(ControlCommandResult.fromJson(result.data ?? {}));
+  }
+
+  ApiResult<List<AssetSummary>> _parseAssetList(Map<String, dynamic> data) {
+    final rawAssets = data['assets'] ?? data['items'] ?? data['data'];
+    if (rawAssets is List) {
+      return ApiResult.success(rawAssets.whereType<Map>().map((item) => AssetSummary.fromJson(Map<String, dynamic>.from(item))).toList());
+    }
+    if (rawAssets is Map) {
+      return ApiResult.success(rawAssets.entries.where((entry) => entry.value is Map).map((entry) {
+        final item = Map<String, dynamic>.from(entry.value as Map);
+        item.putIfAbsent('asset_id', () => entry.key.toString());
+        return AssetSummary.fromJson(item);
+      }).toList());
+    }
+    return ApiResult.failure('Invalid asset response: expected assets/items list or map, got ${rawAssets.runtimeType}');
+  }
+
+  ApiResult<List<SourceSummary>> _parseSourceList(Map<String, dynamic> data) {
+    final rawSources = data['items'] ?? data['sources'] ?? data['data'];
+    if (rawSources is List) {
+      return ApiResult.success(rawSources.whereType<Map>().map((item) => SourceSummary.fromJson(Map<String, dynamic>.from(item))).toList());
+    }
+    return const ApiResult.success([]);
+  }
+
+  Future<ApiResult<Map<String, dynamic>>> _postJson(String path, Map<String, dynamic> body) async {
+    try {
+      final uri = _uri(path);
+      final response = await http.post(uri, headers: _jsonHeaders(), body: jsonEncode(body)).timeout(httpTimeout);
+      if (response.statusCode == 401) {
+        onUnauthorized?.call();
+        return ApiResult.failure('Unauthorized. Please login again.');
+      }
+      if (response.statusCode == 403) return ApiResult.failure('Forbidden for current login role.');
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        return ApiResult.failure('HTTP ${response.statusCode}: ${response.body}');
+      }
+      final decoded = jsonDecode(response.body);
+      if (decoded is! Map) return const ApiResult.failure('Response is not a JSON object');
+      return ApiResult.success(Map<String, dynamic>.from(decoded));
+    } catch (e) {
+      return ApiResult.failure('Request failed after ${httpTimeout.inSeconds}s: $e');
+    }
   }
 
   Future<ApiResult<Map<String, dynamic>>> _getJson(String path, [Map<String, String>? query]) async {
