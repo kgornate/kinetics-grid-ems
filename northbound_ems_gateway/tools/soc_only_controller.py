@@ -5,11 +5,12 @@ Confirmed BESS commands:
 - BESS ON  = Manual Mode + Standby  (manual_auto_mode=0, manual_mode_control=2)
 - BESS OFF = Manual Mode + Shutdown (manual_auto_mode=0, manual_mode_control=1)
 
-v1.8 field change:
-- Transition-aware sequencing for the one-high -> both-high case.
-- If one BESS was OFF because it was high, and then both BESS become high, the controller
-  sends Solar OFF first, then brings the previously OFF BESS back ON. This avoids a
-  transient path where both BESS are OFF or both need to be started together.
+v1.9 field change:
+- Adds lower SOC cutoff protection as highest-priority logic.
+- If a BESS reaches low_cutoff_limit, that BESS is commanded OFF / Shutdown.
+- If both BESS reach low_cutoff_limit, both are commanded OFF and controller enters
+  BOTH_LOW_CUTOFF_LOCKOUT. No automatic lower-side restart is attempted.
+- Upper SOC and Solis transition-aware behavior from v1.8 is preserved.
 
 Default mode is dry-run. Use --live --force only after validating decisions.
 """
@@ -89,6 +90,11 @@ STATE_NORMAL = "NORMAL"
 STATE_X_HIGH_ONLY = "X_HIGH_ONLY"
 STATE_Y_HIGH_ONLY = "Y_HIGH_ONLY"
 STATE_BOTH_HIGH_SOLAR_OFF = "BOTH_HIGH_SOLAR_OFF"
+STATE_X_LOW_CUTOFF = "X_LOW_CUTOFF"
+STATE_Y_LOW_CUTOFF = "Y_LOW_CUTOFF"
+STATE_BOTH_LOW_CUTOFF_LOCKOUT = "BOTH_LOW_CUTOFF_LOCKOUT"
+
+SOLAR_HOLD = "HOLD"
 
 _stop = False
 
@@ -281,19 +287,20 @@ def load_controller_state(path: str, *, clear: bool = False) -> dict[str, Any]:
             Path(path).unlink(missing_ok=True)
         except Exception:
             pass
-        return {"state": STATE_NORMAL, "solar_off_reason": None, "soc_history": []}
+        return {"state": STATE_NORMAL, "solar_off_reason": None, "low_cutoff_reason": None, "soc_history": []}
     try:
         data = json.loads(Path(path).read_text())
         if not isinstance(data, dict):
             raise ValueError("state file is not a JSON object")
         data.setdefault("state", STATE_NORMAL)
         data.setdefault("solar_off_reason", None)
+        data.setdefault("low_cutoff_reason", None)
         data.setdefault("soc_history", [])
         return data
     except FileNotFoundError:
-        return {"state": STATE_NORMAL, "solar_off_reason": None, "soc_history": []}
+        return {"state": STATE_NORMAL, "solar_off_reason": None, "low_cutoff_reason": None, "soc_history": []}
     except Exception as exc:
-        return {"state": STATE_NORMAL, "solar_off_reason": None, "soc_history": [], "state_load_error": str(exc)}
+        return {"state": STATE_NORMAL, "solar_off_reason": None, "low_cutoff_reason": None, "soc_history": [], "state_load_error": str(exc)}
 
 
 def save_controller_state(path: str, state: dict[str, Any]) -> None:
@@ -329,18 +336,27 @@ def decide_states(
     soc_y: float,
     high_limit: float,
     recovery_limit: float,
+    low_cutoff_limit: float,
     *,
     controller_state: str,
     avg_soc_delta: float | None,
     trend_negative_delta: float,
-) -> tuple[str, dict[str, str], str, str, str | None, dict[str, Any]]:
-    """Return decision, BESS states, solar state, next state, solar-off reason and details."""
+) -> tuple[str, dict[str, str], str, str, str | None, str | None, dict[str, Any]]:
+    """Return decision, BESS states, solar state, next state, solar reason, low reason and details.
+
+    Lower cutoff has highest priority and no automatic lower-side recovery is implemented.
+    """
+    x_low = soc_x <= low_cutoff_limit
+    y_low = soc_y <= low_cutoff_limit
     x_high = soc_x >= high_limit
     y_high = soc_y >= high_limit
     any_at_or_below_recovery = min(soc_x, soc_y) <= recovery_limit
     soc_decreasing = avg_soc_delta is not None and avg_soc_delta < -abs(float(trend_negative_delta))
-    recovery_info = {
+    info = {
         "state_before": controller_state,
+        "x_low": x_low,
+        "y_low": y_low,
+        "low_cutoff_limit": low_cutoff_limit,
         "x_high": x_high,
         "y_high": y_high,
         "any_at_or_below_recovery": any_at_or_below_recovery,
@@ -349,18 +365,39 @@ def decide_states(
         "soc_decreasing": soc_decreasing,
     }
 
+    # Persistent low-cutoff lockouts. These states require --clear-state / operator action to exit.
+    if controller_state == STATE_BOTH_LOW_CUTOFF_LOCKOUT:
+        return "both_low_cutoff_lockout_hold_both_off", {"X": "OFF", "Y": "OFF"}, SOLAR_HOLD, STATE_BOTH_LOW_CUTOFF_LOCKOUT, None, "BOTH_SOC_BELOW_LOW_LIMIT", info
+    if controller_state == STATE_X_LOW_CUTOFF:
+        if y_low:
+            return "x_low_state_y_now_low_both_low_lockout", {"X": "OFF", "Y": "OFF"}, SOLAR_HOLD, STATE_BOTH_LOW_CUTOFF_LOCKOUT, None, "BOTH_SOC_BELOW_LOW_LIMIT", info
+        return "x_low_cutoff_hold_x_off_y_on", {"X": "OFF", "Y": "ON"}, SOLAR_HOLD, STATE_X_LOW_CUTOFF, None, "X_SOC_BELOW_LOW_LIMIT", info
+    if controller_state == STATE_Y_LOW_CUTOFF:
+        if x_low:
+            return "y_low_state_x_now_low_both_low_lockout", {"X": "OFF", "Y": "OFF"}, SOLAR_HOLD, STATE_BOTH_LOW_CUTOFF_LOCKOUT, None, "BOTH_SOC_BELOW_LOW_LIMIT", info
+        return "y_low_cutoff_hold_x_on_y_off", {"X": "ON", "Y": "OFF"}, SOLAR_HOLD, STATE_Y_LOW_CUTOFF, None, "Y_SOC_BELOW_LOW_LIMIT", info
+
+    # New lower-side protection. Highest priority before upper SOC/solar logic.
+    if x_low and y_low:
+        return "both_low_cutoff_lockout_both_off", {"X": "OFF", "Y": "OFF"}, SOLAR_HOLD, STATE_BOTH_LOW_CUTOFF_LOCKOUT, None, "BOTH_SOC_BELOW_LOW_LIMIT", info
+    if x_low:
+        return "x_low_cutoff_x_off_y_on", {"X": "OFF", "Y": "ON"}, SOLAR_HOLD, STATE_X_LOW_CUTOFF, None, "X_SOC_BELOW_LOW_LIMIT", info
+    if y_low:
+        return "y_low_cutoff_x_on_y_off", {"X": "ON", "Y": "OFF"}, SOLAR_HOLD, STATE_Y_LOW_CUTOFF, None, "Y_SOC_BELOW_LOW_LIMIT", info
+
+    # Existing upper-side recovery state. Only this state uses SOC trend.
     if controller_state == STATE_BOTH_HIGH_SOLAR_OFF:
         if any_at_or_below_recovery and soc_decreasing:
-            return "post_both_high_recovered_solar_on_both_bess_on", {"X": "ON", "Y": "ON"}, "ON", STATE_NORMAL, None, recovery_info
-        return "both_high_solar_off_waiting_for_recovery", {"X": "ON", "Y": "ON"}, "OFF", STATE_BOTH_HIGH_SOLAR_OFF, "BOTH_BESS_HIGH", recovery_info
+            return "post_both_high_recovered_solar_on_both_bess_on", {"X": "ON", "Y": "ON"}, "ON", STATE_NORMAL, None, None, info
+        return "both_high_solar_off_waiting_for_recovery", {"X": "ON", "Y": "ON"}, "OFF", STATE_BOTH_HIGH_SOLAR_OFF, "BOTH_BESS_HIGH", None, info
 
     if x_high and y_high:
-        return "both_high_keep_both_on_solar_off", {"X": "ON", "Y": "ON"}, "OFF", STATE_BOTH_HIGH_SOLAR_OFF, "BOTH_BESS_HIGH", recovery_info
+        return "both_high_keep_both_on_solar_off", {"X": "ON", "Y": "ON"}, "OFF", STATE_BOTH_HIGH_SOLAR_OFF, "BOTH_BESS_HIGH", None, info
     if x_high and not y_high:
-        return "only_x_high_x_off_y_on_solar_on", {"X": "OFF", "Y": "ON"}, "ON", STATE_X_HIGH_ONLY, None, recovery_info
+        return "only_x_high_x_off_y_on_solar_on", {"X": "OFF", "Y": "ON"}, "ON", STATE_X_HIGH_ONLY, None, None, info
     if y_high and not x_high:
-        return "only_y_high_x_on_y_off_solar_on", {"X": "ON", "Y": "OFF"}, "ON", STATE_Y_HIGH_ONLY, None, recovery_info
-    return "normal_keep_both_on_solar_on", {"X": "ON", "Y": "ON"}, "ON", STATE_NORMAL, None, recovery_info
+        return "only_y_high_x_on_y_off_solar_on", {"X": "ON", "Y": "OFF"}, "ON", STATE_Y_HIGH_ONLY, None, None, info
+    return "normal_keep_both_on_solar_on", {"X": "ON", "Y": "ON"}, "ON", STATE_NORMAL, None, None, info
 
 
 def command_bess(
@@ -408,7 +445,6 @@ def read_solis_status(client: Any, cfg: SolisConfig) -> dict[str, Any]:
     if not cfg.status_read_enabled:
         return {"enabled": True, "status_read_enabled": False}
     out: dict[str, Any] = {"enabled": True, "transport": cfg.transport, "serial_port": cfg.serial_port, "unit_id": cfg.unit_id}
-    # Best effort only. Some Solis models reject some registers.
     probes = [
         ("operation_status_raw", 3000 - 1, "input"),
         ("active_power_raw", 3005 - 1, "input"),
@@ -427,10 +463,14 @@ def read_solis_status(client: Any, cfg: SolisConfig) -> dict[str, Any]:
 
 
 def command_solis(client: Any, cfg: SolisConfig, target: str, *, live: bool) -> dict[str, Any]:
+    if target == SOLAR_HOLD:
+        return {"device": "Solis", "target": SOLAR_HOLD, "skipped": True, "reason": "hold_no_solar_command"}
     if not cfg.enabled:
         return {"device": "Solis", "enabled": False, "target": target, "skipped": True}
     if target not in {"ON", "OFF"}:
         raise ValueError(f"Invalid Solis target={target}")
+    if client is None:
+        raise RuntimeError("Solis client not connected")
     if not live:
         return {"device": "Solis", "target": target, "dry_run": True, "method": cfg.control_method, "writes": []}
 
@@ -440,13 +480,7 @@ def command_solis(client: Any, cfg: SolisConfig, target: str, *, live: bool) -> 
         rr = write_register(client, SOLIS_HOLDING_ON_OFF_REGISTER_3007_SEND_ADDRESS, value, cfg.unit_id)
         if _is_modbus_error(rr):
             raise RuntimeError(f"Solis holding ON/OFF write failed addr={SOLIS_HOLDING_ON_OFF_REGISTER_3007_SEND_ADDRESS} value=0x{value:04X} response={rr}")
-        writes.append({
-            "signal": "solis_on_off_holding_3007",
-            "document_register": 3007,
-            "send_address": SOLIS_HOLDING_ON_OFF_REGISTER_3007_SEND_ADDRESS,
-            "value_hex": f"0x{value:04X}",
-            "target": target,
-        })
+        writes.append({"signal": "solis_on_off_holding_3007", "document_register": 3007, "send_address": SOLIS_HOLDING_ON_OFF_REGISTER_3007_SEND_ADDRESS, "value_hex": f"0x{value:04X}", "target": target})
     elif cfg.control_method == "coil_5000":
         value = target == "ON"
         rr = write_coil(client, SOLIS_COIL_GRID_ON_OFF_5000, value, cfg.unit_id)
@@ -458,35 +492,43 @@ def command_solis(client: Any, cfg: SolisConfig, target: str, *, live: bool) -> 
             switch_value, limit_value = 0, 10000
         else:
             switch_value, limit_value = 1, 0
-        for address, value, signal in [
+        for address, value, signal_name in [
             (SOLIS_POWER_LIMIT_SWITCH_3070_SEND_ADDRESS, switch_value, "solis_power_limit_switch_3070"),
             (SOLIS_POWER_LIMIT_VALUE_3052_SEND_ADDRESS, limit_value, "solis_power_limit_value_3052"),
         ]:
             rr = write_register(client, address, value, cfg.unit_id)
             if _is_modbus_error(rr):
                 raise RuntimeError(f"Solis power-limit write failed addr={address} value={value} response={rr}")
-            writes.append({"signal": signal, "send_address": address, "value": value, "target": target})
+            writes.append({"signal": signal_name, "send_address": address, "value": value, "target": target})
     else:
         raise ValueError(f"Unsupported Solis control_method={cfg.control_method}")
     return {"device": "Solis", "target": target, "dry_run": False, "method": cfg.control_method, "writes": writes}
 
 
 def build_action_plan(previous_state: str, desired_bess: dict[str, str], desired_solar: str, solar_enabled: bool) -> list[tuple[str, str, str]]:
-    """Build ordered action plan: (kind, key, target).
-
-    v1.8 critical sequence:
-    - If previous state was X_HIGH_ONLY/Y_HIGH_ONLY and next target is both-high solar-off,
-      switch Solis OFF first, then bring the previously OFF BESS back ON.
-    """
+    """Build ordered action plan: (kind, key, target)."""
     plan: list[tuple[str, str, str]] = []
+
+    # Lower cutoff is BESS safety priority. No Solis command is issued when desired_solar=HOLD.
+    if desired_solar == SOLAR_HOLD:
+        if previous_state == STATE_X_LOW_CUTOFF:
+            order = ["X", "Y"]
+        elif previous_state == STATE_Y_LOW_CUTOFF:
+            order = ["Y", "X"]
+        else:
+            order = ["X", "Y"]
+        for key in order:
+            if key in desired_bess:
+                plan.append(("bess", key, desired_bess[key]))
+        return plan
+
+    # v1.8 transition: one-high -> both-high. Solar OFF first, then previously OFF BESS ON.
     both_bess_on = desired_bess.get("X") == "ON" and desired_bess.get("Y") == "ON"
     both_high_target = desired_solar == "OFF" and both_bess_on
-
     if both_high_target:
         if solar_enabled:
             plan.append(("solar", "Solis", "OFF"))
         if previous_state == STATE_X_HIGH_ONLY:
-            # X was previously OFF; bring it back first. Y should already be ON, then re-assert if needed.
             plan.append(("bess", "X", "ON"))
             plan.append(("bess", "Y", "ON"))
         elif previous_state == STATE_Y_HIGH_ONLY:
@@ -497,11 +539,10 @@ def build_action_plan(previous_state: str, desired_bess: dict[str, str], desired
             plan.append(("bess", "Y", "ON"))
         return plan
 
-    # For all other transitions, turn BESS into safe desired states first; if solar is ON, enable it after BESS is ready.
     for key in ("X", "Y"):
         if key in desired_bess:
             plan.append(("bess", key, desired_bess[key]))
-    if solar_enabled:
+    if solar_enabled and desired_solar in {"ON", "OFF"}:
         plan.append(("solar", "Solis", desired_solar))
     return plan
 
@@ -515,6 +556,7 @@ def config_to_arg_defaults(path: str | None) -> dict[str, Any]:
         "byte_order": "ABCD",
         "high_limit": 98.0,
         "recovery_limit": 75.0,
+        "low_cutoff_limit": 10.0,
         "soc_trend_window_sec": 60.0,
         "soc_trend_negative_delta": 0.1,
         "state_file": "/tmp/nb_ems_soc_solis_controller_state.json",
@@ -561,6 +603,7 @@ def config_to_arg_defaults(path: str | None) -> dict[str, Any]:
     soc_logic = data.get("soc_logic", {})
     defaults["high_limit"] = float(soc_logic.get("high_limit", defaults["high_limit"]))
     defaults["recovery_limit"] = float(soc_logic.get("recovery_limit", defaults["recovery_limit"]))
+    defaults["low_cutoff_limit"] = float(soc_logic.get("low_cutoff_limit", defaults["low_cutoff_limit"]))
     defaults["soc_trend_window_sec"] = float(soc_logic.get("soc_trend_window_sec", defaults["soc_trend_window_sec"]))
     defaults["soc_trend_negative_delta"] = float(soc_logic.get("soc_trend_negative_delta", defaults["soc_trend_negative_delta"]))
     defaults["state_file"] = soc_logic.get("state_file", defaults["state_file"])
@@ -592,6 +635,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--byte-order", default=d["byte_order"], choices=["ABCD", "BADC", "CDAB", "DCBA"])
     p.add_argument("--high-limit", type=float, default=d["high_limit"])
     p.add_argument("--recovery-limit", type=float, default=d["recovery_limit"])
+    p.add_argument("--low-cutoff-limit", type=float, default=d["low_cutoff_limit"])
     p.add_argument("--soc-trend-window-sec", type=float, default=d["soc_trend_window_sec"])
     p.add_argument("--soc-trend-negative-delta", type=float, default=d["soc_trend_negative_delta"])
     p.add_argument("--state-file", default=d["state_file"])
@@ -650,10 +694,11 @@ def main() -> int:
     print(json.dumps({
         "timestamp_utc": utc_now(),
         "event": "soc_solis_controller_started",
-        "version": "v1.8_transition_aware",
+        "version": "v1.9_lower_cutoff_transition_aware",
         "mode": "LIVE_WRITES_ENABLED" if args.live else "DRY_RUN_NO_WRITES",
         "high_limit": args.high_limit,
         "recovery_limit": args.recovery_limit,
+        "low_cutoff_limit": args.low_cutoff_limit,
         "soc_trend_window_sec": args.soc_trend_window_sec,
         "soc_trend_negative_delta": args.soc_trend_negative_delta,
         "state_file": args.state_file,
@@ -688,11 +733,12 @@ def main() -> int:
 
                 trend = update_soc_history(controller_state_store, devices["X"].soc, devices["Y"].soc, window_sec=args.soc_trend_window_sec)  # type: ignore[arg-type]
                 previous_state = str(controller_state_store.get("state", STATE_NORMAL))
-                decision, desired_bess, desired_solar, next_state, solar_off_reason, recovery_info = decide_states(
+                decision, desired_bess, desired_solar, next_state, solar_off_reason, low_cutoff_reason, info = decide_states(
                     float(devices["X"].soc),
                     float(devices["Y"].soc),
                     args.high_limit,
                     args.recovery_limit,
+                    args.low_cutoff_limit,
                     controller_state=previous_state,
                     avg_soc_delta=trend.get("avg_soc_delta"),
                     trend_negative_delta=args.soc_trend_negative_delta,
@@ -704,9 +750,10 @@ def main() -> int:
                     "previous": previous_state,
                     "next": next_state,
                     "solar_off_reason": solar_off_reason,
+                    "low_cutoff_reason": low_cutoff_reason,
                     "state_file": args.state_file,
                     "trend": trend,
-                    "recovery_info": recovery_info,
+                    "decision_info": info,
                 }
                 cycle["desired_states"] = {"bess": desired_bess, "solar": desired_solar}
                 cycle["action_plan"] = [{"kind": k, "id": i, "target": t} for k, i, t in plan]
@@ -730,6 +777,7 @@ def main() -> int:
 
                 controller_state_store["state"] = next_state
                 controller_state_store["solar_off_reason"] = solar_off_reason
+                controller_state_store["low_cutoff_reason"] = low_cutoff_reason
                 controller_state_store["last_decision"] = decision
                 controller_state_store["last_update_utc"] = utc_now()
                 controller_state_store["last_soc_x"] = devices["X"].soc

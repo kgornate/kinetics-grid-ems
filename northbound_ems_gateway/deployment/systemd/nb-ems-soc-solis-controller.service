@@ -1,5 +1,5 @@
 [Unit]
-Description=Northbound EMS SOC + Solis RTU Transition-Aware Controller
+Description=Northbound EMS SOC + Solis RTU Lower-Cutoff Transition-Aware Controller
 After=network-online.target
 Wants=network-online.target
 

@@ -16,6 +16,7 @@
   "soc_logic": {
     "high_limit": 98.0,
     "recovery_limit": 75.0,
+    "low_cutoff_limit": 10.0,
     "soc_trend_window_sec": 60.0,
     "soc_trend_negative_delta": 0.1,
     "state_file": "/tmp/nb_ems_soc_only_controller_state.json"
