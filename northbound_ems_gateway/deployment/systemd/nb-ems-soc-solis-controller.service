@@ -1,0 +1,15 @@
+[Unit]
+Description=Northbound EMS SOC + Solis RTU Transition-Aware Controller
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/root/kinetics-grid-ems/northbound_ems_gateway
+Environment=PYTHONPATH=/root/kinetics-grid-ems/northbound_ems_gateway/src
+ExecStart=/usr/bin/python3 /root/kinetics-grid-ems/northbound_ems_gateway/tools/soc_only_controller.py --config configs/soc_solis_field_rtu.json --live --force
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

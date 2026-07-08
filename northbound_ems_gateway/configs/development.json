@@ -147,5 +147,20 @@
       "timeout_sec": 60.0,
       "minimum_valid_voltage": 10.0
     }
+  },
+  "soc_protection": {
+    "enabled": false,
+    "background_enabled": true,
+    "dry_run": true,
+    "interval_sec": 10,
+    "high_soc_limit": 95.0,
+    "low_soc_limit": 10.0,
+    "high_recovery_soc": 93.0,
+    "low_recovery_soc": 12.0,
+    "command_cooldown_sec": 60,
+    "readback": true,
+    "soc_signal_name": "soc",
+    "solar_generation_available": null,
+    "standby_when_both_low_and_solar_available": true
   }
 }

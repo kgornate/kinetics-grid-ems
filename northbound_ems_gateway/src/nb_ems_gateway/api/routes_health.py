@@ -10,6 +10,8 @@ def health(request: Request)->dict:
         storage_status={'enabled':c.config.storage.enabled,'status_error':str(exc),'tables':{}}
     d['storage']=storage_status
     d['server_upload']=c.server_upload_status()
+    if getattr(c, 'soc_protection_controller', None):
+        d['soc_protection']=c.soc_protection_controller.status.to_dict()
     d['logging']={
         'enabled':c.config.logging.enabled,
         'min_severity':c.config.logging.min_severity,

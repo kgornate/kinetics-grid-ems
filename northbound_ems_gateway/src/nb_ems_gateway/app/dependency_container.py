@@ -24,6 +24,7 @@ class DependencyContainer:
     readers: dict[str, Any] = field(default_factory=dict)
     control_service: Any | None = None
     server_upload_service: Any | None = None
+    soc_protection_controller: Any | None = None
 
     @classmethod
     def create(cls, *, config: AppConfig, register_map: RegisterMap) -> 'DependencyContainer':
@@ -53,6 +54,8 @@ class DependencyContainer:
                 'auth_enabled': config.auth.enabled,
                 'source_count': len(sources),
                 'sources': [s.model_dump() for s in sources],
+                'soc_protection_enabled': config.soc_protection.enabled,
+                'soc_protection_dry_run': config.soc_protection.dry_run,
             },
             source='gateway',
         )

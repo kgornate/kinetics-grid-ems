@@ -104,21 +104,67 @@ class ModbusTcpRegisterReader:
         self.client = ModbusTcpClient(host=host, port=port, timeout=timeout_sec)
         self.client.connect()
 
+    def _read_holding_registers_compat(self, address: int, count: int):
+        """Call pymodbus read_holding_registers across 2.x/3.x/4.x style APIs.
+
+        Different pymodbus versions use different unit-id names:
+        unit, slave, or device_id. Recent versions also make count keyword-only.
+        Field rootfs images can have any of these, so we try the known signatures.
+        """
+        attempts = [
+            lambda: self.client.read_holding_registers(address=address, count=count, device_id=self.unit_id),
+            lambda: self.client.read_holding_registers(address, count=count, device_id=self.unit_id),
+            lambda: self.client.read_holding_registers(address=address, count=count, slave=self.unit_id),
+            lambda: self.client.read_holding_registers(address, count=count, slave=self.unit_id),
+            lambda: self.client.read_holding_registers(address=address, count=count, unit=self.unit_id),
+            lambda: self.client.read_holding_registers(address, count=count, unit=self.unit_id),
+            lambda: self.client.read_holding_registers(address, count, slave=self.unit_id),
+            lambda: self.client.read_holding_registers(address, count, unit=self.unit_id),
+            lambda: self.client.read_holding_registers(address, count),
+            lambda: self.client.read_holding_registers(address=address, count=count),
+        ]
+        last_exc: TypeError | None = None
+        for attempt in attempts:
+            try:
+                return attempt()
+            except TypeError as exc:
+                last_exc = exc
+                continue
+        if last_exc is not None:
+            raise last_exc
+        raise RuntimeError('No pymodbus read_holding_registers signature matched')
+
+    def _write_registers_compat(self, address: int, registers: list[int]):
+        """Call pymodbus write_registers across 2.x/3.x/4.x style APIs."""
+        attempts = [
+            lambda: self.client.write_registers(address=address, values=registers, device_id=self.unit_id),
+            lambda: self.client.write_registers(address, registers, device_id=self.unit_id),
+            lambda: self.client.write_registers(address=address, values=registers, slave=self.unit_id),
+            lambda: self.client.write_registers(address, registers, slave=self.unit_id),
+            lambda: self.client.write_registers(address=address, values=registers, unit=self.unit_id),
+            lambda: self.client.write_registers(address, registers, unit=self.unit_id),
+            lambda: self.client.write_registers(address, registers),
+        ]
+        last_exc: TypeError | None = None
+        for attempt in attempts:
+            try:
+                return attempt()
+            except TypeError as exc:
+                last_exc = exc
+                continue
+        if last_exc is not None:
+            raise last_exc
+        raise RuntimeError('No pymodbus write_registers signature matched')
+
     def read_point(self, point: RegisterPoint) -> list[int]:
-        try:
-            rr = self.client.read_holding_registers(point.address, point.register_qty, slave=self.unit_id)
-        except TypeError:
-            rr = self.client.read_holding_registers(point.address, point.register_qty, unit=self.unit_id)
+        rr = self._read_holding_registers_compat(point.address, point.register_qty)
         if rr is None or getattr(rr, 'isError', lambda: False)():
             raise RuntimeError(f'Modbus read failed source={self.source_id} host={self.host}:{self.port} addr={point.address}')
         return list(rr.registers)
 
     def write_point(self, point: RegisterPoint, value: float) -> list[int]:
         registers = encode_float32(float(value), self.byte_order)
-        try:
-            rr = self.client.write_registers(point.address, registers, slave=self.unit_id)
-        except TypeError:
-            rr = self.client.write_registers(point.address, registers, unit=self.unit_id)
+        rr = self._write_registers_compat(point.address, registers)
         if rr is None or getattr(rr, 'isError', lambda: False)():
             raise RuntimeError(f'Modbus write failed source={self.source_id} host={self.host}:{self.port} addr={point.address}')
         return registers

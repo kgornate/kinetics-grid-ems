@@ -119,6 +119,22 @@ class LoggingConfig(BaseModel):
     retention_days: int = 30
     export_max_rows: int = 5000
 
+
+class SOCProtectionConfig(BaseModel):
+    enabled: bool = False
+    background_enabled: bool = True
+    dry_run: bool = True
+    interval_sec: float = 10.0
+    high_soc_limit: float = 95.0
+    low_soc_limit: float = 10.0
+    high_recovery_soc: float = 93.0
+    low_recovery_soc: float = 12.0
+    command_cooldown_sec: float = 60.0
+    readback: bool = True
+    soc_signal_name: str = "soc"
+    solar_generation_available: bool | None = None
+    standby_when_both_low_and_solar_available: bool = True
+
 class VoltageStabilizationConfig(BaseModel):
     sample_interval_sec: float = 1.0
     stable_window_sec: float = 10.0
@@ -149,6 +165,7 @@ class AppConfig(BaseModel):
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
     auth: AuthConfig = Field(default_factory=AuthConfig)
     control: ControlConfig = Field(default_factory=ControlConfig)
+    soc_protection: SOCProtectionConfig = Field(default_factory=SOCProtectionConfig)
 
     def active_external_sources(self) -> list[ExternalEMSUnitConfig]:
         units = [u for u in self.external_ems_units if u.enabled]
