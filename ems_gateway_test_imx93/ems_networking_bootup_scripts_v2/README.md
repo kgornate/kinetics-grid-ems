@@ -269,3 +269,109 @@ This will only stop the log viewing command. It will not stop the gateway servic
 To stop the actual gateway service, that would be:
 
 systemctl stop nb-ems-gateway.service
+## v2.1 Wi-Fi robustness update
+
+This package includes an updated `scripts/imx93_wifi_setup.sh` based on the field debug flow that successfully reconnects primary Wi-Fi.
+
+Changes:
+- waits for `mlan0` to exist before Wi-Fi setup
+- cleanly restarts `wpa_supplicant` and `udhcpc`
+- waits for `wpa_state=COMPLETED`
+- triggers reassociation during slow AP scans
+- retries DHCP before failing
+- keeps optional static fallback disabled by default
+- keeps EMS field network on `eth1 = 192.168.100.2/24`
+- checks Chinese EMS targets `192.168.100.151` and `192.168.100.153`
+
+Default Wi-Fi retry tuning is in `config/ems_network.conf`:
+
+```sh
+WIFI_IFACE_WAIT_ATTEMPTS="30"
+WIFI_CONNECT_ATTEMPTS="12"
+WIFI_CONNECT_SLEEP_SEC="2"
+WIFI_DHCP_ATTEMPTS="3"
+WIFI_DHCP_TRIES_PER_ATTEMPT="5"
+WIFI_DHCP_TIMEOUT_SEC="2"
+WIFI_STATIC_FALLBACK_ENABLED="0"
+```
+
+After install, validate with:
+
+```sh
+/root/kinetics-grid-ems/ems_network_bootup/imx93_wifi_setup.sh
+wpa_cli -p /var/run/wpa_supplicant -i mlan0 status
+ip -br addr show mlan0
+ip route
+ping -I mlan0 -c 3 8.8.8.8
+```
+
+---
+
+# v2.2 Solis Modbus RTU boot setup addition
+
+This package also prepares the Solis inverter RS485/Modbus RTU port during boot.
+
+Boot sequence becomes:
+
+```text
+i.MX93 power ON
+  -> Linux boots
+  -> ems-network-setup.service runs
+  -> eth1/eth0/mlan0 are configured
+  -> Solis USB-RS485 serial port is detected
+  -> /dev/ems_solis_rtu stable symlink is created
+  -> serial mode is set to 9600 8N1 raw mode
+  -> configs/soc_solis_field_rtu.json is patched to use /dev/ems_solis_rtu
+  -> optional read-only Solis Modbus RTU probe runs
+  -> application/controller can start after setup
+```
+
+## Solis RTU config
+
+Edit `/etc/ems_network.conf` after installation if the USB adapter appears on a different port:
+
+```bash
+SOLIS_RTU_ENABLED="1"
+SOLIS_RTU_PORT="/dev/ttyUSB1"
+SOLIS_RTU_STABLE_LINK="/dev/ems_solis_rtu"
+SOLIS_RTU_BAUDRATE="9600"
+SOLIS_RTU_UNIT_ID="1"
+SOLIS_RTU_BOOT_READ_TEST="1"
+SOLIS_RTU_REQUIRED="0"
+SOC_SOLIS_GATEWAY_CONFIG="/root/kinetics-grid-ems/northbound_ems_gateway/configs/soc_solis_field_rtu.json"
+```
+
+`SOLIS_RTU_REQUIRED="0"` means boot will continue even if the inverter is disconnected. Set it to `1` only after the field wiring is final and you want boot to fail if Solis RTU is not detected.
+
+## Solis RTU manual checks
+
+```bash
+ls -l /dev/ttyUSB* /dev/ems_solis_rtu
+stty -F /dev/ems_solis_rtu -a
+/root/kinetics-grid-ems/ems_network_bootup/solis_rtu_modbus_check.py --port /dev/ems_solis_rtu --baudrate 9600 --unit-id 1
+cat /var/log/ems_network_setup.log | grep -i solis -A30
+```
+
+## SOC + Solis controller service
+
+The installer also copies this service file:
+
+```text
+/etc/systemd/system/nb-ems-soc-solis-controller.service
+```
+
+It is installed but not enabled automatically, so that the field team can finish manual Solis read/write validation first. After validation:
+
+```bash
+systemctl stop nb-ems-gateway.service
+systemctl disable nb-ems-gateway.service
+systemctl enable nb-ems-soc-solis-controller.service
+systemctl start nb-ems-soc-solis-controller.service
+journalctl -u nb-ems-soc-solis-controller.service -f
+```
+
+Emergency stop:
+
+```bash
+systemctl stop nb-ems-soc-solis-controller.service
+```

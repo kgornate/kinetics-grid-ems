@@ -16,10 +16,15 @@
   "soc_logic": {
     "high_limit": 98.0,
     "recovery_limit": 75.0,
-    "low_cutoff_limit": 10.0,
+    "low_cutoff_enabled": false,
+    "enable_low_cutoff": false,
+    "low_logic_enabled": false,
+    "low_cutoff_limit": -1.0,
+    "low_limit": -1.0,
+    "lower_limit": -1.0,
     "soc_trend_window_sec": 60.0,
     "soc_trend_negative_delta": 0.1,
-    "state_file": "/tmp/nb_ems_soc_only_controller_state.json"
+    "state_file": "/var/lib/nb-ems-soc-controller/state.json"
   },
   "control": {
     "interval_sec": 5.0,

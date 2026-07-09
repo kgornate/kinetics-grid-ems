@@ -30,9 +30,17 @@ if command -v systemctl >/dev/null 2>&1; then
     systemctl is-active nb-ems-gateway.service >/dev/null 2>&1 && printf 'nb-ems-gateway.service : ACTIVE\n' || printf 'nb-ems-gateway.service : NOT ACTIVE\n'
     systemctl is-active ems-network-setup.service >/dev/null 2>&1 && printf 'ems-network-setup     : ACTIVE\n' || printf 'ems-network-setup     : NOT ACTIVE\n'
     systemctl is-active cloudflared >/dev/null 2>&1 && printf 'cloudflared           : ACTIVE\n' || printf 'cloudflared           : NOT ACTIVE\n'
+    systemctl is-active nb-ems-soc-solis-controller.service >/dev/null 2>&1 && printf 'soc-solis-controller  : ACTIVE\n' || printf 'soc-solis-controller  : NOT ACTIVE\n'
 else
     printf 'systemctl not available\n'
 fi
+
+
+printf '\n[Solis RTU]\n'
+NETWORK_CONFIG_FILE="/etc/ems_network.conf"
+[ -f "$NETWORK_CONFIG_FILE" ] && . "$NETWORK_CONFIG_FILE"
+printf 'enabled=%s port=%s stable_link=%s unit_id=%s baud=%s\n' "${SOLIS_RTU_ENABLED:-0}" "${SOLIS_RTU_PORT:-/dev/ttyUSB1}" "${SOLIS_RTU_STABLE_LINK:-/dev/ems_solis_rtu}" "${SOLIS_RTU_UNIT_ID:-1}" "${SOLIS_RTU_BAUDRATE:-9600}"
+ls -l "${SOLIS_RTU_PORT:-/dev/ttyUSB1}" "${SOLIS_RTU_STABLE_LINK:-/dev/ems_solis_rtu}" 2>/dev/null || true
 
 printf '\n[Port check]\n'
 ss -lntp 2>/dev/null | grep ":$NB_EMS_GATEWAY_API_PORT" || printf 'No process currently listening on port %s\n' "$NB_EMS_GATEWAY_API_PORT"
@@ -73,6 +81,7 @@ fi
 
 printf '\n[Useful live log commands]\n'
 printf 'journalctl -u nb-ems-gateway.service -f\n'
+printf 'journalctl -u nb-ems-soc-solis-controller.service -f\n'
 printf 'journalctl -u nb-ems-gateway.service -n 100 --no-pager\n'
 printf 'cat %s\n' "$NB_EMS_GATEWAY_START_LOG"
 printf '======================================\n'

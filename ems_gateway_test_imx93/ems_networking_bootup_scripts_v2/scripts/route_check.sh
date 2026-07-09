@@ -35,3 +35,14 @@ systemctl is-active cloudflared 2>/dev/null || true
 ps aux | grep cloudflared | grep -v grep || true
 
 echo "======================================"
+
+echo ""
+echo "[Solis RTU serial]"
+echo "enabled=${SOLIS_RTU_ENABLED:-0} configured_port=${SOLIS_RTU_PORT:-/dev/ttyUSB1} stable_link=${SOLIS_RTU_STABLE_LINK:-/dev/ems_solis_rtu} unit_id=${SOLIS_RTU_UNIT_ID:-1} baud=${SOLIS_RTU_BAUDRATE:-9600}"
+ls -l ${SOLIS_RTU_PORT:-/dev/ttyUSB1} ${SOLIS_RTU_STABLE_LINK:-/dev/ems_solis_rtu} 2>/dev/null || true
+if [ -e "${SOLIS_RTU_STABLE_LINK:-/dev/ems_solis_rtu}" ]; then
+    stty -F "${SOLIS_RTU_STABLE_LINK:-/dev/ems_solis_rtu}" -a 2>/dev/null || true
+fi
+if [ -x /root/kinetics-grid-ems/ems_network_bootup/solis_rtu_modbus_check.py ]; then
+    /root/kinetics-grid-ems/ems_network_bootup/solis_rtu_modbus_check.py --port "${SOLIS_RTU_STABLE_LINK:-/dev/ems_solis_rtu}" --baudrate "${SOLIS_RTU_BAUDRATE:-9600}" --unit-id "${SOLIS_RTU_UNIT_ID:-1}" --timeout "${SOLIS_RTU_TIMEOUT_SEC:-3}" 2>/dev/null || true
+fi

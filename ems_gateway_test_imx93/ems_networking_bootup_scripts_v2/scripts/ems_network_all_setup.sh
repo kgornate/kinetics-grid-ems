@@ -20,6 +20,7 @@ load_config
 ETH0_SCRIPT="$SCRIPT_DIR/imx93_eth0_application_setup.sh"
 ETH1_SCRIPT="$SCRIPT_DIR/imx93_eth1_field_setup.sh"
 WIFI_SCRIPT="$SCRIPT_DIR/imx93_wifi_setup.sh"
+SOLIS_RTU_SCRIPT="$SCRIPT_DIR/imx93_solis_rtu_setup.sh"
 
 LOG_FILE="${LOG_FILE:-/var/log/ems_network_setup.log}"
 
@@ -28,14 +29,18 @@ mkdir -p "$(dirname "$LOG_FILE")"
 run_step() {
     STEP_NAME="$1"
     STEP_SCRIPT="$2"
+    STATUS_FILE="/tmp/ems_network_step_status.$$"
+    rm -f "$STATUS_FILE" 2>/dev/null || true
     echo "" | tee -a "$LOG_FILE"
     echo "[$STEP_NAME] Running $STEP_SCRIPT" | tee -a "$LOG_FILE"
     if [ ! -x "$STEP_SCRIPT" ]; then
         echo "ERROR: script not found or not executable: $STEP_SCRIPT" | tee -a "$LOG_FILE"
         return 1
     fi
-    "$STEP_SCRIPT" 2>&1 | tee -a "$LOG_FILE"
-    return ${PIPESTATUS:-0}
+    ( "$STEP_SCRIPT"; echo "$?" > "$STATUS_FILE" ) 2>&1 | tee -a "$LOG_FILE"
+    RC="$(cat "$STATUS_FILE" 2>/dev/null || echo 1)"
+    rm -f "$STATUS_FILE" 2>/dev/null || true
+    return "$RC"
 }
 
 echo "======================================" | tee "$LOG_FILE"
@@ -95,7 +100,16 @@ for TARGET in $FIELD_TARGET_IPS; do
 done
 
 echo "" | tee -a "$LOG_FILE"
-echo "[9] Local API checks" | tee -a "$LOG_FILE"
+if [ "${SOLIS_RTU_ENABLED:-0}" = "1" ]; then
+    run_step "9 Solis inverter Modbus RTU" "$SOLIS_RTU_SCRIPT" || SOLIS_RTU_RESULT=1
+    SOLIS_RTU_RESULT=${SOLIS_RTU_RESULT:-0}
+else
+    echo "[9 Solis inverter Modbus RTU] Skipped because SOLIS_RTU_ENABLED=${SOLIS_RTU_ENABLED:-0}" | tee -a "$LOG_FILE"
+    SOLIS_RTU_RESULT=0
+fi
+
+echo "" | tee -a "$LOG_FILE"
+echo "[10] Local API checks" | tee -a "$LOG_FILE"
 for PORT in "$LOCAL_API_PORT" "$LOCAL_LOGS_PORT"; do
     CODE="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 3 "http://127.0.0.1:$PORT/api/health" 2>/dev/null || echo 000)"
     echo "127.0.0.1:$PORT /api/health -> HTTP $CODE" | tee -a "$LOG_FILE"
@@ -103,7 +117,7 @@ done
 
 if [ "$CLOUDFLARED_ENABLED" = "1" ]; then
     echo "" | tee -a "$LOG_FILE"
-    echo "[10] Cloudflare tunnel status" | tee -a "$LOG_FILE"
+    echo "[11] Cloudflare tunnel status" | tee -a "$LOG_FILE"
     if command -v systemctl >/dev/null 2>&1; then
         if [ "$RESTART_CLOUDFLARED_AFTER_NETWORK" = "1" ]; then
             echo "Restarting cloudflared after network setup..." | tee -a "$LOG_FILE"
@@ -123,6 +137,7 @@ echo "EMS Network Setup Summary" | tee -a "$LOG_FILE"
 echo "eth1 field setup result   : $ETH1_RESULT" | tee -a "$LOG_FILE"
 echo "eth0 application result   : $ETH0_RESULT" | tee -a "$LOG_FILE"
 echo "wifi setup result         : $WIFI_RESULT" | tee -a "$LOG_FILE"
+echo "solis RTU setup result    : ${SOLIS_RTU_RESULT:-0}" | tee -a "$LOG_FILE"
 echo "eth1 final result         : $ETH1_FINAL_RESULT" | tee -a "$LOG_FILE"
 echo "eth0 final result         : $ETH0_FINAL_RESULT" | tee -a "$LOG_FILE"
 echo "Log file                  : $LOG_FILE" | tee -a "$LOG_FILE"
@@ -139,5 +154,13 @@ if [ "$WIFI_RESULT" -ne 0 ]; then
     echo "WARNING: Wi-Fi setup failed. Cloudflare may still work if eth0 LAN has internet." | tee -a "$LOG_FILE"
 fi
 
-echo "EMS full network setup completed." | tee -a "$LOG_FILE"
+if [ "${SOLIS_RTU_RESULT:-0}" -ne 0 ]; then
+    if [ "${SOLIS_RTU_REQUIRED:-0}" = "1" ]; then
+        echo "ERROR: Solis RTU setup failed and SOLIS_RTU_REQUIRED=1." | tee -a "$LOG_FILE"
+        exit 1
+    fi
+    echo "WARNING: Solis RTU setup/probe failed. Network setup continues because SOLIS_RTU_REQUIRED!=1." | tee -a "$LOG_FILE"
+fi
+
+echo "EMS full network + Solis RTU setup completed." | tee -a "$LOG_FILE"
 exit 0

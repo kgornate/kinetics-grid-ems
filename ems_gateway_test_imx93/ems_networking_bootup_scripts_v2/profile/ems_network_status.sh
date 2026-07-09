@@ -51,6 +51,16 @@ for TARGET in ${FIELD_TARGET_IPS:-192.168.1.100 192.168.1.200}; do
     ip route get "$TARGET" 2>/dev/null || true
 done
 
+
+printf '\n[Solis RTU]\n'
+printf 'enabled=%s configured_port=%s stable_link=%s unit_id=%s baud=%s\n' "${SOLIS_RTU_ENABLED:-0}" "${SOLIS_RTU_PORT:-/dev/ttyUSB1}" "${SOLIS_RTU_STABLE_LINK:-/dev/ems_solis_rtu}" "${SOLIS_RTU_UNIT_ID:-1}" "${SOLIS_RTU_BAUDRATE:-9600}"
+ls -l "${SOLIS_RTU_PORT:-/dev/ttyUSB1}" "${SOLIS_RTU_STABLE_LINK:-/dev/ems_solis_rtu}" 2>/dev/null || true
+if systemctl is-active nb-ems-soc-solis-controller.service >/dev/null 2>&1; then
+    printf 'SOC + Solis controller : ACTIVE\n'
+else
+    printf 'SOC + Solis controller : NOT ACTIVE\n'
+fi
+
 printf '\n[Local API checks]\n'
 for PORT in ${LOCAL_API_PORT:-8000} ${LOCAL_LOGS_PORT:-7000}; do
     CODE="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 2 "http://127.0.0.1:$PORT/api/health" 2>/dev/null || echo 000)"
@@ -60,6 +70,7 @@ done
 printf '\nFull network log      : cat /var/log/ems_network_setup.log\n'
 printf 'NorthBound start log  : cat /var/log/nb_ems_gateway_start.log\n'
 printf 'NorthBound live logs  : journalctl -u nb-ems-gateway.service -f\n'
+printf 'SOC+Solis live logs   : journalctl -u nb-ems-soc-solis-controller.service -f\n'
 printf '======================================\n'
 
 # Print NorthBound details after login, similar to the network status banner.
