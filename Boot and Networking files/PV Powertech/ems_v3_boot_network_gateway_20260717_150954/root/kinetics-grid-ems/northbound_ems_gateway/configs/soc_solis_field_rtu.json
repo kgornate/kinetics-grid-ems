@@ -1,0 +1,49 @@
+{
+  "ems": {
+    "x": {
+      "name": "EMS X",
+      "host": "192.168.100.151",
+      "port": 502,
+      "unit_id": 1
+    },
+    "y": {
+      "name": "EMS Y",
+      "host": "192.168.100.153",
+      "port": 502,
+      "unit_id": 1
+    }
+  },
+  "solis": {
+    "enabled": true,
+    "transport": "rtu",
+    "serial_port": "/dev/ttyUSB0",
+    "baudrate": 9600,
+    "unit_id": 1,
+    "timeout": 3.0,
+    "control_method": "holding_onoff_3007",
+    "status_read_enabled": true
+  },
+  "soc_logic": {
+    "high_limit": 98.0,
+    "recovery_limit": 75.0,
+    "low_cutoff_limit": 10.0,
+    "soc_trend_window_sec": 60.0,
+    "soc_trend_negative_delta": 0.1,
+    "state_file": "/var/lib/nb-ems-soc-solis-controller/state.json",
+    "low_cutoff_enabled": false,
+    "enable_low_cutoff": false,
+    "low_logic_enabled": false,
+    "low_recovery_limit": 10.0
+  },
+  "control": {
+    "interval_sec": 5.0,
+    "byte_order": "ABCD",
+    "live_default": false,
+    "force_default": false,
+    "once_default": false,
+    "readback": true,
+    "enable_reset_before_on": false,
+    "enable_offgrid_before_on": false,
+    "inter_device_command_delay_sec": 2.0
+  }
+}

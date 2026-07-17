@@ -1,0 +1,14 @@
+[Unit]
+Description=EMS V3 Solis USB stable link setup
+After=multi-user.target
+Before=ems-v3-boot-summary.service
+Wants=multi-user.target
+
+[Service]
+Type=oneshot
+ExecStart=/root/kinetics-grid-ems/ems_boot_v3/scripts/ems_v3_solis_link.sh
+RemainAfterExit=yes
+TimeoutStartSec=60
+
+[Install]
+WantedBy=multi-user.target

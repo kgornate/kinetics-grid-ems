@@ -1,0 +1,12 @@
+[Unit]
+Description=EMS Boot V3 eth1 field-side setup
+After=network-pre.target
+Before=ems-v3-wifi.service
+
+[Service]
+Type=oneshot
+ExecStart=/root/kinetics-grid-ems/ems_boot_v3/scripts/imx93_eth1_v3.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

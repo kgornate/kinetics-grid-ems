@@ -1,0 +1,17 @@
+[Unit]
+Description=Cloudflared tunnel (V3)
+After=ems-v3-wifi.service
+Wants=ems-v3-wifi.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/cloudflared --no-autoupdate --config /etc/cloudflared/config.yml tunnel run
+Restart=always
+RestartSec=5
+TimeoutStartSec=60
+KillMode=process
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

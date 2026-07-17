@@ -1,0 +1,166 @@
+{
+  "gateway": {
+    "id": "northbound_ems_gateway_1",
+    "name": "NorthBound EMS Gateway",
+    "mode": "ems_read_write"
+  },
+  "network": {
+    "field_interface": "eth1",
+    "application_interface": "eth0"
+  },
+  "existing_ems": {
+    "protocol": "modbus_tcp",
+    "host": "192.168.100.151",
+    "port": 502,
+    "unit_id": 1,
+    "register_function": "holding_registers",
+    "timeout_sec": 2.0,
+    "retries": 2
+  },
+  "register_map": {
+    "path": "data/register_maps/unity261pv_modbus_north_v1.json"
+  },
+  "decoding": {
+    "data_type": "float32",
+    "registers_per_point": 2,
+    "byte_order": "ABCD",
+    "apply_factor": true
+  },
+  "polling": {
+    "enabled": true,
+    "default_interval_sec": 5,
+    "fast_interval_sec": 1,
+    "slow_interval_sec": 10,
+    "max_registers_per_read": 120
+  },
+  "api": {
+    "host": "0.0.0.0",
+    "port": 8000,
+    "commands_enabled": true
+  },
+  "logs_api": {
+    "enabled": true,
+    "host": "0.0.0.0",
+    "port": 7000
+  },
+  "storage": {
+    "enabled": false,
+    "type": "sqlite",
+    "path": "/mnt/ems-logs/northbound_ems_gateway/nb_ems_gateway.db",
+    "required_mount_path": "/mnt/ems-logs",
+    "fail_if_mount_missing": true,
+    "min_free_space_mb": 512,
+    "max_db_size_mb": 2048,
+    "retention_days": 7,
+    "store_mode": "key_signals",
+    "snapshot_interval_sec": 30,
+    "cleanup_on_startup": true,
+    "vacuum_after_cleanup": false
+  },
+  "server_upload": {
+    "enabled": false,
+    "transport": "https_rest",
+    "endpoint_url": "https://CHANGE_ME_SERVER_HOST/api/v1/gateway/telemetry",
+    "api_key": "CHANGE_ME_API_TOKEN",
+    "network_interface": "mlan0",
+    "source_ip": null,
+    "bind_to_interface_source_ip": true,
+    "upload_interval_sec": 10,
+    "timeout_sec": 5,
+    "payload_mode": "key_signals",
+    "buffer_when_offline": true,
+    "max_queue_size": 1000,
+    "verify_tls": true
+  },
+  "logging": {
+    "enabled": true,
+    "min_severity": "debug",
+    "store_access_logs": true,
+    "store_poll_events": true,
+    "store_server_upload_events": true,
+    "store_telemetry_quality_events": true,
+    "max_query_limit": 1000,
+    "default_query_limit": 200,
+    "retention_days": 30,
+    "export_max_rows": 5000
+  },
+  "auth": {
+    "enabled": true,
+    "token_expiry_minutes": 480,
+    "jwt_secret": "northbound-dev-change-this-jwt-secret",
+    "jwt_secret_env": "NB_EMS_JWT_SECRET",
+    "users": [
+      {
+        "username": "customer",
+        "display_name": "Customer Admin",
+        "role": "customer_admin",
+        "password_hash": "nbems_pbkdf2_sha256$210000$X3VuNWdYUFTMT5ZGVvFRwVrO$vnVo87tdggfeqXQuLLDK9Lm0DwnRV7kt0W9Je-hzqvk",
+        "enabled": true
+      },
+      {
+        "username": "internal",
+        "display_name": "Unity ESS Internal",
+        "role": "internal_admin",
+        "password_hash": "nbems_pbkdf2_sha256$210000$n8vPnKeW9CEUJPwRv00-7Bn3$lI3uDC3NmMEsxgMJG2PVek9IPp4lUh1vFk5KT3hPCK8",
+        "enabled": true
+      }
+    ]
+  },
+  "external_ems_units": [
+    {
+      "source_id": "external_ems_1",
+      "display_name": "Chinese EMS 1",
+      "host": "192.168.100.151",
+      "port": 502,
+      "unit_id": 1,
+      "interface": "eth1",
+      "protocol": "modbus_tcp",
+      "register_function": "holding_registers",
+      "timeout_sec": 2.0,
+      "retries": 2,
+      "enabled": true
+    },
+    {
+      "source_id": "external_ems_2",
+      "display_name": "Chinese EMS 2",
+      "host": "192.168.100.153",
+      "port": 502,
+      "unit_id": 1,
+      "interface": "eth1",
+      "protocol": "modbus_tcp",
+      "register_function": "holding_registers",
+      "timeout_sec": 2.0,
+      "retries": 2,
+      "enabled": true
+    }
+  ],
+  "control": {
+    "enabled": true,
+    "default_timeout_sec": 60.0,
+    "off_grid_inter_source_delay_sec": 0.0,
+    "use_mode_precondition_writes": false,
+    "voltage_stabilization": {
+      "sample_interval_sec": 1.0,
+      "stable_window_sec": 10.0,
+      "tolerance_percent": 5.0,
+      "phase_imbalance_tolerance_percent": 5.0,
+      "timeout_sec": 60.0,
+      "minimum_valid_voltage": 10.0
+    }
+  },
+  "soc_protection": {
+    "enabled": false,
+    "background_enabled": true,
+    "dry_run": true,
+    "interval_sec": 10,
+    "high_soc_limit": 95.0,
+    "low_soc_limit": 10.0,
+    "high_recovery_soc": 93.0,
+    "low_recovery_soc": 12.0,
+    "command_cooldown_sec": 60,
+    "readback": true,
+    "soc_signal_name": "soc",
+    "solar_generation_available": null,
+    "standby_when_both_low_and_solar_available": true
+  }
+}
