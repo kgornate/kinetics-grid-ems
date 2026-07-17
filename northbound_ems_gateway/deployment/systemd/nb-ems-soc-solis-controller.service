@@ -1,5 +1,5 @@
 [Unit]
-Description=Northbound EMS SOC + Solis RTU Lower-Cutoff Transition-Aware Controller
+Description=Northbound EMS SOC + Solis RTU Controller
 After=network-online.target
 Wants=network-online.target
 
@@ -7,6 +7,8 @@ Wants=network-online.target
 Type=simple
 WorkingDirectory=/root/kinetics-grid-ems/northbound_ems_gateway
 Environment=PYTHONPATH=/root/kinetics-grid-ems/northbound_ems_gateway/src
+Environment=PYTHONUNBUFFERED=1
+ExecStartPre=/bin/sleep 15
 ExecStart=/usr/bin/python3 /root/kinetics-grid-ems/northbound_ems_gateway/tools/soc_only_controller.py --config configs/soc_solis_field_rtu.json --live --force
 Restart=always
 RestartSec=5

@@ -1,13 +1,15 @@
 [Unit]
-Description=Northbound EMS SOC-only field controller
+Description=Northbound EMS SOC Upper-Limit Controller (No Solis)
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
 WorkingDirectory=/root/kinetics-grid-ems/northbound_ems_gateway
+Environment=PYTHONPATH=/root/kinetics-grid-ems/northbound_ems_gateway/src
 Environment=PYTHONUNBUFFERED=1
-ExecStart=/usr/bin/python3 /root/kinetics-grid-ems/northbound_ems_gateway/tools/soc_only_controller.py --live --interval 5
+ExecStartPre=/bin/sleep 15
+ExecStart=/usr/bin/python3 /root/kinetics-grid-ems/northbound_ems_gateway/tools/soc_only_controller.py --config configs/soc_only_field_no_solar.json --live --force
 Restart=always
 RestartSec=5
 

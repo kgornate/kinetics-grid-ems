@@ -78,3 +78,7 @@ Restore after lower tests requires operator intent:
 ```bash
 python3 tools/soc_only_controller.py --config configs/soc_solis_field_rtu.json --once --live --force --clear-state --low-cutoff-limit 1 --high-limit 200 --recovery-limit 0
 ```
+
+## Superseded note
+
+The original v1.9 text said lower lockout requires manual `--clear-state`. That behavior was updated in v1.10 after field discussion with Bittu. See `docs/v1_10_lower_cutoff_recovery.md` for the current rule: low-cutoff states are held only until latest SOC recovers above `low_recovery_limit`, or immediately ignored when `low_cutoff_enabled=false`.

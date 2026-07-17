@@ -1,7 +1,17 @@
 {
   "ems": {
-    "x": {"name": "EMS X", "host": "192.168.100.151", "port": 502, "unit_id": 1},
-    "y": {"name": "EMS Y", "host": "192.168.100.153", "port": 502, "unit_id": 1}
+    "x": {
+      "name": "EMS X",
+      "host": "192.168.100.151",
+      "port": 502,
+      "unit_id": 1
+    },
+    "y": {
+      "name": "EMS Y",
+      "host": "192.168.100.153",
+      "port": 502,
+      "unit_id": 1
+    }
   },
   "solis": {
     "enabled": false,
@@ -16,15 +26,16 @@
   "soc_logic": {
     "high_limit": 98.0,
     "recovery_limit": 75.0,
-    "low_cutoff_enabled": false,
-    "enable_low_cutoff": false,
-    "low_logic_enabled": false,
-    "low_cutoff_limit": -1.0,
-    "low_limit": -1.0,
-    "lower_limit": -1.0,
+    "low_cutoff_enabled": true,
+    "enable_low_cutoff": true,
+    "low_logic_enabled": true,
+    "low_cutoff_limit": 10,
+    "low_limit": 10,
+    "lower_limit": 10,
     "soc_trend_window_sec": 60.0,
     "soc_trend_negative_delta": 0.1,
-    "state_file": "/var/lib/nb-ems-soc-controller/state.json"
+    "state_file": "/var/lib/nb-ems-soc-controller/state.json",
+    "low_recovery_limit": 15
   },
   "control": {
     "interval_sec": 5.0,

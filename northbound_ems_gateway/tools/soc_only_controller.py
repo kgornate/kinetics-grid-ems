@@ -5,11 +5,13 @@ Confirmed BESS commands:
 - BESS ON  = Manual Mode + Standby  (manual_auto_mode=0, manual_mode_control=2)
 - BESS OFF = Manual Mode + Shutdown (manual_auto_mode=0, manual_mode_control=1)
 
-v1.9 field change:
-- Adds lower SOC cutoff protection as highest-priority logic.
-- If a BESS reaches low_cutoff_limit, that BESS is commanded OFF / Shutdown.
-- If both BESS reach low_cutoff_limit, both are commanded OFF and controller enters
-  BOTH_LOW_CUTOFF_LOCKOUT. No automatic lower-side restart is attempted.
+v1.10 field change:
+- Lower SOC cutoff is now optional/config gated.
+- Low cutoff states are no longer permanent blockers. If the latest SOC has recovered
+  above low_recovery_limit, stale X/Y/BOTH low-cutoff state is cleared and the
+  controller resumes normal/upper-limit logic.
+- This matches the field workflow where an operator may manually inspect/turn on
+  a BESS, after which the gateway continuously reads latest SOC and updates state.
 - Upper SOC and Solis transition-aware behavior from v1.8 is preserved.
 
 Default mode is dry-run. Use --live --force only after validating decisions.
@@ -338,25 +340,39 @@ def decide_states(
     recovery_limit: float,
     low_cutoff_limit: float,
     *,
+    low_cutoff_enabled: bool,
+    low_recovery_limit: float,
     controller_state: str,
     avg_soc_delta: float | None,
     trend_negative_delta: float,
 ) -> tuple[str, dict[str, str], str, str, str | None, str | None, dict[str, Any]]:
     """Return decision, BESS states, solar state, next state, solar reason, low reason and details.
 
-    Lower cutoff has highest priority and no automatic lower-side recovery is implemented.
+    Lower cutoff is highest priority only when enabled. Low-cutoff states are latched
+    while the protected BESS is still below low_recovery_limit. Once latest SOC has
+    recovered, the stale low state is cleared and normal/upper SOC logic resumes.
     """
-    x_low = soc_x <= low_cutoff_limit
-    y_low = soc_y <= low_cutoff_limit
+    low_recovery_limit = max(float(low_recovery_limit), float(low_cutoff_limit))
+    low_state_active = controller_state in {STATE_X_LOW_CUTOFF, STATE_Y_LOW_CUTOFF, STATE_BOTH_LOW_CUTOFF_LOCKOUT}
+
+    x_low = bool(low_cutoff_enabled) and soc_x <= low_cutoff_limit
+    y_low = bool(low_cutoff_enabled) and soc_y <= low_cutoff_limit
+    x_low_recovered = soc_x >= low_recovery_limit
+    y_low_recovered = soc_y >= low_recovery_limit
     x_high = soc_x >= high_limit
     y_high = soc_y >= high_limit
     any_at_or_below_recovery = min(soc_x, soc_y) <= recovery_limit
     soc_decreasing = avg_soc_delta is not None and avg_soc_delta < -abs(float(trend_negative_delta))
     info = {
         "state_before": controller_state,
+        "low_cutoff_enabled": bool(low_cutoff_enabled),
+        "low_state_active": low_state_active,
         "x_low": x_low,
         "y_low": y_low,
         "low_cutoff_limit": low_cutoff_limit,
+        "low_recovery_limit": low_recovery_limit,
+        "x_low_recovered": x_low_recovered,
+        "y_low_recovered": y_low_recovered,
         "x_high": x_high,
         "y_high": y_high,
         "any_at_or_below_recovery": any_at_or_below_recovery,
@@ -365,25 +381,38 @@ def decide_states(
         "soc_decreasing": soc_decreasing,
     }
 
-    # Persistent low-cutoff lockouts. These states require --clear-state / operator action to exit.
-    if controller_state == STATE_BOTH_LOW_CUTOFF_LOCKOUT:
-        return "both_low_cutoff_lockout_hold_both_off", {"X": "OFF", "Y": "OFF"}, SOLAR_HOLD, STATE_BOTH_LOW_CUTOFF_LOCKOUT, None, "BOTH_SOC_BELOW_LOW_LIMIT", info
-    if controller_state == STATE_X_LOW_CUTOFF:
-        if y_low:
-            return "x_low_state_y_now_low_both_low_lockout", {"X": "OFF", "Y": "OFF"}, SOLAR_HOLD, STATE_BOTH_LOW_CUTOFF_LOCKOUT, None, "BOTH_SOC_BELOW_LOW_LIMIT", info
-        return "x_low_cutoff_hold_x_off_y_on", {"X": "OFF", "Y": "ON"}, SOLAR_HOLD, STATE_X_LOW_CUTOFF, None, "X_SOC_BELOW_LOW_LIMIT", info
-    if controller_state == STATE_Y_LOW_CUTOFF:
-        if x_low:
-            return "y_low_state_x_now_low_both_low_lockout", {"X": "OFF", "Y": "OFF"}, SOLAR_HOLD, STATE_BOTH_LOW_CUTOFF_LOCKOUT, None, "BOTH_SOC_BELOW_LOW_LIMIT", info
-        return "y_low_cutoff_hold_x_on_y_off", {"X": "ON", "Y": "OFF"}, SOLAR_HOLD, STATE_Y_LOW_CUTOFF, None, "Y_SOC_BELOW_LOW_LIMIT", info
+    if low_state_active and not low_cutoff_enabled:
+        info["low_state_release"] = "low_cutoff_disabled"
+        controller_state = STATE_NORMAL
 
-    # New lower-side protection. Highest priority before upper SOC/solar logic.
-    if x_low and y_low:
-        return "both_low_cutoff_lockout_both_off", {"X": "OFF", "Y": "OFF"}, SOLAR_HOLD, STATE_BOTH_LOW_CUTOFF_LOCKOUT, None, "BOTH_SOC_BELOW_LOW_LIMIT", info
-    if x_low:
-        return "x_low_cutoff_x_off_y_on", {"X": "OFF", "Y": "ON"}, SOLAR_HOLD, STATE_X_LOW_CUTOFF, None, "X_SOC_BELOW_LOW_LIMIT", info
-    if y_low:
-        return "y_low_cutoff_x_on_y_off", {"X": "ON", "Y": "OFF"}, SOLAR_HOLD, STATE_Y_LOW_CUTOFF, None, "Y_SOC_BELOW_LOW_LIMIT", info
+    # New/current lower-side protection. Highest priority before upper SOC/solar logic.
+    if low_cutoff_enabled:
+        if x_low and y_low:
+            return "both_low_cutoff_both_off", {"X": "OFF", "Y": "OFF"}, SOLAR_HOLD, STATE_BOTH_LOW_CUTOFF_LOCKOUT, None, "BOTH_SOC_BELOW_LOW_LIMIT", info
+        if x_low:
+            return "x_low_cutoff_x_off_y_on", {"X": "OFF", "Y": "ON"}, SOLAR_HOLD, STATE_X_LOW_CUTOFF, None, "X_SOC_BELOW_LOW_LIMIT", info
+        if y_low:
+            return "y_low_cutoff_x_on_y_off", {"X": "ON", "Y": "OFF"}, SOLAR_HOLD, STATE_Y_LOW_CUTOFF, None, "Y_SOC_BELOW_LOW_LIMIT", info
+
+        # Previously latched lower states. Hold only until the relevant BESS SOC has recovered.
+        if controller_state == STATE_BOTH_LOW_CUTOFF_LOCKOUT:
+            if x_low_recovered and y_low_recovered:
+                info["low_state_release"] = "both_soc_recovered"
+                controller_state = STATE_NORMAL
+            else:
+                return "both_low_cutoff_hold_both_off_until_recovery", {"X": "OFF", "Y": "OFF"}, SOLAR_HOLD, STATE_BOTH_LOW_CUTOFF_LOCKOUT, None, "BOTH_SOC_BELOW_LOW_RECOVERY", info
+        elif controller_state == STATE_X_LOW_CUTOFF:
+            if x_low_recovered:
+                info["low_state_release"] = "x_soc_recovered"
+                controller_state = STATE_NORMAL
+            else:
+                return "x_low_cutoff_hold_x_off_y_on_until_recovery", {"X": "OFF", "Y": "ON"}, SOLAR_HOLD, STATE_X_LOW_CUTOFF, None, "X_SOC_BELOW_LOW_RECOVERY", info
+        elif controller_state == STATE_Y_LOW_CUTOFF:
+            if y_low_recovered:
+                info["low_state_release"] = "y_soc_recovered"
+                controller_state = STATE_NORMAL
+            else:
+                return "y_low_cutoff_hold_x_on_y_off_until_recovery", {"X": "ON", "Y": "OFF"}, SOLAR_HOLD, STATE_Y_LOW_CUTOFF, None, "Y_SOC_BELOW_LOW_RECOVERY", info
 
     # Existing upper-side recovery state. Only this state uses SOC trend.
     if controller_state == STATE_BOTH_HIGH_SOLAR_OFF:
@@ -556,7 +585,9 @@ def config_to_arg_defaults(path: str | None) -> dict[str, Any]:
         "byte_order": "ABCD",
         "high_limit": 98.0,
         "recovery_limit": 75.0,
+        "low_cutoff_enabled": False,
         "low_cutoff_limit": 10.0,
+        "low_recovery_limit": 10.0,
         "soc_trend_window_sec": 60.0,
         "soc_trend_negative_delta": 0.1,
         "state_file": "/tmp/nb_ems_soc_solis_controller_state.json",
@@ -603,7 +634,12 @@ def config_to_arg_defaults(path: str | None) -> dict[str, Any]:
     soc_logic = data.get("soc_logic", {})
     defaults["high_limit"] = float(soc_logic.get("high_limit", defaults["high_limit"]))
     defaults["recovery_limit"] = float(soc_logic.get("recovery_limit", defaults["recovery_limit"]))
+    low_enabled = bool(soc_logic.get("low_cutoff_enabled", defaults["low_cutoff_enabled"]))
+    low_enabled = low_enabled or bool(soc_logic.get("enable_low_cutoff", False))
+    low_enabled = low_enabled or bool(soc_logic.get("low_logic_enabled", False))
+    defaults["low_cutoff_enabled"] = low_enabled
     defaults["low_cutoff_limit"] = float(soc_logic.get("low_cutoff_limit", defaults["low_cutoff_limit"]))
+    defaults["low_recovery_limit"] = float(soc_logic.get("low_recovery_limit", soc_logic.get("low_cutoff_limit", defaults["low_recovery_limit"])))
     defaults["soc_trend_window_sec"] = float(soc_logic.get("soc_trend_window_sec", defaults["soc_trend_window_sec"]))
     defaults["soc_trend_negative_delta"] = float(soc_logic.get("soc_trend_negative_delta", defaults["soc_trend_negative_delta"]))
     defaults["state_file"] = soc_logic.get("state_file", defaults["state_file"])
@@ -635,7 +671,9 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--byte-order", default=d["byte_order"], choices=["ABCD", "BADC", "CDAB", "DCBA"])
     p.add_argument("--high-limit", type=float, default=d["high_limit"])
     p.add_argument("--recovery-limit", type=float, default=d["recovery_limit"])
+    p.add_argument("--low-cutoff-enable", action=argparse.BooleanOptionalAction, default=d["low_cutoff_enabled"], help="Enable lower SOC cutoff protection")
     p.add_argument("--low-cutoff-limit", type=float, default=d["low_cutoff_limit"])
+    p.add_argument("--low-recovery-limit", type=float, default=d["low_recovery_limit"], help="SOC threshold for clearing a latched low-cutoff state")
     p.add_argument("--soc-trend-window-sec", type=float, default=d["soc_trend_window_sec"])
     p.add_argument("--soc-trend-negative-delta", type=float, default=d["soc_trend_negative_delta"])
     p.add_argument("--state-file", default=d["state_file"])
@@ -694,11 +732,13 @@ def main() -> int:
     print(json.dumps({
         "timestamp_utc": utc_now(),
         "event": "soc_solis_controller_started",
-        "version": "v1.9_lower_cutoff_transition_aware",
+        "version": "v1.10_lower_cutoff_recovery_transition_aware",
         "mode": "LIVE_WRITES_ENABLED" if args.live else "DRY_RUN_NO_WRITES",
         "high_limit": args.high_limit,
         "recovery_limit": args.recovery_limit,
+        "low_cutoff_enabled": args.low_cutoff_enable,
         "low_cutoff_limit": args.low_cutoff_limit,
+        "low_recovery_limit": args.low_recovery_limit,
         "soc_trend_window_sec": args.soc_trend_window_sec,
         "soc_trend_negative_delta": args.soc_trend_negative_delta,
         "state_file": args.state_file,
@@ -739,6 +779,8 @@ def main() -> int:
                     args.high_limit,
                     args.recovery_limit,
                     args.low_cutoff_limit,
+                    low_cutoff_enabled=args.low_cutoff_enable,
+                    low_recovery_limit=args.low_recovery_limit,
                     controller_state=previous_state,
                     avg_soc_delta=trend.get("avg_soc_delta"),
                     trend_negative_delta=args.soc_trend_negative_delta,
