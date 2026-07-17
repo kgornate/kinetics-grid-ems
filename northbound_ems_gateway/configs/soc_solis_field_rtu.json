@@ -16,7 +16,7 @@
   "solis": {
     "enabled": true,
     "transport": "rtu",
-    "serial_port": "/dev/ttyUSB1",
+    "serial_port": "/dev/ttyUSB0",
     "baudrate": 9600,
     "unit_id": 1,
     "timeout": 3.0,

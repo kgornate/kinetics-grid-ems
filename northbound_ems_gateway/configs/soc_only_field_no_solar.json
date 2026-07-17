@@ -24,8 +24,8 @@
     "status_read_enabled": false
   },
   "soc_logic": {
-    "high_limit": 98.0,
-    "recovery_limit": 75.0,
+    "high_limit": 95.0,
+    "recovery_limit": 80.0,
     "low_cutoff_enabled": true,
     "enable_low_cutoff": true,
     "low_logic_enabled": true,

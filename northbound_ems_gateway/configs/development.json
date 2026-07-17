@@ -44,7 +44,7 @@
     "port": 7000
   },
   "storage": {
-    "enabled": true,
+    "enabled": false,
     "type": "sqlite",
     "path": "/mnt/ems-logs/northbound_ems_gateway/nb_ems_gateway.db",
     "required_mount_path": "/mnt/ems-logs",
