@@ -1,0 +1,4 @@
+# These dependencies are already included in pubspec.yaml in this bundle.
+dependencies:
+  http: ^1.2.2
+  shared_preferences: ^2.3.2

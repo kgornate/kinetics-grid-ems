@@ -79,17 +79,47 @@ class SQLiteStore:
         self.skipped_write_count+=1; self.last_skip_reason='; '.join(h['reasons'])
         return False
 
-    def insert_snapshot(self, asset_id: str, payload: dict[str,Any]) -> bool:
-        now=time.time()
-        if now - self.last_snapshot_write_ts < self.config.snapshot_interval_sec: return False
-        if not self._can_write(): return False
-        ts=datetime.now(timezone.utc).isoformat()
-        signals=payload.get('signals',{}) if self.config.store_mode=='full_snapshot' else payload.get('key_signals',{})
+    def _snapshot_signals(self, payload: dict[str,Any]) -> dict[str,Any]:
+        return payload.get('signals',{}) if self.config.store_mode=='full_snapshot' else payload.get('key_signals',{})
+
+    def _insert_snapshot_rows(self, ts: str, asset_id: str, payload: dict[str,Any]) -> int:
+        signals=self._snapshot_signals(payload)
         stored={k:v for k,v in payload.items() if k!='signals'}; stored['signals']=signals
         self.conn.execute('INSERT INTO telemetry_snapshots(timestamp_utc,asset_id,payload_json) VALUES (?,?,?)',(ts,asset_id,json.dumps(stored,separators=(',',':'))))
         for name,sig in signals.items():
             self.conn.execute('INSERT INTO telemetry_points(timestamp_utc,asset_id,signal_name,category,value,unit,quality,payload_json) VALUES (?,?,?,?,?,?,?,?)',(ts,asset_id,name,sig.get('category'),sig.get('value') if isinstance(sig.get('value'),(int,float)) else None,sig.get('unit'),sig.get('quality','good'),json.dumps(sig,separators=(',',':'))))
-        self.conn.commit(); self.last_snapshot_write_ts=now; return True
+        return len(signals)
+
+    def insert_snapshot(self, asset_id: str, payload: dict[str,Any], *, enforce_interval: bool=True, timestamp_utc: str | None=None, autocommit: bool=True) -> bool:
+        now=time.time()
+        if enforce_interval and now - self.last_snapshot_write_ts < self.config.snapshot_interval_sec: return False
+        if not self._can_write(): return False
+        ts=timestamp_utc or datetime.now(timezone.utc).isoformat()
+        self._insert_snapshot_rows(ts, asset_id, payload)
+        if autocommit:
+            self.conn.commit()
+        self.last_snapshot_write_ts=now
+        return True
+
+    def insert_cycle_snapshots(self, assets: dict[str,dict[str,Any]]) -> dict[str,Any]:
+        now=time.time()
+        if now - self.last_snapshot_write_ts < self.config.snapshot_interval_sec:
+            return {'ok':False,'written_assets':0,'written_points':0,'reason':'interval_not_elapsed'}
+        if not self._can_write():
+            return {'ok':False,'written_assets':0,'written_points':0,'reason':self.last_skip_reason}
+        ts=datetime.now(timezone.utc).isoformat()
+        written_assets=0
+        written_points=0
+        try:
+            for asset_id,payload in assets.items():
+                written_points += self._insert_snapshot_rows(ts, asset_id, payload)
+                written_assets += 1
+            self.conn.commit()
+            self.last_snapshot_write_ts=now
+            return {'ok':True,'timestamp_utc':ts,'written_assets':written_assets,'written_points':written_points}
+        except Exception:
+            self.conn.rollback()
+            raise
 
     def insert_event(self,severity:str,event_type:str,message:str,payload:dict[str,Any]|None=None,*,source:str|None=None,asset_id:str|None=None) -> int | None:
         if not self._can_write(): return None

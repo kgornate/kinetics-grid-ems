@@ -86,8 +86,8 @@ class PollingScheduler:
         self.container.latest_poll_errors = errors[-50:]
         self.cycle_count += 1
         if self.container.storage:
-            for asset_id, asset in self.container.asset_manager.snapshot().items():
-                self.container.storage.insert_snapshot(asset_id, asset)
+            assets_snapshot = self.container.asset_manager.snapshot()
+            self.container.storage.insert_cycle_snapshots(assets_snapshot)
         if self.cycle_count == 1 or bad:
             self.container.event_logger.log(
                 'warning' if bad else 'info',
