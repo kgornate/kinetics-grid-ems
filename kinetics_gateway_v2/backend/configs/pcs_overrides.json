@@ -1,0 +1,4 @@
+{
+  "_note": "Populate this file when the PCS vendor provides data types, scaling, units, writable access, write function codes, enums and bitfields. Keys are PCS register addresses.",
+  "points": {}
+}

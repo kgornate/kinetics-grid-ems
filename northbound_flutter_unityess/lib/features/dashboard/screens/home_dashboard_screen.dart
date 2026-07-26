@@ -16,8 +16,13 @@ import '../widgets/source_summary_card.dart';
 import '../widgets/system_status_panel.dart';
 import 'bms_screen.dart';
 import 'liquid_cooling_screen.dart';
+import 'fire_screen.dart';
+import 'dehumidifier_screen.dart';
 import 'pcs_screen.dart';
 import 'topology_screen.dart';
+import 'utility_meter_screen.dart';
+import 'ems_system_screen.dart';
+import 'strategy_command_screen.dart';
 
 class HomeDashboardScreen extends StatefulWidget {
   final AuthSession session;
@@ -107,6 +112,36 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
   }
 
 
+
+
+Future<void> _goDehumidifier() async {
+  if (widget.onNavigate != null) {
+    widget.onNavigate!(DashboardPage.dehumidifier);
+    return;
+  }
+  _timer?.cancel();
+  if (!mounted) return;
+  Navigator.of(context).pushReplacement(
+    MaterialPageRoute(
+      builder: (_) => DehumidifierScreen(session: widget.session),
+    ),
+  );
+}
+
+Future<void> _goFire() async {
+  if (widget.onNavigate != null) {
+    widget.onNavigate!(DashboardPage.fire);
+    return;
+  }
+  _timer?.cancel();
+  if (!mounted) return;
+  Navigator.of(context).pushReplacement(
+    MaterialPageRoute(
+      builder: (_) => FireScreen(session: widget.session),
+    ),
+  );
+}
+
 Future<void> _goChiller() async {
   if (widget.onNavigate != null) {
     widget.onNavigate!(DashboardPage.chiller);
@@ -121,7 +156,48 @@ Future<void> _goChiller() async {
   );
 }
 
-  Future<void> _logout() async {
+  
+
+Future<void> _goUtilityMeter() async {
+  if (widget.onNavigate != null) {
+    widget.onNavigate!(DashboardPage.utilityMeter);
+    return;
+  }
+  _timer?.cancel();
+  if (!mounted) return;
+  Navigator.of(context).pushReplacement(
+    MaterialPageRoute(builder: (_) => UtilityMeterScreen(session: widget.session)),
+  );
+}
+
+Future<void> _goEmsSystem() async {
+  if (widget.onNavigate != null) {
+    widget.onNavigate!(DashboardPage.emsSystem);
+    return;
+  }
+  _timer?.cancel();
+  if (!mounted) return;
+  Navigator.of(context).pushReplacement(
+    MaterialPageRoute(builder: (_) => EmsSystemScreen(session: widget.session)),
+  );
+}
+
+Future<void> _goStrategy() async {
+  if (widget.onNavigate != null) {
+    widget.onNavigate!(DashboardPage.strategy);
+    return;
+  }
+  _timer?.cancel();
+  if (!mounted) return;
+  Navigator.of(context).pushReplacement(
+    MaterialPageRoute(
+      builder: (_) => StrategyCommandScreen(session: widget.session),
+    ),
+  );
+}
+
+
+Future<void> _logout() async {
     if (widget.onLogout != null) {
       await widget.onLogout!();
       return;
@@ -223,6 +299,11 @@ Future<void> _goChiller() async {
             onPcs: _goPcs,
             onBms: _goBms,
             onChiller: _goChiller,
+            onDehumidifier: _goDehumidifier,
+            onFire: _goFire,
+            onUtilityMeter: _goUtilityMeter,
+            onEmsSystem: _goEmsSystem,
+            onStrategy: _goStrategy,
             onLogout: _logout,
             refreshing: _refreshing,
           ),

@@ -31,7 +31,7 @@ class ApiProfile {
     // Use https://ems-logs.unityess.cloud here only if that tunnel/domain is
     // wired to the same NorthBound v0.5 log routes.
     logsBaseUrl: 'https://ems-api.unityess.cloud',
-    httpTimeout: Duration(seconds: 30),
+    httpTimeout: Duration(seconds: 300),
   );
 
   ApiProfile copyWith({

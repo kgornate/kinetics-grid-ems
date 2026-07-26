@@ -1,5 +1,5 @@
-1. Replace your project lib/ with this bundle lib/.
-2. Run:
-   flutter clean
-   flutter pub get
-   flutter run -d windows
+Replace your current project files with this updated bundle, then run:
+
+flutter clean
+flutter pub get
+flutter run -d windows

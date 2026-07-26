@@ -6,6 +6,11 @@ enum DashboardPage {
   pcs,
   bms,
   chiller,
+  dehumidifier,
+  fire,
+  utilityMeter,
+  emsSystem,
+  strategy,
 }
 
 class DashboardNavActions extends StatelessWidget {
@@ -18,6 +23,11 @@ class DashboardNavActions extends StatelessWidget {
     required this.onPcs,
     required this.onBms,
     required this.onChiller,
+    required this.onDehumidifier,
+    required this.onFire,
+    required this.onUtilityMeter,
+    required this.onEmsSystem,
+    this.onStrategy,
     required this.onLogout,
     this.refreshing = false,
   });
@@ -29,6 +39,11 @@ class DashboardNavActions extends StatelessWidget {
   final VoidCallback onPcs;
   final VoidCallback onBms;
   final VoidCallback onChiller;
+  final VoidCallback onDehumidifier;
+  final VoidCallback onFire;
+  final VoidCallback onUtilityMeter;
+  final VoidCallback onEmsSystem;
+  final VoidCallback? onStrategy;
   final VoidCallback onLogout;
   final bool refreshing;
 
@@ -69,6 +84,18 @@ class DashboardNavActions extends StatelessWidget {
         navButton('BMS', DashboardPage.bms, onBms),
         const SizedBox(width: 4),
         navButton('Chiller', DashboardPage.chiller, onChiller),
+        const SizedBox(width: 4),
+        navButton('Dehum/CS', DashboardPage.dehumidifier, onDehumidifier),
+        const SizedBox(width: 4),
+        navButton('Fire', DashboardPage.fire, onFire),
+        const SizedBox(width: 4),
+        navButton('Meter', DashboardPage.utilityMeter, onUtilityMeter),
+        const SizedBox(width: 4),
+        navButton('EMS', DashboardPage.emsSystem, onEmsSystem),
+        if (onStrategy != null) ...[
+          const SizedBox(width: 4),
+          navButton('Strategy', DashboardPage.strategy, onStrategy!),
+        ],
         const SizedBox(width: 10),
         Text(
           connectionLabel,

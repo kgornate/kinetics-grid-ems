@@ -16,7 +16,12 @@ import '../widgets/mini_trend_card.dart';
 import 'bms_screen.dart';
 import 'home_dashboard_screen.dart';
 import 'liquid_cooling_screen.dart';
+import 'fire_screen.dart';
+import 'dehumidifier_screen.dart';
 import 'topology_screen.dart';
+import 'utility_meter_screen.dart';
+import 'ems_system_screen.dart';
+import 'strategy_command_screen.dart';
 
 class PcsScreen extends StatefulWidget {
   final AuthSession session;
@@ -85,6 +90,21 @@ class _PcsScreenState extends State<PcsScreen> {
         break;
       case DashboardPage.chiller:
         target = LiquidCoolingScreen(session: widget.session);
+        break;
+      case DashboardPage.dehumidifier:
+        target = DehumidifierScreen(session: widget.session);
+        break;
+      case DashboardPage.fire:
+        target = FireScreen(session: widget.session);
+        break;
+      case DashboardPage.utilityMeter:
+        target = UtilityMeterScreen(session: widget.session);
+        break;
+      case DashboardPage.emsSystem:
+        target = EmsSystemScreen(session: widget.session);
+        break;
+      case DashboardPage.strategy:
+        target = StrategyCommandScreen(session: widget.session);
         break;
     }
     Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => target));
@@ -222,6 +242,11 @@ class _PcsScreenState extends State<PcsScreen> {
             onPcs: () {},
             onBms: () => _go(DashboardPage.bms),
             onChiller: () => _go(DashboardPage.chiller),
+            onDehumidifier: () => _go(DashboardPage.dehumidifier),
+            onFire: () => _go(DashboardPage.fire),
+            onUtilityMeter: () => _go(DashboardPage.utilityMeter),
+            onEmsSystem: () => _go(DashboardPage.emsSystem),
+            onStrategy: () => _go(DashboardPage.strategy),
             onLogout: _logout,
             refreshing: _refreshing,
           ),

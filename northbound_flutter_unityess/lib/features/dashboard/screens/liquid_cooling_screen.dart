@@ -17,6 +17,11 @@ import 'bms_screen.dart';
 import 'home_dashboard_screen.dart';
 import 'pcs_screen.dart';
 import 'topology_screen.dart';
+import 'utility_meter_screen.dart';
+import 'ems_system_screen.dart';
+import 'strategy_command_screen.dart';
+import 'fire_screen.dart';
+import 'dehumidifier_screen.dart';
 
 class LiquidCoolingScreen extends StatefulWidget {
   final AuthSession session;
@@ -86,6 +91,21 @@ class _LiquidCoolingScreenState extends State<LiquidCoolingScreen> {
         break;
       case DashboardPage.chiller:
         return;
+      case DashboardPage.dehumidifier:
+        target = DehumidifierScreen(session: widget.session);
+        break;
+      case DashboardPage.fire:
+        target = FireScreen(session: widget.session);
+        break;
+      case DashboardPage.utilityMeter:
+        target = UtilityMeterScreen(session: widget.session);
+        break;
+      case DashboardPage.emsSystem:
+        target = EmsSystemScreen(session: widget.session);
+        break;
+      case DashboardPage.strategy:
+        target = StrategyCommandScreen(session: widget.session);
+        break;
     }
     Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => target));
   }
@@ -213,6 +233,11 @@ class _LiquidCoolingScreenState extends State<LiquidCoolingScreen> {
             onPcs: () => _go(DashboardPage.pcs),
             onBms: () => _go(DashboardPage.bms),
             onChiller: () {},
+            onDehumidifier: () => _go(DashboardPage.dehumidifier),
+            onFire: () => _go(DashboardPage.fire),
+            onUtilityMeter: () => _go(DashboardPage.utilityMeter),
+            onEmsSystem: () => _go(DashboardPage.emsSystem),
+            onStrategy: () => _go(DashboardPage.strategy),
             onLogout: _logout,
             refreshing: _refreshing,
           ),
