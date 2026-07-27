@@ -8,6 +8,7 @@ import 'dashboard_screen.dart';
 import 'diagnostics_screen.dart';
 import 'environment_screen.dart';
 import 'historian_screen.dart';
+import 'pcs_screen.dart';
 import 'racks_screen.dart';
 
 class HomeShell extends StatefulWidget {
@@ -27,6 +28,7 @@ class _HomeShellState extends State<HomeShell> {
     NavigationDestination(icon: Icon(Icons.battery_charging_full_outlined), selectedIcon: Icon(Icons.battery_charging_full), label: 'BAU'),
     NavigationDestination(icon: Icon(Icons.view_column_outlined), selectedIcon: Icon(Icons.view_column), label: 'Racks'),
     NavigationDestination(icon: Icon(Icons.ac_unit_outlined), selectedIcon: Icon(Icons.ac_unit), label: 'Environment'),
+    NavigationDestination(icon: Icon(Icons.power_outlined), selectedIcon: Icon(Icons.power), label: 'PCS'),
     NavigationDestination(icon: Icon(Icons.warning_amber_outlined), selectedIcon: Icon(Icons.warning_amber), label: 'Alarms'),
     NavigationDestination(icon: Icon(Icons.timeline_outlined), selectedIcon: Icon(Icons.timeline), label: 'Historian'),
     NavigationDestination(icon: Icon(Icons.monitor_heart_outlined), selectedIcon: Icon(Icons.monitor_heart), label: 'Diagnostics'),
@@ -41,6 +43,7 @@ class _HomeShellState extends State<HomeShell> {
           : BauScreen(controller: widget.controller),
       RacksScreen(controller: widget.controller),
       EnvironmentScreen(controller: widget.controller),
+      PcsScreen(controller: widget.controller),
       AlarmsScreen(controller: widget.controller),
       HistorianScreen(controller: widget.controller),
       DiagnosticsScreen(controller: widget.controller),

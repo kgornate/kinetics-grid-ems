@@ -143,6 +143,75 @@ const Map<String, String> _friendlyNames = <String, String>{
   'do2': 'Fault indicator',
   'do3': 'Run indicator',
   'do4': 'AC/DC trip relay',
+  // PCS measurements and status registers from the three-phase three-wire protocol.
+  'dc_bus_voltage': 'DC bus voltage',
+  'dc_bus_current': 'DC bus current',
+  'battery_voltage': 'Battery voltage',
+  'battery_current': 'Battery current',
+  'dc_power': 'DC power',
+  'grid_ab_voltage': 'Grid AB line voltage',
+  'grid_bc_voltage': 'Grid BC line voltage',
+  'grid_ca_voltage': 'Grid CA line voltage',
+  'grid_a_current': 'Grid phase A current',
+  'grid_b_current': 'Grid phase B current',
+  'grid_c_current': 'Grid phase C current',
+  'grid_n_current': 'Grid neutral current',
+  'power_factor': 'Power factor',
+  'grid_frequency': 'Grid frequency',
+  'grid_active_power': 'Grid active power',
+  'grid_reactive_power': 'Grid reactive power',
+  'grid_apparent_power': 'Grid apparent power',
+  'igbt_a_temperature': 'IGBT A temperature',
+  'igbt_b_temperature': 'IGBT B temperature',
+  'igbt_c_temperature': 'IGBT C temperature',
+  'cabinet_temperature': 'Cabinet temperature',
+  'positive_bus_voltage': 'Positive DC bus voltage',
+  'negative_bus_voltage': 'Negative DC bus voltage',
+  'inverter_ab_voltage': 'Inverter AB line voltage',
+  'inverter_bc_voltage': 'Inverter BC line voltage',
+  'inverter_ca_voltage': 'Inverter CA line voltage',
+  'pcc_ab_voltage': 'PCC AB line voltage',
+  'reg_112c': 'PCC BC line voltage',
+  'reg_112d': 'PCC CA line voltage',
+  'auxiliary_bus_voltage': 'Auxiliary bus voltage',
+  'phase_a_to_ground_voltage': 'Phase A-to-ground voltage',
+  'phase_b_to_ground_voltage': 'Phase B-to-ground voltage',
+  'phase_c_to_ground_voltage': 'Phase C-to-ground voltage',
+  'battery_positive_ground_impedance': 'Battery positive-to-ground impedance',
+  'battery_negative_ground_impedance': 'Battery negative-to-ground impedance',
+  'operating_state': 'Operating state',
+  'status_word_1': 'Control and authorization status',
+  'status_word_2': 'Grid and battery status',
+  'status_word_3': 'Safety and operating status',
+  'actual_product_mode': 'Product operating mode',
+  'actual_pq_mode': 'PQ operating mode',
+  'reg_1210': 'PCS input/status word',
+  'reg_1211': 'System fault word 1',
+  'reg_1212': 'System fault word 2',
+  'reg_1213': 'Voltage and frequency fault word',
+  'reg_1214': 'Thermal fault word',
+  'reg_1215': 'Hardware overcurrent fault word',
+  'reg_1216': 'Hardware interlock fault word',
+  'reg_1217': 'PWM and inverter enable word',
+  'reg_1218': 'Converter protection fault word',
+  'reg_1219': 'Derating and permission status word',
+  'reg_121a': 'Scheduling and BMS communication status word',
+  'reg_1400': 'Remote start/stop command state',
+  'reg_1401': 'HMI start/stop command state',
+  'reg_1402': 'Remote/local mode setting',
+  'reg_1403': 'Rated power setting',
+  'reg_1404': 'Rated grid voltage setting',
+  'reg_1405': 'Rated grid frequency setting',
+  'reg_1406': 'Product operating mode setting',
+  'reg_1407': 'PQ operating mode setting',
+  'reg_1408': 'VSG feature settings',
+  'reg_1409': 'Active power setpoint',
+  'reg_140a': 'Reactive power setpoint',
+  'reg_140b': 'Power-factor setpoint',
+  'reg_140c': 'DC voltage setpoint',
+  'reg_140d': 'DC current setpoint',
+  'reg_140e': 'AC voltage setpoint',
+  'reg_140f': 'AC current setpoint',
 };
 
 String friendlyName(String key, TelemetryPoint point) {
@@ -171,7 +240,9 @@ String normaliseUnit(String? unit) {
       .replaceAll('Î©/V', 'Ω/V')
       .replaceAll('Î©', 'Ω')
       .replaceAll('Kvar', 'kvar')
-      .replaceAll('KVA', 'kVA');
+      .replaceAll('kVar', 'kvar')
+      .replaceAll('KVA', 'kVA')
+      .replaceAll('Kva', 'kVA');
 }
 
 PresentedValue presentPoint(
@@ -188,6 +259,100 @@ PresentedValue presentPoint(
     if (raw is num) {
       value = float32FromUint32(raw.toInt());
       note = 'Decoded as IEEE-754 float from the current U32 payload';
+    }
+  }
+
+
+  if (assetType == 'pcs' && value is num) {
+    if (key == 'operating_state') {
+      return PresentedValue(
+        value: pcsOperatingStateLabel(value.toInt()),
+        unit: '',
+        note: 'Raw 0x${value.toInt().toRadixString(16).toUpperCase().padLeft(4, '0')}',
+      );
+    }
+    if (key == 'actual_product_mode') {
+      return PresentedValue(
+        value: pcsProductModeLabel(value.toInt()),
+        unit: '',
+        note: 'Mode ${value.toInt()}',
+      );
+    }
+    if (key == 'actual_pq_mode') {
+      return PresentedValue(
+        value: pcsPqModeLabel(value.toInt()),
+        unit: '',
+        note: 'Mode ${value.toInt()}',
+      );
+    }
+    if (key == 'status_word_1' ||
+        key == 'status_word_2' ||
+        key == 'status_word_3') {
+      return PresentedValue(
+        value: '0x${value.toInt().toRadixString(16).toUpperCase().padLeft(4, '0')}',
+        unit: '',
+        note: 'Decoded on the Operating status page',
+      );
+    }
+    if (key == 'reg_1400' || key == 'reg_1401') {
+      final raw = value.toInt() & 0xFFFF;
+      final label = raw == 0xFF00
+          ? 'Start command'
+          : raw == 0x00FF
+              ? 'Stop command'
+              : 'Command 0x${raw.toRadixString(16).toUpperCase().padLeft(4, '0')}';
+      return PresentedValue(value: label, unit: '', note: 'Read-only command state');
+    }
+    if (key == 'reg_1402') {
+      final raw = value.toInt() & 0xFFFF;
+      final label = raw == 0xFF00
+          ? 'Local mode'
+          : raw == 0x00FF
+              ? 'Remote mode'
+              : 'Mode 0x${raw.toRadixString(16).toUpperCase().padLeft(4, '0')}';
+      return PresentedValue(value: label, unit: '', note: 'Read-only setting');
+    }
+    if (key == 'reg_1403') {
+      return PresentedValue(
+        value: _formatNumber(value, decimals: 0),
+        unit: 'kW',
+        note: 'Rated power setting',
+      );
+    }
+    if (key == 'reg_1404') {
+      return PresentedValue(
+        value: _formatNumber(value, decimals: 0),
+        unit: 'V',
+        note: 'Rated grid voltage',
+      );
+    }
+    if (key == 'reg_1406') {
+      return PresentedValue(
+        value: pcsProductModeLabel(value.toInt()),
+        unit: '',
+        note: 'Configured product mode',
+      );
+    }
+    if (key == 'reg_1407') {
+      return PresentedValue(
+        value: pcsPqModeLabel(value.toInt()),
+        unit: '',
+        note: 'Configured PQ mode',
+      );
+    }
+    if (key == 'reg_1408') {
+      final raw = value.toInt();
+      final enabled = <String>[
+        if ((raw & (1 << 1)) != 0) 'Primary voltage control',
+        if ((raw & (1 << 2)) != 0) 'Primary frequency control',
+        if ((raw & (1 << 3)) != 0) 'Grid reactive dispatch',
+        if ((raw & (1 << 4)) != 0) 'Grid active dispatch',
+      ];
+      return PresentedValue(
+        value: enabled.isEmpty ? 'All VSG features off' : enabled.join(', '),
+        unit: '',
+        note: 'Raw 0x${raw.toRadixString(16).toUpperCase().padLeft(4, '0')}',
+      );
     }
   }
 
@@ -298,6 +463,8 @@ String categoryTitle(String key, TelemetryPoint point) {
   final category = (point.category ?? '').toLowerCase();
   if (category == 'control') return 'Control and command registers';
   if (category == 'parameter') return 'Configuration and thresholds';
+  if (category == 'status') return 'Operating status and fault words';
+  if (category == 'version') return 'Software and protocol versions';
   if (category == 'signal') {
     final lower = '${key}_${point.nameEn ?? ''}'.toLowerCase();
     if (lower.contains('alarm') || lower.contains('fault') || lower.contains('warn')) {
@@ -345,6 +512,108 @@ List<MapEntry<String, dynamic>> activeBits(TelemetryPoint point) {
   return point.bitfields.entries
       .where((entry) => entry.value == 1 || entry.value == true)
       .toList();
+}
+
+
+String pcsOperatingStateLabel(int raw) {
+  const labels = <int, String>{
+    0: 'Stop',
+    1: 'Soft start',
+    2: 'Self-check',
+    3: 'Standby',
+    4: 'Running',
+    5: 'Energy-saving run',
+    6: 'Scheduled run',
+    7: 'Derated run',
+    8: 'Off-grid run',
+    9: 'Grid-connected run',
+    10: 'Fault shutdown',
+  };
+  final active = <String>[];
+  for (final entry in labels.entries) {
+    if ((raw & (1 << entry.key)) != 0) active.add(entry.value);
+  }
+  return active.isEmpty ? 'Unknown' : active.join(' + ');
+}
+
+String pcsProductModeLabel(int value) {
+  const labels = <int, String>{
+    0: 'Standalone inverter',
+    1: 'PQ mode',
+    2: 'Aging/test run',
+    3: 'VSG mode',
+    4: 'AC voltage-source mode',
+    5: 'Test mode',
+  };
+  return labels[value] ?? 'Mode $value';
+}
+
+String pcsPqModeLabel(int value) {
+  const labels = <int, String>{
+    0: 'Constant power',
+    1: 'Constant DC voltage',
+    2: 'Constant DC current',
+    3: 'Constant grid voltage',
+    4: 'Constant AC current',
+    5: 'Smart mode',
+    6: 'Scheduled dispatch',
+    7: 'Island mode',
+    8: 'Frequency regulation',
+    9: 'Low-voltage ride-through',
+    10: 'High-voltage ride-through',
+  };
+  return labels[value] ?? 'Mode $value';
+}
+
+String pcsControlLocation(AssetSnapshot asset) {
+  final raw = asset.telemetry['status_word_1']?.value;
+  if (raw is! num) return '--';
+  return (raw.toInt() & 0x0001) != 0 ? 'Remote' : 'Local';
+}
+
+String pcsAuthorizationState(AssetSnapshot asset) {
+  final raw = asset.telemetry['status_word_1']?.value;
+  if (raw is! num) return '--';
+  return (raw.toInt() & 0x0002) != 0 ? 'Authorized' : 'Not authorized';
+}
+
+String pcsDcBreakerState(AssetSnapshot asset) {
+  final raw = asset.telemetry['status_word_2']?.value;
+  if (raw is! num) return '--';
+  return (raw.toInt() & (1 << 6)) != 0 ? 'Open' : 'Closed';
+}
+
+int pcsActiveFaultBitCount(AssetSnapshot asset) {
+  var count = 0;
+  for (final entry in asset.telemetry.entries) {
+    final key = entry.key.toLowerCase();
+    if (!RegExp(r'^reg_121[0-9a]$').hasMatch(key)) continue;
+    count += activeBitCount(entry.value);
+  }
+  return count;
+}
+
+List<String> pcsSummary(AssetSnapshot asset) {
+  String shown(String key, String prefix) {
+    final point = asset.telemetry[key];
+    if (point == null) return '';
+    return '$prefix${presentPoint('pcs', key, point).text}';
+  }
+
+  if (asset.telemetry.isEmpty) {
+    return <String>[
+      'Modbus RTU ID ${asset.unitId ?? '--'}',
+      asset.disabled ? 'Disabled' : 'Waiting for response',
+    ];
+  }
+  return <String>[
+    pcsOperatingStateLabel((asset.telemetry['operating_state']?.value as num?)?.toInt() ?? 0),
+    pcsProductModeLabel((asset.telemetry['actual_product_mode']?.value as num?)?.toInt() ?? -1),
+    shown('dc_bus_voltage', 'DC '),
+    shown('grid_active_power', 'P '),
+    shown('grid_frequency', 'Grid '),
+    shown('cabinet_temperature', 'Cabinet '),
+  ];
 }
 
 List<String> environmentSummary(AssetSnapshot asset) {

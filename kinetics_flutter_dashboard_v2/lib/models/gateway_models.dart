@@ -18,12 +18,16 @@ class TelemetryPoint {
     this.unit,
     this.raw,
     this.bitfields = const <String, dynamic>{},
+    this.bitfieldLabels = const <String, String>{},
     this.key,
     this.nameEn,
     this.nameCn,
     this.address,
     this.category,
     this.access,
+    this.enumLabel,
+    this.decodingStatus,
+    this.hardwareValidation,
   });
 
   final dynamic value;
@@ -31,12 +35,16 @@ class TelemetryPoint {
   final String? unit;
   final dynamic raw;
   final Map<String, dynamic> bitfields;
+  final Map<String, String> bitfieldLabels;
   final String? key;
   final String? nameEn;
   final String? nameCn;
   final String? address;
   final String? category;
   final String? access;
+  final String? enumLabel;
+  final String? decodingStatus;
+  final String? hardwareValidation;
 
   factory TelemetryPoint.fromJson(dynamic json) {
     if (json is! Map) {
@@ -44,18 +52,29 @@ class TelemetryPoint {
     }
     final map = Map<String, dynamic>.from(json as Map);
     final bits = map['b'] ?? map['bitfields'];
+    final rawLabels = map['bitfield_labels'];
+    final labels = <String, String>{};
+    if (rawLabels is Map) {
+      for (final entry in rawLabels.entries) {
+        labels[entry.key.toString()] = entry.value?.toString() ?? '';
+      }
+    }
     return TelemetryPoint(
       value: map.containsKey('v') ? map['v'] : map['value'],
       quality: (map['q'] ?? map['quality'] ?? 'unknown').toString(),
       unit: (map['u'] ?? map['unit'])?.toString(),
       raw: map.containsKey('r') ? map['r'] : map['raw'],
       bitfields: bits is Map ? Map<String, dynamic>.from(bits) : const {},
+      bitfieldLabels: labels,
       key: map['key']?.toString(),
       nameEn: map['name_en']?.toString(),
       nameCn: map['name_cn']?.toString(),
       address: map['address']?.toString(),
       category: map['category']?.toString(),
       access: map['access']?.toString(),
+      enumLabel: map['enum_label']?.toString(),
+      decodingStatus: map['decoding_status']?.toString(),
+      hardwareValidation: map['hardware_validation']?.toString(),
     );
   }
 
@@ -84,12 +103,17 @@ class TelemetryPoint {
         if (unit != null) 'unit': unit,
         if (raw != null) 'raw': raw,
         if (bitfields.isNotEmpty) 'bitfields': bitfields,
+        if (bitfieldLabels.isNotEmpty) 'bitfield_labels': bitfieldLabels,
         if (key != null) 'key': key,
         if (nameEn != null) 'name_en': nameEn,
         if (nameCn != null) 'name_cn': nameCn,
         if (address != null) 'address': address,
         if (category != null) 'category': category,
         if (access != null) 'access': access,
+        if (enumLabel != null) 'enum_label': enumLabel,
+        if (decodingStatus != null) 'decoding_status': decodingStatus,
+        if (hardwareValidation != null)
+          'hardware_validation': hardwareValidation,
       };
 }
 
@@ -98,16 +122,26 @@ class AssetSnapshot {
     required this.assetId,
     required this.assetType,
     required this.online,
+    this.label,
+    this.unitId,
+    this.disabled = false,
     this.rackId,
     this.timestamp,
+    this.transport,
+    this.serialDevice,
     Map<String, TelemetryPoint>? telemetry,
   }) : telemetry = telemetry ?? <String, TelemetryPoint>{};
 
   final String assetId;
   String assetType;
+  String? label;
+  int? unitId;
+  bool disabled;
   int? rackId;
   bool online;
   String? timestamp;
+  String? transport;
+  String? serialDevice;
   final Map<String, TelemetryPoint> telemetry;
 
   factory AssetSnapshot.fromJson(Map<String, dynamic> json) {
@@ -121,9 +155,14 @@ class AssetSnapshot {
     return AssetSnapshot(
       assetId: (json['asset_id'] ?? 'unknown').toString(),
       assetType: (json['asset_type'] ?? 'unknown').toString(),
+      label: json['label']?.toString(),
+      unitId: _asInt(json['unit_id']),
+      disabled: json['disabled'] == true,
       rackId: _asInt(json['rack_id']),
       online: json['online'] == true,
       timestamp: json['timestamp']?.toString(),
+      transport: json['transport']?.toString(),
+      serialDevice: json['serial_device']?.toString(),
       telemetry: points,
     );
   }
@@ -132,9 +171,16 @@ class AssetSnapshot {
     if (json.containsKey('asset_type')) {
       assetType = json['asset_type']?.toString() ?? assetType;
     }
+    if (json.containsKey('label')) label = json['label']?.toString();
+    if (json.containsKey('unit_id')) unitId = _asInt(json['unit_id']);
+    if (json.containsKey('disabled')) disabled = json['disabled'] == true;
     if (json.containsKey('rack_id')) rackId = _asInt(json['rack_id']);
     if (json.containsKey('online')) online = json['online'] == true;
     if (json['timestamp'] != null) timestamp = json['timestamp'].toString();
+    if (json.containsKey('transport')) transport = json['transport']?.toString();
+    if (json.containsKey('serial_device')) {
+      serialDevice = json['serial_device']?.toString();
+    }
     final rawTelemetry = json['telemetry'];
     if (rawTelemetry is Map) {
       for (final entry in rawTelemetry.entries) {
@@ -148,13 +194,23 @@ class AssetSnapshot {
                 quality: incoming.quality,
                 unit: incoming.unit ?? existing.unit,
                 raw: incoming.raw,
-                bitfields: incoming.bitfields.isEmpty ? existing.bitfields : incoming.bitfields,
+                bitfields: incoming.bitfields.isEmpty
+                    ? existing.bitfields
+                    : incoming.bitfields,
+                bitfieldLabels: incoming.bitfieldLabels.isEmpty
+                    ? existing.bitfieldLabels
+                    : incoming.bitfieldLabels,
                 key: incoming.key ?? existing.key,
                 nameEn: incoming.nameEn ?? existing.nameEn,
                 nameCn: incoming.nameCn ?? existing.nameCn,
                 address: incoming.address ?? existing.address,
                 category: incoming.category ?? existing.category,
                 access: incoming.access ?? existing.access,
+                enumLabel: incoming.enumLabel ?? existing.enumLabel,
+                decodingStatus:
+                    incoming.decodingStatus ?? existing.decodingStatus,
+                hardwareValidation:
+                    incoming.hardwareValidation ?? existing.hardwareValidation,
               );
       }
     }
@@ -179,9 +235,14 @@ class AssetSnapshot {
   Map<String, dynamic> toJson() => {
         'asset_id': assetId,
         'asset_type': assetType,
+        if (label != null) 'label': label,
+        if (unitId != null) 'unit_id': unitId,
+        'disabled': disabled,
         'rack_id': rackId,
         'online': online,
         'timestamp': timestamp,
+        if (transport != null) 'transport': transport,
+        if (serialDevice != null) 'serial_device': serialDevice,
         'telemetry': telemetry.map((key, value) => MapEntry(key, value.toJson())),
       };
 }
@@ -196,6 +257,18 @@ class PlantSnapshot {
 
   AssetSnapshot? get bank => assets['bms_bank'];
   AssetSnapshot? get pcs => assets['pcs_1'];
+
+  List<AssetSnapshot> get pcsDevices {
+    final result = assets.values
+        .where((asset) => asset.assetType == 'pcs')
+        .toList();
+    result.sort((a, b) {
+      final byUnit = (a.unitId ?? 999).compareTo(b.unitId ?? 999);
+      if (byUnit != 0) return byUnit;
+      return a.assetId.compareTo(b.assetId);
+    });
+    return result;
+  }
 
   List<AssetSnapshot> get racks {
     final result = assets.values
@@ -250,8 +323,21 @@ class PlantSnapshot {
       }
     }
 
+    // Legacy single-PCS field retained for older gateway versions.
     final pcsJson = message['pcs'];
     if (pcsJson is Map) _upsert(Map<String, dynamic>.from(pcsJson));
+
+    // Current RTU gateway publishes all four Unit IDs here.
+    final pcsDevicesJson = message['pcs_devices'];
+    if (pcsDevicesJson is Map) {
+      for (final item in pcsDevicesJson.values.whereType<Map>()) {
+        _upsert(Map<String, dynamic>.from(item));
+      }
+    } else if (pcsDevicesJson is List) {
+      for (final item in pcsDevicesJson.whereType<Map>()) {
+        _upsert(Map<String, dynamic>.from(item));
+      }
+    }
 
     final alarmJson = message['alarms'];
     if (alarmJson is List) {

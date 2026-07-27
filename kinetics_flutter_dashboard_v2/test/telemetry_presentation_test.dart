@@ -20,4 +20,17 @@ void main() {
     final shown = presentPoint('bms_rack', 'tcell_max', point);
     expect(shown.text, '23.3 °C');
   });
+
+  test('PCS operating-state bit mask is presented as an engineering state', () {
+    const point = TelemetryPoint(value: 1, raw: 1, quality: 'good');
+    final shown = presentPoint('pcs', 'operating_state', point);
+    expect(shown.value, 'Stop');
+  });
+
+  test('PCS product and PQ modes are presented in English', () {
+    const product = TelemetryPoint(value: 1, raw: 1, quality: 'good');
+    const pq = TelemetryPoint(value: 0, raw: 0, quality: 'good');
+    expect(presentPoint('pcs', 'actual_product_mode', product).value, 'PQ mode');
+    expect(presentPoint('pcs', 'actual_pq_mode', pq).value, 'Constant power');
+  });
 }

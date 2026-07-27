@@ -6,6 +6,7 @@ import '../models/gateway_models.dart';
 import '../widgets/common_widgets.dart';
 import 'bau_screen.dart';
 import 'environment_asset_screen.dart';
+import 'pcs_detail_screen.dart';
 import 'rack_detail_screen.dart';
 
 class DashboardScreen extends StatelessWidget {
@@ -18,7 +19,7 @@ class DashboardScreen extends StatelessWidget {
     final bank = controller.plant.bank;
     final racks = controller.plant.racks;
     final environments = controller.plant.environment;
-    final pcs = controller.plant.pcs;
+    final pcsDevices = controller.plant.pcsDevices;
     final onlineAssets = controller.plant.assets.values.where((asset) => asset.online).length;
     final effectiveVoltage = _effectiveBankVoltage(bank, racks);
     final effectiveCurrent = _effectiveBankCurrent(bank, racks);
@@ -133,15 +134,54 @@ class DashboardScreen extends StatelessWidget {
             },
           ),
           const SizedBox(height: 24),
-          SectionHeader('PCS'),
+          SectionHeader(
+            'Power conversion system',
+            subtitle: 'Four Modbus RTU PCS units on one RS485 bus',
+          ),
           const SizedBox(height: 12),
-          if (pcs != null)
-            SizedBox(
-              height: 170,
-              child: RichAssetCard(
-                asset: pcs,
-                metrics: [pcs.telemetry.isEmpty ? 'Disabled in BMS-only configuration' : '${pcs.telemetry.length} telemetry points'],
+          if (pcsDevices.isEmpty)
+            const Card(
+              child: ListTile(
+                leading: Icon(Icons.electrical_services),
+                title: Text('No PCS devices received yet'),
               ),
+            )
+          else
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final count = constraints.maxWidth > 1050 ? 2 : 1;
+                return GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: count,
+                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 12,
+                    childAspectRatio: 2.2,
+                  ),
+                  itemCount: pcsDevices.length,
+                  itemBuilder: (context, index) {
+                    final pcs = pcsDevices[index];
+                    return RichAssetCard(
+                      asset: pcs,
+                      title: pcs.label ?? 'PCS ${pcs.unitId ?? index + 1}',
+                      metrics: [
+                        'RTU ID ${pcs.unitId ?? '--'}',
+                        ...pcsSummary(pcs),
+                      ],
+                      warningCount: _alarmCount(pcs.assetId),
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => PcsDetailScreen(
+                            controller: controller,
+                            assetId: pcs.assetId,
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                );
+              },
             ),
           const SizedBox(height: 24),
           SectionHeader('Active alarms', subtitle: '${controller.activeAlarms.length} active alarms'),

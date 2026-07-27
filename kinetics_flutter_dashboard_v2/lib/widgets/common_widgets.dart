@@ -457,7 +457,11 @@ IconData iconForAsset(String type) {
 }
 
 String assetTitle(AssetSnapshot asset) {
+  if (asset.label != null && asset.label!.trim().isNotEmpty) {
+    return asset.label!.trim();
+  }
   if (asset.rackId != null) return 'Rack ${asset.rackId} / BCU ${asset.rackId}';
+  if (asset.assetType == 'pcs') return 'PCS ${asset.unitId ?? asset.assetId.replaceAll('pcs_', '')}';
   const names = <String, String>{
     'bms_bank': 'BMS Bank / BAU',
     'hvac': 'HVAC',
@@ -467,7 +471,6 @@ String assetTitle(AssetSnapshot asset) {
     'dehumidifier_2': 'Dehumidifier 2',
     'safety_io': 'Safety and fire I/O',
     'environment_other': 'Other environment',
-    'pcs_1': 'PCS',
   };
   return names[asset.assetId] ?? prettifyKey(asset.assetId);
 }

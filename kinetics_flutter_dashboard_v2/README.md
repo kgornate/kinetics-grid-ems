@@ -75,3 +75,8 @@ The networking client uses `dart:io`, so this source is intended for Windows des
 ## V2.3 stability update
 
 The BAU, environment asset, and generic telemetry "All points" expansion panels now have explicit Material/Card ancestors. This fixes the intermittent red-screen error that could require closing and reopening a view. See `PATCH_NOTES_V2_3.md`.
+
+
+## V2.5 PCS topology
+
+The PCS area supports four physical PCS units connected to one RS485 bus through Modbus RTU slave IDs 1–4. The gateway must publish the devices in `pcs_devices`; the legacy single `pcs` field remains supported.
