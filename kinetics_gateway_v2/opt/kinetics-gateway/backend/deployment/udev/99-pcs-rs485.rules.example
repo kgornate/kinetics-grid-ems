@@ -1,0 +1,5 @@
+# Replace VENDOR_ID, PRODUCT_ID and ADAPTER_SERIAL after running:
+#   udevadm info --query=property --name=/dev/ttyUSB0
+# Then install this file as /etc/udev/rules.d/99-pcs-rs485.rules.
+# A stable alias prevents ttyUSB0/ttyUSB1 numbering changes after reboot.
+SUBSYSTEM=="tty", ATTRS{idVendor}=="VENDOR_ID", ATTRS{idProduct}=="PRODUCT_ID", ATTRS{serial}=="ADAPTER_SERIAL", SYMLINK+="pcs_rs485", GROUP="dialout", MODE="0660"

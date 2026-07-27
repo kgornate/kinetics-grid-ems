@@ -1,0 +1,29 @@
+ADDED
+- app/protocols/modbus_rtu.py
+- configs/kinetics_hardware_bms_4pcs_rtu_template.json
+- tools/pcs_rtu_probe.py
+- tests/test_modbus_rtu.py
+- deployment/update_pcs_rtu_on_imx93.sh
+- deployment/udev/99-pcs-rs485.rules.example
+- PCS_RTU_INTEGRATION.md
+
+UPDATED FOR PCS RTU / MULTI-PCS ONLY
+- app/core/config.py
+- app/assets/pcs_driver.py
+- app/services/gateway_service.py
+- app/api/routes.py
+- app/main.py (version/description only)
+- tools/hardware_read_validation.py
+- tools/mock_smoke_test.py
+- requirements.txt (pyserial)
+
+EXPLICITLY UNCHANGED
+- app/assets/bms_driver.py
+- generated_protocols/bms_catalog.json
+- etc/config.json
+- etc/network.conf
+- systemd/kinetics-gateway.service
+- systemd/kinetics-network.service
+- deployment/kinetics-gateway.service
+- deployment/network/kinetics-network.service
+- deployment/network/kinetics-network-setup.sh

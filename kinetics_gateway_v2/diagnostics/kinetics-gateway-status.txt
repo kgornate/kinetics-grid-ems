@@ -1,0 +1,26 @@
+● kinetics-gateway.service - Kinetics EMS Gateway V2
+     Loaded: loaded (/etc/systemd/system/kinetics-gateway.service; enabled; preset: disabled)
+    Drop-In: /etc/systemd/system/kinetics-gateway.service.d
+             └─network-guard.conf, override.conf
+     Active: active (running) since Sun 2026-07-26 12:48:47 UTC; 1h 27min ago
+ Invocation: c53fb728cdf44ea5993c042018205cc9
+    Process: 1043 ExecStartPre=/bin/mkdir -p /opt/kinetics-gateway/backend/data (code=exited, status=0/SUCCESS)
+    Process: 1045 ExecStartPre=/bin/mkdir -p /mnt/ems-logs/kinetics-gateway (code=exited, status=0/SUCCESS)
+    Process: 1048 ExecStartPre=/bin/mkdir -p /var/log/kinetics-gateway (code=exited, status=0/SUCCESS)
+   Main PID: 1050 (uvicorn)
+      Tasks: 14 (limit: 2062)
+     Memory: 341.5M (peak: 342.1M)
+        CPU: 25min 47.489s
+     CGroup: /system.slice/kinetics-gateway.service
+             └─1050 /opt/kinetics-gateway/venv/bin/python3 /opt/kinetics-gateway/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
+
+Jul 26 14:16:20 imx93-11x11-lpddr4x-frdm uvicorn[1050]: 2026-07-26 14:16:20,771 INFO kinetics.http GET /api/storage/status status=200 elapsed_ms=141.8
+Jul 26 14:16:20 imx93-11x11-lpddr4x-frdm uvicorn[1050]: INFO:     49.14.142.16:0 - "GET /api/storage/status HTTP/1.1" 200 OK
+Jul 26 14:16:21 imx93-11x11-lpddr4x-frdm uvicorn[1050]: 2026-07-26 14:16:21,437 INFO kinetics.http GET /api/diagnostics/polling status=200 elapsed_ms=782.0
+Jul 26 14:16:21 imx93-11x11-lpddr4x-frdm uvicorn[1050]: INFO:     2402:8100:27eb:1bcc:6db4:32e5:38d0:b9d2:0 - "GET /api/diagnostics/polling HTTP/1.1" 200 OK
+Jul 26 14:16:21 imx93-11x11-lpddr4x-frdm uvicorn[1050]: INFO:     49.14.142.16:0 - "WebSocket /ws/telemetry?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJpbnRlcm5hbCIsInJvbGUiOiJpbnRlcm5hbCIsImlhdCI6MTc4NTA3NDA0MSwiZXhwIjoxNzg1MTE3MjQxLCJnYXRld2F5X2lkIjoia2luZXRpY3NfZ2F0ZXdheV8xIn0.tRgUEPRr6L1YM8PM7vsXP2Vs5fH05S2vr1m44w7qVgI&mode=delta" [accepted]
+Jul 26 14:16:21 imx93-11x11-lpddr4x-frdm uvicorn[1050]: INFO:     connection open
+Jul 26 14:16:22 imx93-11x11-lpddr4x-frdm uvicorn[1050]: 2026-07-26 14:16:22,224 INFO kinetics.http GET /api/health status=200 elapsed_ms=1589.8
+Jul 26 14:16:22 imx93-11x11-lpddr4x-frdm uvicorn[1050]: INFO:     49.14.142.16:0 - "GET /api/health HTTP/1.1" 200 OK
+Jul 26 14:16:22 imx93-11x11-lpddr4x-frdm uvicorn[1050]: 2026-07-26 14:16:22,230 INFO kinetics.http GET /api/diagnostics/data-rate status=200 elapsed_ms=1570.5
+Jul 26 14:16:22 imx93-11x11-lpddr4x-frdm uvicorn[1050]: INFO:     49.14.142.16:0 - "GET /api/diagnostics/data-rate HTTP/1.1" 200 OK
