@@ -21,7 +21,7 @@ def test_multirate_initialization_contains_every_active_group(tmp_path):
     assert len(snapshot["bank"]["telemetry"]) == 155
     assert all(len(rack["telemetry"]) == 371 for rack in snapshot["racks"])
     assert sum(len(asset["telemetry"]) for asset in snapshot["environment"].values()) == 131
-    assert len(snapshot["pcs"]["telemetry"]) == 230
+    assert len(snapshot["pcs"]["telemetry"]) == 288
     for name in ("fast", "normal", "slow", "bulk", "pcs"):
         assert snapshot["polling"][name]["count"] >= 1
 

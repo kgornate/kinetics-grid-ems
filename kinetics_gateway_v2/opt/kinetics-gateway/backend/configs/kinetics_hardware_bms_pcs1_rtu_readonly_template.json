@@ -60,10 +60,10 @@
     "write_enabled": false
   },
   "pcs": {
-    "enabled": false,
+    "enabled": true,
     "transport": "rtu",
     "serial": {
-      "device": "/dev/pcs_rs485",
+      "device": "/dev/ttyUSB0",
       "baudrate": 38400,
       "bytesize": 8,
       "parity": "N",
@@ -77,24 +77,6 @@
         "unit_id": 1,
         "enabled": true,
         "label": "PCS 1"
-      },
-      {
-        "asset_id": "pcs_2",
-        "unit_id": 2,
-        "enabled": false,
-        "label": "PCS 2"
-      },
-      {
-        "asset_id": "pcs_3",
-        "unit_id": 3,
-        "enabled": false,
-        "label": "PCS 3"
-      },
-      {
-        "asset_id": "pcs_4",
-        "unit_id": 4,
-        "enabled": false,
-        "label": "PCS 4"
       }
     ],
     "timeout_seconds": 2.0,
@@ -103,7 +85,7 @@
     "write_enabled": false,
     "overrides_file": "configs/pcs_overrides.json",
     "max_registers_per_request": 120,
-    "commissioning_status": "PCS1 unit ID 1 validated read-only at 38400 8N1; PCS2-PCS4 slave IDs pending"
+    "commissioning_status": "PCS1 hardware validated read-only 38400 8N1 unit 1; using temporary /dev/ttyUSB0"
   },
   "storage": {
     "preferred_root": "/mnt/ems-logs/kinetics-gateway",

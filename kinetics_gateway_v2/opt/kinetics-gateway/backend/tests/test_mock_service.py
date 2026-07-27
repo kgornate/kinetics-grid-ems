@@ -20,7 +20,7 @@ def test_mock_snapshot_all_assets(tmp_path):
     assert snapshot["bank"]["asset_id"] == "bms_bank"
     assert len(snapshot["racks"]) == 4
     assert "hvac" in snapshot["environment"]
-    assert len(snapshot["pcs"]["telemetry"]) == 230
+    assert len(snapshot["pcs"]["telemetry"]) == 288
     assert len(service.assets()) >= 12
 
 

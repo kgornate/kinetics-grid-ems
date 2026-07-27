@@ -109,7 +109,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Kinetics Gateway V2",
-    version="2.2.0-pcs-rtu-4pcs",
+    version="2.3.0-pcs-hmi-map-rtu",
     description=(
         "FRDM i.MX93 BMS/PCS gateway with unchanged BMS Modbus TCP support, four-PCS Modbus RTU/RS485, "
         "delta WebSockets, JWT security, compressed SQLite historian and mock/hardware modes"

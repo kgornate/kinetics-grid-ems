@@ -1,24 +1,29 @@
 {
   "points": {
-    "0x0001": {
-      "key": "dc_voltage",
-      "name_en": "DC Voltage",
-      "data_type": "U16",
+    "0x1100": {
+      "key": "dc_bus_voltage",
+      "name_en": "DC bus voltage",
+      "data_type": "S16",
       "register_count": 1,
       "scale": 0.1,
       "unit": "V",
-      "access": "R",
-      "word_order": "big"
+      "access": "R"
     },
-    "0x0035": {
-      "key": "remote_start_stop",
-      "name_en": "Remote Start Stop",
+    "0x1200": {
+      "key": "operating_state",
+      "name_en": "PCS operating state",
       "data_type": "U16",
       "register_count": 1,
       "scale": 1,
-      "access": "R/W",
-      "write_function": 6,
-      "enum": {"0": "Stop", "1": "Start"}
+      "access": "R",
+      "enum": {
+        "1": "Stopped",
+        "8": "Standby",
+        "16": "Running",
+        "256": "Off-grid",
+        "512": "Grid-connected",
+        "1024": "Fault shutdown"
+      }
     }
   }
 }

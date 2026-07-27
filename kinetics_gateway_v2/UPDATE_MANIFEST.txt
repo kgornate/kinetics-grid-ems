@@ -1,29 +1,18 @@
-ADDED
-- app/protocols/modbus_rtu.py
-- configs/kinetics_hardware_bms_4pcs_rtu_template.json
-- tools/pcs_rtu_probe.py
-- tests/test_modbus_rtu.py
-- deployment/update_pcs_rtu_on_imx93.sh
-- deployment/udev/99-pcs-rs485.rules.example
-- PCS_RTU_INTEGRATION.md
+Version: 2.3.0-pcs-hmi-map-rtu
+Date: 2026-07-27
 
-UPDATED FOR PCS RTU / MULTI-PCS ONLY
-- app/core/config.py
-- app/assets/pcs_driver.py
-- app/services/gateway_service.py
-- app/api/routes.py
-- app/main.py (version/description only)
-- tools/hardware_read_validation.py
-- tools/mock_smoke_test.py
-- requirements.txt (pyserial)
+PCS-specific changes:
+- Replaced obsolete 0x0001-0x00E6 PCS catalog with working HMI map at 0x1100-0x1634.
+- Added HMI metadata extraction from PCS.xlsx, cfg_sys.json and cfg_alarm.json.
+- Added verified scaling, signed decoding, enums and PCS fault bitfields where supported by HMI files.
+- Confirmed PCS1 serial settings: 38400 8N1, slave ID 1, FC03, offset 0.
+- Added PCS1 read-only enable/disable helper scripts.
+- Kept PCS writes disabled and PCS2-PCS4 disabled pending actual IDs.
 
-EXPLICITLY UNCHANGED
-- app/assets/bms_driver.py
-- generated_protocols/bms_catalog.json
-- etc/config.json
-- etc/network.conf
-- systemd/kinetics-gateway.service
-- systemd/kinetics-network.service
-- deployment/kinetics-gateway.service
-- deployment/network/kinetics-network.service
-- deployment/network/kinetics-network-setup.sh
+Not changed:
+- BMS driver and BMS catalog
+- Active /etc/kinetics-gateway/config.json
+- Network scripts and network guard
+- systemd units
+- Cloudflare configuration
+- Authentication, historian and storage

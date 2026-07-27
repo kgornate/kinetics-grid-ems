@@ -1,40 +1,21 @@
-KINETICS GATEWAY V2.2 - FOUR PCS MODBUS RTU/RS485 UPDATE
-Date: 2026-07-26
+Kinetics Gateway V2.3 - PCS HMI-map Modbus RTU update
 
-This package was created from the FRDM i.MX93 backup:
-kinetics_gateway_backup_20260726_141428(1).zip
+Confirmed on hardware:
+- PCS1 Modbus RTU over one USB-RS485 adapter
+- /dev/ttyUSB0 during commissioning
+- 38400 baud, 8N1
+- Unit ID 1
+- FC03
+- Direct register addressing (offset 0)
+- 0x1100 count 34: 10/10 successful reads
+- 0x1200 operating-state read successful
 
-CONFIRMED DESIGN
-- BMS remains on the existing Modbus TCP implementation.
-- Four PCS units will use one shared Modbus RTU/RS485 bus.
-- Each PCS is represented as pcs_1, pcs_2, pcs_3 and pcs_4.
-- The four slave IDs are currently staged as 1,2,3,4 but are UNCONFIRMED.
+The actual PCS catalog now comes from the working Windows HMI package:
+- 269 PCS.xlsx registers
+- 19 additional HMI-config registers
+- 288 catalog points total
 
-SAFETY
-- The existing active etc/config.json is unchanged.
-- Existing systemd and network files are unchanged.
-- The new RTU template has pcs.enabled=false and write_enabled=false.
-- Do not enable RTU polling until serial settings and slave IDs are confirmed.
-- Do not enable writes until data types, scaling and command definitions are confirmed.
-
-UPDATE EXISTING BOARD WITHOUT REPLACING CONFIG OR SYSTEMD
-1. Copy this package to the board and extract it.
-2. Run as root:
-   sh opt/kinetics-gateway/backend/deployment/update_pcs_rtu_on_imx93.sh
-3. The script updates only PCS/multi-PCS application files and installs pyserial.
-4. It does not replace /etc/kinetics-gateway, network scripts or systemd units.
-
-STAGING CONFIG
-opt/kinetics-gateway/backend/configs/kinetics_hardware_bms_4pcs_rtu_template.json
-
-READ-ONLY PCS TEST TOOL
-opt/kinetics-gateway/backend/tools/pcs_rtu_probe.py
-
-FULL NOTES
-opt/kinetics-gateway/backend/PCS_RTU_INTEGRATION.md
-
-VALIDATION
-- 21 automated tests passed.
-- Legacy one-PCS TCP config remains backward compatible.
-- Four-PCS mock RTU snapshot and shared-bus model were tested.
-- Modbus RTU CRC and FC03 frame parsing were tested.
+Safety:
+- PCS writes are disabled.
+- PCS2-PCS4 are disabled until their actual slave IDs are confirmed.
+- Existing BMS code/catalog, /etc config, networking, Cloudflare and systemd units are not replaced by the patch updater.

@@ -50,7 +50,7 @@ class PcsSerialConfig(BaseModel):
     """Shared RS485 serial-bus parameters for all configured PCS slaves."""
 
     device: str = "/dev/pcs_rs485"
-    baudrate: int = 9600
+    baudrate: int = 38400
     bytesize: Literal[7, 8] = 8
     parity: Literal["N", "E", "O"] = "N"
     stopbits: Literal[1, 2] = 1
@@ -108,7 +108,7 @@ class PcsConfig(BaseModel):
     write_enabled: bool = False
     overrides_file: str = "configs/pcs_overrides.json"
     max_registers_per_request: int = 120
-    commissioning_status: str = "vendor_serial_parameters_pending"
+    commissioning_status: str = "pcs1_readonly_hardware_validated_2026_07_27"
 
     @model_validator(mode="after")
     def validate_and_expand_devices(self) -> "PcsConfig":

@@ -88,7 +88,10 @@ class PcsModbusDriver:
             return self.disabled_asset(device)
 
         client = self._client_for(device)
-        points = sorted(self.catalog.points, key=lambda point: int(point["address"]))
+        points = sorted(
+            (point for point in self.catalog.points if point.get("poll_enabled", True)),
+            key=lambda point: int(point["address"]),
+        )
         telemetry: dict[str, Any] = {}
         errors: list[dict[str, Any]] = []
         index = 0
@@ -138,13 +141,23 @@ class PcsModbusDriver:
                             word_order=str(point.get("word_order") or "big"),
                         )
                         payload["decoding_status"] = "decoded"
+                    enum_map = point.get("enum") or {}
+                    if enum_map and not isinstance(payload.get("value"), list):
+                        payload["enum_label"] = enum_map.get(str(payload.get("raw")))
+                    if point.get("bitfields"):
+                        payload["bitfield_labels"] = {
+                            str(bit["key"]): bit.get("name_en") or bit.get("name_cn")
+                            for bit in point["bitfields"]
+                        }
                     telemetry[str(point["key"])] = {
                         **payload,
                         "key": point["key"],
                         "name_en": point.get("name_en"),
                         "name_cn": point.get("name_cn"),
                         "address": point.get("address_hex"),
+                        "category": point.get("category"),
                         "access": point.get("access", "R"),
+                        "hardware_validation": point.get("hardware_validation"),
                     }
             except Exception as error:
                 LOGGER.warning(

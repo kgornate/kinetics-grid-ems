@@ -87,7 +87,7 @@ def test_four_pcs_rtu_mock_snapshot(tmp_path: Path):
     snapshot = service.snapshot()
     assert snapshot["pcs"]["asset_id"] == "pcs_1"
     assert set(snapshot["pcs_devices"]) == {"pcs_1", "pcs_2", "pcs_3", "pcs_4"}
-    assert all(len(asset["telemetry"]) == 230 for asset in snapshot["pcs_devices"].values())
+    assert all(len(asset["telemetry"]) == 288 for asset in snapshot["pcs_devices"].values())
     event = service.poll_pcs()
     assert len(event["assets"]) == 4
     assert service.data_rate_analysis()["field_modbus"]["groups"]["pcs"]["configured_devices"] == 4

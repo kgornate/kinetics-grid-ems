@@ -16,6 +16,6 @@ def test_bms_catalog_is_complete():
 
 def test_pcs_catalog_has_all_rows():
     catalog = ProtocolCatalog.load(project_root() / "generated_protocols/pcs_catalog.json")
-    assert len(catalog.points) == 230
-    assert catalog.points[0]["address"] == 1
-    assert catalog.points[-1]["address"] == 0x00E6
+    assert len(catalog.points) == 288
+    assert catalog.points[0]["address"] == 0x1100
+    assert catalog.points[-1]["address"] == 0x1634
