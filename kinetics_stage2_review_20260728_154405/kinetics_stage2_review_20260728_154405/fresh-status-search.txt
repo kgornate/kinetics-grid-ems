@@ -1,0 +1,93 @@
+/opt/kinetics-gateway/backend/FIELD_VALIDATED_CONTROL_SEQUENCE_V2_5.md:37:- `GET /api/control-sequence/capabilities`
+/opt/kinetics-gateway/backend/FIELD_VALIDATED_CONTROL_SEQUENCE_V2_5.md:38:- `GET /api/control-sequence/{pair_id}/status?fresh=true`
+/opt/kinetics-gateway/backend/FIELD_VALIDATED_CONTROL_SEQUENCE_V2_5.md:39:- `POST /api/control-sequence/{pair_id}/automatic-start`
+/opt/kinetics-gateway/backend/FIELD_VALIDATED_CONTROL_SEQUENCE_V2_5.md:40:- `POST /api/control-sequence/{pair_id}/next-step`
+/opt/kinetics-gateway/backend/FIELD_VALIDATED_CONTROL_SEQUENCE_V2_5.md:41:- `POST /api/control-sequence/{pair_id}/configure-pcs`
+/opt/kinetics-gateway/backend/FIELD_VALIDATED_CONTROL_SEQUENCE_V2_5.md:42:- `POST /api/control-sequence/{pair_id}/enable-rack`
+/opt/kinetics-gateway/backend/FIELD_VALIDATED_CONTROL_SEQUENCE_V2_5.md:43:- `POST /api/control-sequence/{pair_id}/start-precharge`
+/opt/kinetics-gateway/backend/FIELD_VALIDATED_CONTROL_SEQUENCE_V2_5.md:44:- `POST /api/control-sequence/{pair_id}/start-pcs`
+/opt/kinetics-gateway/backend/FIELD_VALIDATED_CONTROL_SEQUENCE_V2_5.md:45:- `POST /api/control-sequence/{pair_id}/set-power`
+/opt/kinetics-gateway/backend/FIELD_VALIDATED_CONTROL_SEQUENCE_V2_5.md:46:- `POST /api/control-sequence/{pair_id}/zero-power`
+/opt/kinetics-gateway/backend/FIELD_VALIDATED_CONTROL_SEQUENCE_V2_5.md:47:- `POST /api/control-sequence/{pair_id}/safe-stop`
+/opt/kinetics-gateway/backend/FIELD_VALIDATED_CONTROL_SEQUENCE_V2_5.md:48:- `POST /api/control-sequence/{pair_id}/abort`
+/opt/kinetics-gateway/backend/app/api/routes.py:225:    @router.get("/api/control-sequence/capabilities")
+/opt/kinetics-gateway/backend/app/api/routes.py:229:    @router.get("/api/control-sequence/{pair_id}/status")
+/opt/kinetics-gateway/backend/app/api/routes.py:236:            return service.control_sequence.status(pair_id, fresh=fresh)
+/opt/kinetics-gateway/backend/app/api/routes.py:244:    @router.post("/api/control-sequence/{pair_id}/automatic-start", status_code=202)
+/opt/kinetics-gateway/backend/app/api/routes.py:269:    @router.post("/api/control-sequence/{pair_id}/next-step")
+/opt/kinetics-gateway/backend/app/api/routes.py:292:    @router.post("/api/control-sequence/{pair_id}/precheck")
+/opt/kinetics-gateway/backend/app/api/routes.py:309:    @router.post("/api/control-sequence/{pair_id}/enable-rack")
+/opt/kinetics-gateway/backend/app/api/routes.py:328:    @router.post("/api/control-sequence/{pair_id}/start-insulation")
+/opt/kinetics-gateway/backend/app/api/routes.py:347:    @router.get("/api/control-sequence/{pair_id}/verify-insulation")
+/opt/kinetics-gateway/backend/app/api/routes.py:361:    @router.post("/api/control-sequence/{pair_id}/start-precharge")
+/opt/kinetics-gateway/backend/app/api/routes.py:380:    @router.post("/api/control-sequence/{pair_id}/recover-bms")
+/opt/kinetics-gateway/backend/app/api/routes.py:399:    @router.get("/api/control-sequence/{pair_id}/verify-ready")
+/opt/kinetics-gateway/backend/app/api/routes.py:413:    @router.post("/api/control-sequence/{pair_id}/prepare-pcs-standby")
+/opt/kinetics-gateway/backend/app/api/routes.py:432:    @router.post("/api/control-sequence/{pair_id}/configure-pcs")
+/opt/kinetics-gateway/backend/app/api/routes.py:451:    @router.post("/api/control-sequence/{pair_id}/start-pcs")
+/opt/kinetics-gateway/backend/app/api/routes.py:470:    @router.post("/api/control-sequence/{pair_id}/set-power")
+/opt/kinetics-gateway/backend/app/api/routes.py:489:    @router.post("/api/control-sequence/{pair_id}/zero-power")
+/opt/kinetics-gateway/backend/app/api/routes.py:508:    @router.get("/api/control-sequence/{pair_id}/verify-power")
+/opt/kinetics-gateway/backend/app/api/routes.py:522:    @router.post("/api/control-sequence/{pair_id}/safe-stop")
+/opt/kinetics-gateway/backend/app/api/routes.py:541:    @router.post("/api/control-sequence/{pair_id}/abort")
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:280:    def status(self, pair_id: str, *, fresh: bool = True) -> dict[str, Any]:
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:514:        status = self.status(pair_id, fresh=True)
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:609:        status = self.status(pair_id, fresh=True)
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:646:        status = self.status(pair_id, fresh=True)
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:693:        status_before = self.status(pair_id, fresh=True)
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:726:                observed = self.status(pair_id, fresh=True)
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:792:        status = self.status(pair_id, fresh=True)
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:924:        status_before = self.status(pair_id, fresh=True)
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:963:                current = self.status(pair_id, fresh=True)
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1019:            status = self.status(pair_id, fresh=True)
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1082:        before = self.status(pair_id, fresh=True)
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1107:            verified = self.status(pair_id, fresh=True)
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1143:        before = self.status(pair_id, fresh=True)
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1172:                current = self.status(pair_id, fresh=True)
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1280:            last_status = self.status(pair_id, fresh=True)
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1398:                final_status = self.status(pair_id, fresh=True)
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1628:                name=f"control-sequence-{pair_id}",
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1649:            "status_endpoint": f"/api/control-sequence/{pair_id}/status?fresh=true",
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1772:        status = self.status(pair_id, fresh=True)
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1836:            "status": self.status(pair_id, fresh=True),
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1884:                status = self.status(pair_id, fresh=True)
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:2027:                "status": "GET /api/control-sequence/{pair_id}/status?fresh=true",
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:2028:                "next_step": "POST /api/control-sequence/{pair_id}/next-step",
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:2029:                "automatic_start": "POST /api/control-sequence/{pair_id}/automatic-start",
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:2030:                "set_power": "POST /api/control-sequence/{pair_id}/set-power",
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:2031:                "zero_power": "POST /api/control-sequence/{pair_id}/zero-power",
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:2032:                "safe_stop": "POST /api/control-sequence/{pair_id}/safe-stop",
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:2033:                "abort": "POST /api/control-sequence/{pair_id}/abort",
+/opt/kinetics-gateway/backend/STAGED_BMS_PCS_CONTROL.md:193:- `GET /api/control-sequence/capabilities`
+/opt/kinetics-gateway/backend/STAGED_BMS_PCS_CONTROL.md:194:- `GET /api/control-sequence/{pair_id}/status`
+/opt/kinetics-gateway/backend/STAGED_BMS_PCS_CONTROL.md:195:- `POST /api/control-sequence/{pair_id}/precheck`
+/opt/kinetics-gateway/backend/STAGED_BMS_PCS_CONTROL.md:196:- `POST /api/control-sequence/{pair_id}/enable-rack`
+/opt/kinetics-gateway/backend/STAGED_BMS_PCS_CONTROL.md:197:- `POST /api/control-sequence/{pair_id}/start-precharge`
+/opt/kinetics-gateway/backend/STAGED_BMS_PCS_CONTROL.md:198:- `GET /api/control-sequence/{pair_id}/verify-ready`
+/opt/kinetics-gateway/backend/STAGED_BMS_PCS_CONTROL.md:199:- `POST /api/control-sequence/{pair_id}/configure-pcs`
+/opt/kinetics-gateway/backend/STAGED_BMS_PCS_CONTROL.md:200:- `POST /api/control-sequence/{pair_id}/start-pcs`
+/opt/kinetics-gateway/backend/STAGED_BMS_PCS_CONTROL.md:201:- `POST /api/control-sequence/{pair_id}/set-power`
+/opt/kinetics-gateway/backend/STAGED_BMS_PCS_CONTROL.md:202:- `GET /api/control-sequence/{pair_id}/verify-power`
+/opt/kinetics-gateway/backend/STAGED_BMS_PCS_CONTROL.md:203:- `POST /api/control-sequence/{pair_id}/safe-stop`
+/opt/kinetics-gateway/backend/tools/control_sequence_cli.py:65:        result = request_json(f"{base}/api/control-sequence/capabilities", token=token)
+/opt/kinetics-gateway/backend/tools/control_sequence_cli.py:67:        result = request_json(f"{base}/api/control-sequence/{pair}/status?fresh=true", token=token)
+/opt/kinetics-gateway/backend/tools/control_sequence_cli.py:72:            f"{base}/api/control-sequence/{pair}/precheck",
+/opt/kinetics-gateway/backend/tools/control_sequence_cli.py:80:            f"{base}/api/control-sequence/{pair}/enable-rack",
+/opt/kinetics-gateway/backend/tools/control_sequence_cli.py:98:            f"{base}/api/control-sequence/{pair}/{endpoint}",
+/opt/kinetics-gateway/backend/tools/control_sequence_cli.py:103:        result = request_json(f"{base}/api/control-sequence/{pair}/verify-insulation", token=token)
+/opt/kinetics-gateway/backend/tools/control_sequence_cli.py:105:        result = request_json(f"{base}/api/control-sequence/{pair}/verify-ready", token=token)
+/opt/kinetics-gateway/backend/tools/control_sequence_cli.py:110:            f"{base}/api/control-sequence/{pair}/set-power",
+/opt/kinetics-gateway/backend/tools/control_sequence_cli.py:119:        result = request_json(f"{base}/api/control-sequence/{pair}/verify-power", token=token)
+/opt/kinetics-gateway/backend/tools/control_sequence_cli.py:122:            f"{base}/api/control-sequence/{pair}/zero-power",
+/opt/kinetics-gateway/backend/tools/control_sequence_cli.py:139:            f"{base}/api/control-sequence/{pair}/automatic-start",
+/opt/kinetics-gateway/backend/tools/control_sequence_cli.py:146:            f"{base}/api/control-sequence/{pair}/next-step",
+/opt/kinetics-gateway/backend/tools/control_sequence_cli.py:156:            f"{base}/api/control-sequence/{pair}/safe-stop",
+/opt/kinetics-gateway/backend/tools/control_sequence_cli.py:162:            f"{base}/api/control-sequence/{pair}/abort",
+/opt/kinetics-gateway/backend/CONTROL_SEQUENCE_API_V2_5.md:7:`GET /api/control-sequence/capabilities`
+/opt/kinetics-gateway/backend/CONTROL_SEQUENCE_API_V2_5.md:13:`GET /api/control-sequence/pair_1/status?fresh=true`
+/opt/kinetics-gateway/backend/CONTROL_SEQUENCE_API_V2_5.md:25:`POST /api/control-sequence/pair_1/automatic-start`
+/opt/kinetics-gateway/backend/CONTROL_SEQUENCE_API_V2_5.md:41:`POST /api/control-sequence/pair_1/next-step`
+/opt/kinetics-gateway/backend/CONTROL_SEQUENCE_API_V2_5.md:55:`POST /api/control-sequence/pair_1/set-power`
+/opt/kinetics-gateway/backend/CONTROL_SEQUENCE_API_V2_5.md:69:`POST /api/control-sequence/pair_1/zero-power`
+/opt/kinetics-gateway/backend/CONTROL_SEQUENCE_API_V2_5.md:77:`POST /api/control-sequence/pair_1/safe-stop`
+/opt/kinetics-gateway/backend/CONTROL_SEQUENCE_API_V2_5.md:88:`POST /api/control-sequence/pair_1/abort`

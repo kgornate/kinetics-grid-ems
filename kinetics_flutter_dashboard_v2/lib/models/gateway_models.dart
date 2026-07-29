@@ -402,3 +402,212 @@ int? _asInt(dynamic value) {
   if (value is num) return value.toInt();
   return int.tryParse(value?.toString() ?? '');
 }
+
+class ControlPairSummary {
+  const ControlPairSummary({
+    required this.pairId,
+    required this.rackId,
+    required this.pcsAssetId,
+    required this.enabled,
+  });
+
+  factory ControlPairSummary.fromJson(Map<String, dynamic> json) {
+    return ControlPairSummary(
+      pairId: json['pair_id']?.toString() ?? 'pair_1',
+      rackId: _asInt(json['rack_id']) ?? 1,
+      pcsAssetId: json['pcs_asset_id']?.toString() ?? 'pcs_1',
+      enabled: _asBool(json['enabled']) ?? false,
+    );
+  }
+
+  final String pairId;
+  final int rackId;
+  final String pcsAssetId;
+  final bool enabled;
+}
+
+class ControlSequenceCapabilities {
+  const ControlSequenceCapabilities({
+    required this.enabled,
+    required this.fullAutomaticAllowed,
+    required this.confirmationPhrase,
+    required this.automaticConfirmationPhrase,
+    required this.pairs,
+    required this.safetyLimits,
+    required this.raw,
+  });
+
+  factory ControlSequenceCapabilities.fromJson(Map<String, dynamic> json) {
+    final pairItems = json['pairs'];
+    return ControlSequenceCapabilities(
+      enabled: _asBool(json['enabled']) ?? false,
+      fullAutomaticAllowed:
+          _asBool(json['full_automatic_sequence_allowed']) ?? false,
+      confirmationPhrase:
+          json['confirmation_phrase']?.toString() ?? 'EXECUTE_STAGE_WRITE',
+      automaticConfirmationPhrase:
+          json['automatic_confirmation_phrase']?.toString() ??
+              'EXECUTE_AUTOMATIC_SEQUENCE',
+      pairs: pairItems is List
+          ? pairItems
+              .whereType<Map>()
+              .map((item) =>
+                  ControlPairSummary.fromJson(Map<String, dynamic>.from(item)))
+              .toList()
+          : const <ControlPairSummary>[],
+      safetyLimits: _asMap(json['safety_limits']),
+      raw: Map<String, dynamic>.from(json),
+    );
+  }
+
+  final bool enabled;
+  final bool fullAutomaticAllowed;
+  final String confirmationPhrase;
+  final String automaticConfirmationPhrase;
+  final List<ControlPairSummary> pairs;
+  final Map<String, dynamic> safetyLimits;
+  final Map<String, dynamic> raw;
+
+  double get maxPowerKw =>
+      _asDouble(safetyLimits['max_abs_power_kw']) ?? 240.0;
+
+  double get defaultRampStepKw =>
+      _asDouble(safetyLimits['automatic_power_ramp_step_kw']) ?? 10.0;
+
+  double get defaultRampIntervalSeconds =>
+      _asDouble(safetyLimits['automatic_power_ramp_interval_seconds']) ?? 1.0;
+}
+
+class ControlSequenceStep {
+  const ControlSequenceStep({
+    required this.key,
+    required this.label,
+    required this.complete,
+    required this.status,
+    this.message,
+  });
+
+  factory ControlSequenceStep.fromJson(Map<String, dynamic> json) {
+    final status = json['status']?.toString();
+    final complete = _asBool(json['complete']) ?? status == 'success';
+    return ControlSequenceStep(
+      key: json['key']?.toString() ?? '',
+      label: json['label']?.toString() ??
+          (json['key']?.toString() ?? 'Sequence step'),
+      complete: complete,
+      status: status ?? (complete ? 'success' : 'pending'),
+      message: json['message']?.toString(),
+    );
+  }
+
+  final String key;
+  final String label;
+  final bool complete;
+  final String status;
+  final String? message;
+
+  bool get running => status == 'running';
+  bool get failed => status == 'failed';
+}
+
+class ControlSequenceStatus {
+  const ControlSequenceStatus({
+    required this.pairId,
+    required this.timestamp,
+    required this.summary,
+    required this.blockers,
+    required this.workflow,
+    required this.runtime,
+    required this.writeGates,
+    required this.errors,
+    required this.raw,
+  });
+
+  factory ControlSequenceStatus.fromJson(Map<String, dynamic> json) {
+    final pair = _asMap(json['pair']);
+    final summary = _asMap(json['summary']);
+    final workflow = _asMap(json['workflow']);
+    final runtime = _asMap(json['runtime']);
+    return ControlSequenceStatus(
+      pairId: pair['pair_id']?.toString() ?? 'pair_1',
+      timestamp: json['timestamp']?.toString(),
+      summary: summary,
+      blockers: _asMap(summary['blockers']),
+      workflow: workflow,
+      runtime: runtime,
+      writeGates: _asMap(json['write_gates']),
+      errors: json['errors'] is List
+          ? List<dynamic>.from(json['errors'] as List)
+          : const <dynamic>[],
+      raw: Map<String, dynamic>.from(json),
+    );
+  }
+
+  final String pairId;
+  final String? timestamp;
+  final Map<String, dynamic> summary;
+  final Map<String, dynamic> blockers;
+  final Map<String, dynamic> workflow;
+  final Map<String, dynamic> runtime;
+  final Map<String, dynamic> writeGates;
+  final List<dynamic> errors;
+  final Map<String, dynamic> raw;
+
+  String get systemState => workflow['system_state']?.toString() ?? 'unknown';
+  String get runStatus => runtime['run_status']?.toString() ?? 'idle';
+  String? get runId => runtime['run_id']?.toString();
+  String? get lastError => runtime['last_error']?.toString();
+  bool get stoppedSafe => _asBool(workflow['stopped_safe']) ?? false;
+  bool get readyForPower => _asBool(workflow['ready_for_power']) ?? false;
+  bool get hardBlocked => _asBool(workflow['hard_blocked']) ?? false;
+  bool get automaticRunning => runStatus == 'running';
+  bool get controlEnabled =>
+      (_asBool(writeGates['control_sequence_enabled']) ?? false) &&
+      writeGates['gateway_mode']?.toString() == 'control_enabled' &&
+      (_asBool(writeGates['bms_write_enabled']) ?? false) &&
+      (_asBool(writeGates['pcs_write_enabled']) ?? false);
+
+  double? value(String key) => _asDouble(summary[key]);
+  bool flag(String key) => _asBool(summary[key]) ?? false;
+  bool blocker(String key) => _asBool(blockers[key]) ?? false;
+
+  List<ControlSequenceStep> get workflowSteps {
+    final items = workflow['steps'];
+    if (items is! List) return const <ControlSequenceStep>[];
+    return items
+        .whereType<Map>()
+        .map((item) =>
+            ControlSequenceStep.fromJson(Map<String, dynamic>.from(item)))
+        .toList();
+  }
+
+  List<ControlSequenceStep> get runSteps {
+    final items = runtime['steps'];
+    if (items is! List) return const <ControlSequenceStep>[];
+    return items
+        .whereType<Map>()
+        .map((item) =>
+            ControlSequenceStep.fromJson(Map<String, dynamic>.from(item)))
+        .toList();
+  }
+}
+
+double? _asDouble(dynamic value) {
+  if (value is num) return value.toDouble();
+  return double.tryParse(value?.toString() ?? '');
+}
+
+bool? _asBool(dynamic value) {
+  if (value is bool) return value;
+  if (value is num) return value != 0;
+  final text = value?.toString().toLowerCase();
+  if (text == 'true' || text == '1') return true;
+  if (text == 'false' || text == '0') return false;
+  return null;
+}
+
+Map<String, dynamic> _asMap(dynamic value) {
+  if (value is Map<String, dynamic>) return value;
+  if (value is Map) return Map<String, dynamic>.from(value);
+  return <String, dynamic>{};
+}

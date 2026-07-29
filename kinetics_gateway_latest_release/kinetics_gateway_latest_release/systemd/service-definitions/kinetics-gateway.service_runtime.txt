@@ -1,0 +1,10 @@
+MainPID=0
+NRestarts=0
+ExecStart={ path=/opt/kinetics-gateway/venv/bin/uvicorn ; argv[]=/opt/kinetics-gateway/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 ; ignore_errors=no ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }
+MemoryCurrent=[not set]
+MemoryPeak=[not set]
+Environment=KINETICS_CONFIG=/etc/kinetics-gateway/config.json
+ActiveState=inactive
+SubState=dead
+FragmentPath=/etc/systemd/system/kinetics-gateway.service
+DropInPaths=/etc/systemd/system/kinetics-gateway.service.d/20-sd-storage.conf /etc/systemd/system/kinetics-gateway.service.d/network-guard.conf /etc/systemd/system/kinetics-gateway.service.d/override.conf

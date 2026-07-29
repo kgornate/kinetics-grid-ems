@@ -1,0 +1,3 @@
+[Tue Jul 28 13:18:46 2026] kworker/0:0 invoked oom-killer: gfp_mask=0x40cc0(GFP_KERNEL|__GFP_COMP), order=0, oom_score_adj=0
+[Tue Jul 28 13:18:46 2026] oom-kill:constraint=CONSTRAINT_NONE,nodemask=(null),cpuset=/,mems_allowed=0,global_oom,task_memcg=/system.slice/kinetics-gateway.service,task=uvicorn,pid=22292,uid=0
+[Tue Jul 28 13:18:46 2026] Out of memory: Killed process 22292 (uvicorn) total-vm:1731924kB, anon-rss:1196936kB, file-rss:232kB, shmem-rss:0kB, UID:0 pgtables:2536kB oom_score_adj:0

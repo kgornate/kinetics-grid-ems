@@ -1,0 +1,18 @@
+/opt/kinetics-gateway/backend/app/main.py:115:        "manual staged BMS-to-PCS control, delta WebSockets, JWT security, compressed SQLite historian and mock/hardware modes"
+/opt/kinetics-gateway/backend/app/api/routes.py:6:from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect, status
+/opt/kinetics-gateway/backend/app/api/routes.py:653:    @router.websocket("/ws/telemetry")
+/opt/kinetics-gateway/backend/app/api/routes.py:655:        websocket: WebSocket,
+/opt/kinetics-gateway/backend/app/api/routes.py:662:            await websocket.close(code=4401)
+/opt/kinetics-gateway/backend/app/api/routes.py:664:        await websocket.accept()
+/opt/kinetics-gateway/backend/app/api/routes.py:668:                    await websocket.send_json(service.snapshot())
+/opt/kinetics-gateway/backend/app/api/routes.py:671:            await websocket.send_json(service.compact_snapshot())
+/opt/kinetics-gateway/backend/app/api/routes.py:675:                    await websocket.send_json(update)
+/opt/kinetics-gateway/backend/app/api/routes.py:678:        except WebSocketDisconnect:
+/opt/kinetics-gateway/backend/app/api/routes.py:681:    @router.websocket("/ws/alarms")
+/opt/kinetics-gateway/backend/app/api/routes.py:682:    async def alarm_socket(websocket: WebSocket, token: str = Query(...)) -> None:
+/opt/kinetics-gateway/backend/app/api/routes.py:686:            await websocket.close(code=4401)
+/opt/kinetics-gateway/backend/app/api/routes.py:688:        await websocket.accept()
+/opt/kinetics-gateway/backend/app/api/routes.py:692:                await websocket.send_json({"alarms": alarms, "count": len(alarms)})
+/opt/kinetics-gateway/backend/app/api/routes.py:694:        except WebSocketDisconnect:
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:755:                "transport": "WebSocket initial compact snapshot plus multi-rate delta events",
+/opt/kinetics-gateway/backend/app/assets/bms_driver.py:58:    def _read_chunked(self, client: ModbusTcpClient, endpoint: Endpoint, block: ReadBlock) -> list[int]:

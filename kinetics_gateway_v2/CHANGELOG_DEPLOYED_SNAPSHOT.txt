@@ -1,0 +1,8 @@
+This bundle is an exact snapshot of the source currently deployed under
+/opt/kinetics-gateway.
+
+It does not assign an invented application version.
+
+Previously applied patches may already be merged into the deployed source.
+Review patch-history, source timestamps, Git data and diagnostics to reconstruct
+the deployment history.

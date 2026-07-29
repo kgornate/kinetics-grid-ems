@@ -1,0 +1,9 @@
+Package type: Actual deployed gateway snapshot
+Gateway hostname: imx93-11x11-lpddr4x-frdm
+Capture time: 2026-07-29T05:13:47+00:00
+
+Gateway service command:
+{ path=/opt/kinetics-gateway/venv/bin/uvicorn ; argv[]=/opt/kinetics-gateway/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 ; ignore_errors=no ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }
+
+Git revision:
+No Git revision available

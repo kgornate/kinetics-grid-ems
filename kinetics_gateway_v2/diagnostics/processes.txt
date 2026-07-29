@@ -1,0 +1,165 @@
+UID          PID    PPID  C STIME TTY          TIME CMD
+root           1       0  6 05:12 ?        00:00:05 /sbin/init
+root           2       0  0 05:12 ?        00:00:00 [kthreadd]
+root           3       2  0 05:12 ?        00:00:00 [pool_workqueue_release]
+root           4       2  0 05:12 ?        00:00:00 [kworker/R-rcu_gp]
+root           5       2  0 05:12 ?        00:00:00 [kworker/R-sync_wq]
+root           6       2  0 05:12 ?        00:00:00 [kworker/R-kvfree_rcu_reclaim]
+root           7       2  0 05:12 ?        00:00:00 [kworker/R-slub_flushwq]
+root           8       2  0 05:12 ?        00:00:00 [kworker/R-netns]
+root           9       2  0 05:12 ?        00:00:00 [kworker/0:0-mm_percpu_wq]
+root          10       2  0 05:12 ?        00:00:00 [kworker/0:0H-events_highpri]
+root          11       2  0 05:12 ?        00:00:00 [kworker/0:1-device_link_wq]
+root          12       2  0 05:12 ?        00:00:00 [kworker/u8:0-events_power_efficient]
+root          13       2  0 05:12 ?        00:00:00 [kworker/R-mm_percpu_wq]
+root          14       2  0 05:12 ?        00:00:00 [ksoftirqd/0]
+root          15       2  0 05:12 ?        00:00:00 [rcu_preempt]
+root          16       2  0 05:12 ?        00:00:00 [rcu_exp_par_gp_kthread_worker/0]
+root          17       2  0 05:12 ?        00:00:00 [rcu_exp_gp_kthread_worker]
+root          18       2  0 05:12 ?        00:00:00 [migration/0]
+root          19       2  0 05:12 ?        00:00:00 [cpuhp/0]
+root          20       2  0 05:12 ?        00:00:00 [cpuhp/1]
+root          21       2  0 05:12 ?        00:00:00 [migration/1]
+root          22       2  0 05:12 ?        00:00:00 [ksoftirqd/1]
+root          23       2  0 05:12 ?        00:00:00 [kworker/1:0-cgroup_free]
+root          24       2  0 05:12 ?        00:00:00 [kworker/1:0H-events_highpri]
+root          25       2  0 05:12 ?        00:00:00 [kdevtmpfs]
+root          26       2  0 05:12 ?        00:00:00 [kworker/R-inet_frag_wq]
+root          27       2  0 05:12 ?        00:00:00 [rcu_tasks_kthread]
+root          28       2  0 05:12 ?        00:00:00 [rcu_tasks_trace_kthread]
+root          29       2  0 05:12 ?        00:00:00 [kauditd]
+root          30       2  0 05:12 ?        00:00:00 [oom_reaper]
+root          31       2  0 05:12 ?        00:00:00 [kworker/R-writeback]
+root          32       2  0 05:12 ?        00:00:00 [kcompactd0]
+root          33       2  0 05:12 ?        00:00:00 [ksmd]
+root          34       2  0 05:12 ?        00:00:00 [khugepaged]
+root          35       2  0 05:12 ?        00:00:00 [kworker/R-kblockd]
+root          36       2  0 05:12 ?        00:00:00 [kworker/R-blkcg_punt_bio]
+root          37       2  0 05:12 ?        00:00:00 [kworker/R-kintegrityd]
+root          38       2  0 05:12 ?        00:00:00 [kworker/u8:1-ext4-rsv-conversion]
+root          39       2  0 05:12 ?        00:00:00 [kworker/R-tpm_dev_wq]
+root          40       2  0 05:12 ?        00:00:00 [kworker/u8:2-flush-179:0]
+root          41       2  0 05:12 ?        00:00:00 [kworker/R-ata_sff]
+root          42       2  0 05:12 ?        00:00:00 [kworker/R-edac-poller]
+root          43       2  0 05:12 ?        00:00:00 [kworker/R-devfreq_wq]
+root          44       2  0 05:12 ?        00:00:00 [watchdogd]
+root          45       2  0 05:12 ?        00:00:00 [kworker/R-quota_events_unbound]
+root          46       2  0 05:12 ?        00:00:00 [kworker/0:1H-mmc_complete]
+root          47       2  0 05:12 ?        00:00:00 [kworker/R-rpciod]
+root          48       2  0 05:12 ?        00:00:00 [kworker/R-xprtiod]
+root          49       2  0 05:12 ?        00:00:00 [kworker/R-cfg80211]
+root          50       2  0 05:12 ?        00:00:00 [kswapd0]
+root          51       2  0 05:12 ?        00:00:00 [kworker/R-nfsiod]
+root          52       2  0 05:12 ?        00:00:00 [kworker/R-kpcitest]
+root          54       2  0 05:12 ?        00:00:00 [kworker/1:1-events]
+root          55       2  0 05:12 ?        00:00:00 [kworker/1:2-cgroup_free]
+root          56       2  0 05:12 ?        00:00:00 [kworker/0:2-cgroup_free]
+root          61       2  0 05:12 ?        00:00:00 [kworker/R-nvme-wq]
+root          62       2  0 05:12 ?        00:00:00 [kworker/R-nvme-reset-wq]
+root          63       2  0 05:12 ?        00:00:00 [kworker/R-nvme-delete-wq]
+root          64       2  0 05:12 ?        00:00:00 [kworker/R-vfio-irqfd-cleanup]
+root          65       2  0 05:12 ?        00:00:00 [kworker/R-uas]
+root          66       2  0 05:12 ?        00:00:00 [kworker/u9:0-MOAL_WORK_QUEUE]
+root          67       2  0 05:12 ?        00:00:00 [kworker/R-sdhci]
+root          68       2  0 05:12 ?        00:00:00 [irq/24-mmc0]
+root          69       2  0 05:12 ?        00:00:00 [hwrng]
+root          70       2  0 05:12 ?        00:00:00 [kworker/R-mmc_complete]
+root          71       2  0 05:12 ?        00:00:00 [kworker/1:1H-kblockd]
+root          72       2  0 05:12 ?        00:00:00 [kworker/R-tls-strp]
+root          73       2  0 05:12 ?        00:00:00 [kworker/R-mld]
+root          74       2  0 05:12 ?        00:00:00 [kworker/R-ipv6_addrconf]
+root          75       2  0 05:12 ?        00:00:00 [kworker/R-dsa_ordered]
+root          76       2  0 05:12 ?        00:00:00 [krfcommd]
+root          77       2  0 05:12 ?        00:00:00 [kworker/R-kstrp]
+root          78       2  0 05:12 ?        00:00:00 [pxp_dispatch]
+root          86       2  0 05:12 ?        00:00:00 [kworker/R-ci_otg]
+root          87       2  0 05:12 ?        00:00:00 [irq/111-1-0022]
+root          88       2  0 05:12 ?        00:00:00 [2-0050]
+root          89       2  0 05:12 ?        00:00:00 [irq/111-2-0050]
+root          90       2  0 05:12 ?        00:00:00 [kworker/u8:3-events_power_efficient]
+root          91       2  0 05:12 ?        00:00:00 [kworker/R-remoteproc-cm33]
+root          97       2  0 05:12 ?        00:00:00 [kworker/R-stmmac_wq]
+root          99       2  0 05:12 ?        00:00:00 [kworker/u8:4-async]
+root         100       2  0 05:12 ?        00:00:00 [card0-crtc0]
+root         101       2  0 05:12 ?        00:00:00 [kworker/R-sdhci]
+root         102       2  0 05:12 ?        00:00:00 [irq/115-mmc1]
+root         103       2  0 05:12 ?        00:00:00 [card0-crtc1]
+root         104       2  0 05:12 ?        00:00:00 [card0-crtc2]
+root         105       2  0 05:12 ?        00:00:00 [card0-crtc3]
+root         106       2  0 05:12 ?        00:00:00 [kworker/u8:5-events_power_efficient]
+root         107       2  0 05:12 ?        00:00:00 [kworker/R-sdhci]
+root         108       2  0 05:12 ?        00:00:00 [irq/116-mmc2]
+root         109       2  0 05:12 ?        00:00:00 [irq/117-42860000.mmc cd]
+root         110       2  0 05:12 ?        00:00:00 [kworker/0:3-events]
+root         111       2  0 05:12 ?        00:00:00 [kworker/0:4]
+root         112       2  0 05:12 ?        00:00:00 [kworker/R-mmc_complete]
+root         113       2  0 05:12 ?        00:00:00 [spi2]
+root         117       2  0 05:12 ?        00:00:00 [jbd2/mmcblk0p2-8]
+root         118       2  0 05:12 ?        00:00:00 [kworker/R-ext4-rsv-conversion]
+root         120       2  0 05:12 ?        00:00:00 [kworker/1:3-cgroup_free]
+root         148       1  0 05:12 ?        00:00:00 /usr/lib/systemd/systemd-journald
+root         155       2  0 05:12 ?        00:00:00 [kworker/0:2H-mmc_complete]
+root         157       2  0 05:12 ?        00:00:00 [kworker/R-MOAL_HANG_WORK_QUEUE]
+root         164       2  0 05:12 ?        00:00:00 [kworker/R-MOAL_WORK_QUEUE]
+root         165       2  0 05:12 ?        00:00:00 [kworker/R-MOAL_EVT_WORK_QUEUE]
+root         166       2  0 05:12 ?        00:00:00 [kworker/R-MOAL_RX_WORK_QUEUE]
+root         167       2  0 05:12 ?        00:00:00 [kworker/R-MOAL_TX_WORK_QUEUE]
+root         168       2  0 05:12 ?        00:00:00 [woal_reassoc_service]
+systemd+     189       1  0 05:12 ?        00:00:00 /usr/lib/systemd/systemd-timesyncd
+root         192       1  0 05:12 ?        00:00:00 /usr/lib/systemd/systemd-userdbd
+root         194       1  0 05:12 ?        00:00:00 /usr/lib/systemd/systemd-udevd
+root         195     192  0 05:12 ?        00:00:00 systemd-userwork: waiting...
+root         196     192  0 05:12 ?        00:00:00 systemd-userwork: waiting...
+root         197     192  0 05:12 ?        00:00:00 systemd-userwork: waiting...
+root         208       2  0 05:12 ?        00:00:00 [kworker/u9:1-MOAL_RX_WORK_QUEUE]
+root         224       2  0 05:12 ?        00:00:00 [kworker/R-CSAmlan-2096417823]
+root         225       2  0 05:12 ?        00:00:00 [kworker/R-MCLIST_WORK_QUEUE]
+root         226       2  0 05:12 ?        00:00:00 [kworker/u9:2-MOAL_WORK_QUEUE]
+root         227       2  0 05:12 ?        00:00:00 [kworker/R-CSAuap-2096417824]
+root         228       2  0 05:12 ?        00:00:00 [kworker/R-MCLIST_WORK_QUEUE]
+root         234       2  0 05:12 ?        00:00:00 [kworker/R-CSAwfd-2096417824]
+root         235       2  0 05:12 ?        00:00:00 [kworker/R-MCLIST_WORK_QUEUE]
+root         237       2  0 05:12 ?        00:00:00 [irq/121-wifi_oob_wakeup]
+root         251       2  0 05:12 ?        00:00:00 [kworker/1:4-cgroup_free]
+rpc          263       1  0 05:12 ?        00:00:00 /usr/sbin/rpcbind -w -f
+systemd+     266       1  0 05:12 ?        00:00:00 /usr/lib/systemd/systemd-resolved
+root         404       1  0 05:12 ?        00:00:00 /usr/sbin/ModemManager
+root         409       1  0 05:12 ?        00:00:00 /usr/sbin/atd -f
+avahi        410       1  0 05:12 ?        00:00:00 avahi-daemon: running [imx93-11x11-lpddr4x-frdm.local]
+root         420       1  0 05:12 ?        00:00:00 /usr/sbin/crond -n
+message+     426       1  0 05:12 ?        00:00:00 /usr/bin/dbus-daemon --system --address=systemd: --nofork --nopidfile --systemd-activation --syslog-only
+root         427       1  0 05:12 ?        00:00:00 /usr/bin/firmwared -d /lib/firmware
+root         439       1  0 05:12 ?        00:00:00 /usr/sbin/ofonod -n
+parsec       440       1  0 05:12 ?        00:00:00 /usr/libexec/parsec/parsec --config /etc/parsec/config.toml
+root         441       1  0 05:12 ?        00:00:00 seatd -g seat
+root         442       1  0 05:12 ?        00:00:00 /usr/sbin/syslogd -F
+root         443       2  0 05:12 ?        00:00:00 [kworker/1:2H-kblockd]
+root         445       1  0 05:12 ?        00:00:00 /usr/lib/systemd/systemd-logind
+avahi        466     410  0 05:12 ?        00:00:00 avahi-daemon: chroot helper
+systemd+     475       1  0 05:12 ?        00:00:00 /usr/lib/systemd/systemd-networkd
+root         515       1  0 05:12 ?        00:00:00 /bin/sh /usr/local/sbin/kinetics-network-guard.sh
+ntp          516       1  0 05:12 ?        00:00:00 /usr/sbin/ntpd -u ntp:ntp -n -g
+root         523       1  0 05:12 ?        00:00:00 /usr/lib/systemd/systemd-networkd-wait-online --any
+root         527       1  0 05:12 ?        00:00:00 /usr/bin/containerd
+root         536       1  0 05:12 tty1     00:00:00 /sbin/agetty -o -- \u --noreset --noclear - linux
+root         537       1  0 05:12 ttyLP0   00:00:00 /sbin/agetty -o -- \u --noreset --noclear --keep-baud 115200,57600,38400,9600 - vt220
+root         568       1  0 05:12 ?        00:00:00 /usr/lib/systemd/systemd --user
+root         572     568  0 05:12 ?        00:00:00 (sd-pam)
+root         574       2  0 05:12 ?        00:00:00 [jbd2/mmcblk1p1-8]
+root         575       2  0 05:12 ?        00:00:00 [kworker/R-ext4-rsv-conversion]
+root         576       2  0 05:12 ?        00:00:00 [ext4lazyinit]
+root         599     568  0 05:12 ?        00:00:00 /usr/bin/dbus-daemon --session --address=systemd: --nofork --nopidfile --systemd-activation --syslog-only
+root         600     568  0 05:12 ?        00:00:00 /usr/bin/pipewire
+root         623     568  0 05:12 ?        00:00:00 /usr/bin/wireplumber
+root         624     568  0 05:12 ?        00:00:00 /usr/bin/pipewire -c filter-chain.conf
+root         625     568  0 05:12 ?        00:00:00 /usr/bin/pipewire-pulse
+teesuppl     627       1  0 05:12 ?        00:00:00 /usr/sbin/tee-supplicant
+root         674       1  0 05:12 ?        00:00:00 wpa_supplicant -B -Dnl80211 -i mlan0 -c /run/ems-wpa-mlan0.conf
+root         781       1  2 05:12 ?        00:00:01 /bin/cloudflared --no-autoupdate --config /etc/cloudflared/config.yml tunnel run
+root         848       1  0 05:12 ?        00:00:00 sshd-session: root [priv]
+root         849     848  0 05:12 ?        00:00:00 [sshd] <defunct>
+root         853     848  0 05:12 ?        00:00:00 sshd-session: root@pts/0
+root         854     853  0 05:12 pts/0    00:00:00 -sh
+root         936     515  0 05:13 ?        00:00:00 sleep 5
+root         937     854  1 05:13 pts/0    00:00:00 /bin/bash /root/build_gateway_release_bundle.sh
+root         999     937 99 05:13 pts/0    00:00:00 ps -ef

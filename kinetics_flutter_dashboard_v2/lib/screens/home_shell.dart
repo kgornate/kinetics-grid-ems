@@ -4,6 +4,7 @@ import '../core/state/gateway_controller.dart';
 import '../widgets/common_widgets.dart';
 import 'alarms_screen.dart';
 import 'bau_screen.dart';
+import 'control_sequence_screen.dart';
 import 'dashboard_screen.dart';
 import 'diagnostics_screen.dart';
 import 'environment_screen.dart';
@@ -23,16 +24,43 @@ class HomeShell extends StatefulWidget {
 class _HomeShellState extends State<HomeShell> {
   int _index = 0;
 
-  static const _destinations = <NavigationDestination>[
-    NavigationDestination(icon: Icon(Icons.dashboard_outlined), selectedIcon: Icon(Icons.dashboard), label: 'Overview'),
-    NavigationDestination(icon: Icon(Icons.battery_charging_full_outlined), selectedIcon: Icon(Icons.battery_charging_full), label: 'BAU'),
-    NavigationDestination(icon: Icon(Icons.view_column_outlined), selectedIcon: Icon(Icons.view_column), label: 'Racks'),
-    NavigationDestination(icon: Icon(Icons.ac_unit_outlined), selectedIcon: Icon(Icons.ac_unit), label: 'Environment'),
-    NavigationDestination(icon: Icon(Icons.power_outlined), selectedIcon: Icon(Icons.power), label: 'PCS'),
-    NavigationDestination(icon: Icon(Icons.warning_amber_outlined), selectedIcon: Icon(Icons.warning_amber), label: 'Alarms'),
-    NavigationDestination(icon: Icon(Icons.timeline_outlined), selectedIcon: Icon(Icons.timeline), label: 'Historian'),
-    NavigationDestination(icon: Icon(Icons.monitor_heart_outlined), selectedIcon: Icon(Icons.monitor_heart), label: 'Diagnostics'),
-  ];
+  List<NavigationDestination> get _destinations => <NavigationDestination>[
+        const NavigationDestination(icon: Icon(Icons.dashboard_outlined), selectedIcon: Icon(Icons.dashboard), label: 'Overview'),
+        const NavigationDestination(icon: Icon(Icons.battery_charging_full_outlined), selectedIcon: Icon(Icons.battery_charging_full), label: 'BAU'),
+        const NavigationDestination(icon: Icon(Icons.view_column_outlined), selectedIcon: Icon(Icons.view_column), label: 'Racks'),
+        const NavigationDestination(icon: Icon(Icons.ac_unit_outlined), selectedIcon: Icon(Icons.ac_unit), label: 'Environment'),
+        const NavigationDestination(icon: Icon(Icons.power_outlined), selectedIcon: Icon(Icons.power), label: 'PCS'),
+        if (widget.controller.isInternal)
+          const NavigationDestination(icon: Icon(Icons.account_tree_outlined), selectedIcon: Icon(Icons.account_tree), label: 'Control'),
+        const NavigationDestination(icon: Icon(Icons.warning_amber_outlined), selectedIcon: Icon(Icons.warning_amber), label: 'Alarms'),
+        const NavigationDestination(icon: Icon(Icons.timeline_outlined), selectedIcon: Icon(Icons.timeline), label: 'Historian'),
+        const NavigationDestination(icon: Icon(Icons.monitor_heart_outlined), selectedIcon: Icon(Icons.monitor_heart), label: 'Diagnostics'),
+      ];
+
+
+  bool _isControlDestination(int index) {
+    final destinations = _destinations;
+    return index >= 0 &&
+        index < destinations.length &&
+        destinations[index].label == 'Control';
+  }
+
+  void _selectDestination(int value) {
+    final showControl = _isControlDestination(value);
+    setState(() => _index = value);
+    if (showControl) {
+      widget.controller.refreshControlCapabilities(silent: true);
+      widget.controller.startControlPolling();
+    } else {
+      widget.controller.stopControlPolling();
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.controller.stopControlPolling();
+    super.dispose();
+  }
 
   List<Widget> get _screens {
     final bank = widget.controller.plant.bank;
@@ -44,6 +72,8 @@ class _HomeShellState extends State<HomeShell> {
       RacksScreen(controller: widget.controller),
       EnvironmentScreen(controller: widget.controller),
       PcsScreen(controller: widget.controller),
+      if (widget.controller.isInternal)
+        ControlSequenceScreen(controller: widget.controller),
       AlarmsScreen(controller: widget.controller),
       HistorianScreen(controller: widget.controller),
       DiagnosticsScreen(controller: widget.controller),
@@ -55,10 +85,13 @@ class _HomeShellState extends State<HomeShell> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final wide = constraints.maxWidth >= 960;
-        final body = IndexedStack(index: _index, children: _screens);
+        final destinations = _destinations;
+        final screens = _screens;
+        final safeIndex = _index.clamp(0, screens.length - 1);
+        final body = IndexedStack(index: safeIndex, children: screens);
         return Scaffold(
           appBar: AppBar(
-            title: Text('Kinetics Gateway - ${_destinations[_index].label}'),
+            title: Text('Kinetics Gateway - ${destinations[safeIndex].label}'),
             actions: [
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 10),
@@ -94,10 +127,10 @@ class _HomeShellState extends State<HomeShell> {
               ? Row(
                   children: [
                     NavigationRail(
-                      selectedIndex: _index,
-                      onDestinationSelected: (value) => setState(() => _index = value),
+                      selectedIndex: safeIndex,
+                      onDestinationSelected: _selectDestination,
                       labelType: NavigationRailLabelType.all,
-                      destinations: _destinations
+                      destinations: destinations
                           .map((item) => NavigationRailDestination(
                                 icon: item.icon,
                                 selectedIcon: item.selectedIcon,
@@ -113,9 +146,9 @@ class _HomeShellState extends State<HomeShell> {
           bottomNavigationBar: wide
               ? null
               : NavigationBar(
-                  selectedIndex: _index,
-                  onDestinationSelected: (value) => setState(() => _index = value),
-                  destinations: _destinations,
+                  selectedIndex: safeIndex,
+                  onDestinationSelected: _selectDestination,
+                  destinations: destinations,
                 ),
         );
       },

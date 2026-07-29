@@ -1,0 +1,757 @@
+/opt/kinetics-gateway/backend/tests/test_scheduler_storage.py:24:    assert len(snapshot["pcs"]["telemetry"]) == 230
+/opt/kinetics-gateway/backend/tests/test_scheduler_storage.py:25:    for name in ("fast", "normal", "slow", "bulk", "pcs"):
+/opt/kinetics-gateway/backend/tests/test_scheduler_storage.py:26:        assert snapshot["polling"][name]["count"] >= 1
+/opt/kinetics-gateway/backend/tests/test_scheduler_storage.py:29:def test_delta_updates_are_available_per_poll_class(tmp_path):
+/opt/kinetics-gateway/backend/tests/test_scheduler_storage.py:32:    event = service.poll_bms_class("fast")
+/opt/kinetics-gateway/backend/tests/test_scheduler_storage.py:33:    assert event["poll_class"] == "fast"
+/opt/kinetics-gateway/backend/tests/test_api.py:5:from fastapi.testclient import TestClient
+/opt/kinetics-gateway/backend/tests/test_api.py:54:def test_background_scheduler_advances_fast_group():
+/opt/kinetics-gateway/backend/tests/test_api.py:58:        before = client.get("/api/health").json()["polling"]["fast"]["count"]
+/opt/kinetics-gateway/backend/tests/test_api.py:60:        after = client.get("/api/health").json()["polling"]["fast"]["count"]
+/opt/kinetics-gateway/backend/tests/test_mock_service.py:23:    assert len(snapshot["pcs"]["telemetry"]) == 230
+/opt/kinetics-gateway/backend/tests/test_mock_service.py:27:def test_full_rack_detail_contains_bulk_arrays(tmp_path):
+/opt/kinetics-gateway/backend/tests/test_bms_pcs_control.py:5:from app.core.config import GatewayConfig, PcsDeviceConfig
+/opt/kinetics-gateway/backend/tests/test_bms_pcs_control.py:6:from app.services.bms_pcs_control import BmsPcsControlService
+/opt/kinetics-gateway/backend/tests/test_bms_pcs_control.py:35:                "pcs_ctrl": 0,
+/opt/kinetics-gateway/backend/tests/test_bms_pcs_control.py:73:class FakePcs:
+/opt/kinetics-gateway/backend/tests/test_bms_pcs_control.py:100:def configured_service() -> BmsPcsControlService:
+/opt/kinetics-gateway/backend/tests/test_bms_pcs_control.py:104:    config.pcs.enabled = True
+/opt/kinetics-gateway/backend/tests/test_bms_pcs_control.py:105:    config.pcs.write_enabled = True
+/opt/kinetics-gateway/backend/tests/test_bms_pcs_control.py:106:    config.pcs.transport = "rtu"
+/opt/kinetics-gateway/backend/tests/test_bms_pcs_control.py:107:    config.pcs.devices = [
+/opt/kinetics-gateway/backend/tests/test_bms_pcs_control.py:108:        PcsDeviceConfig(asset_id="pcs_1", unit_id=1, enabled=True),
+/opt/kinetics-gateway/backend/tests/test_bms_pcs_control.py:109:        PcsDeviceConfig(asset_id="pcs_2", unit_id=2, enabled=False),
+/opt/kinetics-gateway/backend/tests/test_bms_pcs_control.py:110:        PcsDeviceConfig(asset_id="pcs_3", unit_id=3, enabled=False),
+/opt/kinetics-gateway/backend/tests/test_bms_pcs_control.py:111:        PcsDeviceConfig(asset_id="pcs_4", unit_id=4, enabled=False),
+/opt/kinetics-gateway/backend/tests/test_bms_pcs_control.py:116:    config.control_sequence.pcs_start_timeout_seconds = 0.1
+/opt/kinetics-gateway/backend/tests/test_bms_pcs_control.py:117:    return BmsPcsControlService(config, FakeBms(), FakePcs(), FakeStore())
+/opt/kinetics-gateway/backend/tests/test_bms_pcs_control.py:127:    assert service.configure_pcs("internal", "pair_1", confirm)["ok"] is True
+/opt/kinetics-gateway/backend/tests/test_bms_pcs_control.py:128:    assert service.start_pcs("internal", "pair_1", confirm)["ok"] is True
+/opt/kinetics-gateway/backend/tests/test_catalogs.py:17:def test_pcs_catalog_has_all_rows():
+/opt/kinetics-gateway/backend/tests/test_catalogs.py:18:    catalog = ProtocolCatalog.load(project_root() / "generated_protocols/pcs_catalog.json")
+/opt/kinetics-gateway/backend/app/main.py:11:from fastapi import FastAPI, Request
+/opt/kinetics-gateway/backend/app/main.py:30:    """Run an independent polling class without allowing drift to accumulate."""
+/opt/kinetics-gateway/backend/app/main.py:53:async def lifespan(app: FastAPI):
+/opt/kinetics-gateway/backend/app/main.py:59:                    periodic_loop("bms-fast", config.bms.poll_fast_seconds, lambda: service.poll_bms_class("fast")),
+/opt/kinetics-gateway/backend/app/main.py:60:                    name="kinetics-bms-fast",
+/opt/kinetics-gateway/backend/app/main.py:63:                    periodic_loop("bms-normal", config.bms.poll_normal_seconds, lambda: service.poll_bms_class("normal")),
+/opt/kinetics-gateway/backend/app/main.py:64:                    name="kinetics-bms-normal",
+/opt/kinetics-gateway/backend/app/main.py:67:                    periodic_loop("bms-slow", config.bms.poll_slow_seconds, lambda: service.poll_bms_class("slow")),
+/opt/kinetics-gateway/backend/app/main.py:68:                    name="kinetics-bms-slow",
+/opt/kinetics-gateway/backend/app/main.py:71:                    periodic_loop("bms-bulk", config.bms.poll_bulk_seconds, lambda: service.poll_bms_class("bulk")),
+/opt/kinetics-gateway/backend/app/main.py:72:                    name="kinetics-bms-bulk",
+/opt/kinetics-gateway/backend/app/main.py:76:    if config.pcs.enabled:
+/opt/kinetics-gateway/backend/app/main.py:79:                periodic_loop("pcs", config.pcs.poll_seconds, service.poll_pcs),
+/opt/kinetics-gateway/backend/app/main.py:80:                name="kinetics-pcs",
+/opt/kinetics-gateway/backend/app/main.py:91:                "bms_fast_seconds": config.bms.poll_fast_seconds,
+/opt/kinetics-gateway/backend/app/main.py:92:                "bms_normal_seconds": config.bms.poll_normal_seconds,
+/opt/kinetics-gateway/backend/app/main.py:93:                "bms_slow_seconds": config.bms.poll_slow_seconds,
+/opt/kinetics-gateway/backend/app/main.py:94:                "bms_bulk_seconds": config.bms.poll_bulk_seconds,
+/opt/kinetics-gateway/backend/app/main.py:95:                "pcs_seconds": config.pcs.poll_seconds,
+/opt/kinetics-gateway/backend/app/main.py:110:app = FastAPI(
+/opt/kinetics-gateway/backend/app/main.py:112:    version="2.4.0-staged-bms-pcs-control",
+/opt/kinetics-gateway/backend/app/main.py:114:        "FRDM i.MX93 BMS/PCS gateway with unchanged BMS Modbus TCP support, four-PCS Modbus RTU/RS485, "
+/opt/kinetics-gateway/backend/app/main.py:115:        "manual staged BMS-to-PCS control, delta WebSockets, JWT security, compressed SQLite historian and mock/hardware modes"
+/opt/kinetics-gateway/backend/app/security/auth.py:13:from fastapi import Depends, HTTPException, status
+/opt/kinetics-gateway/backend/app/security/auth.py:14:from fastapi.security import OAuth2PasswordBearer
+/opt/kinetics-gateway/backend/app/api/routes.py:6:from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect, status
+/opt/kinetics-gateway/backend/app/api/routes.py:7:from fastapi.responses import PlainTextResponse
+/opt/kinetics-gateway/backend/app/api/routes.py:86:        include_slow: bool = Query(False),
+/opt/kinetics-gateway/backend/app/api/routes.py:87:        include_bulk: bool = Query(False),
+/opt/kinetics-gateway/backend/app/api/routes.py:90:        return service.refresh(include_slow=include_slow, include_bulk=include_bulk) if refresh else service.snapshot()
+/opt/kinetics-gateway/backend/app/api/routes.py:101:    @router.get("/api/diagnostics/polling")
+/opt/kinetics-gateway/backend/app/api/routes.py:102:    def diagnostics_polling(user: User = Depends(current_user)) -> dict[str, Any]:
+/opt/kinetics-gateway/backend/app/api/routes.py:103:        return {"polling": service.health().get("polling", {})}
+/opt/kinetics-gateway/backend/app/api/routes.py:114:            "pcs": snapshot.get("pcs"),
+/opt/kinetics-gateway/backend/app/api/routes.py:115:            "pcs_devices": snapshot.get("pcs_devices", {}),
+/opt/kinetics-gateway/backend/app/api/routes.py:119:    def bms_bank(include_slow: bool = Query(False), user: User = Depends(current_user)) -> dict[str, Any]:
+/opt/kinetics-gateway/backend/app/api/routes.py:120:        snapshot = service.refresh(include_slow=True) if include_slow else service.snapshot()
+/opt/kinetics-gateway/backend/app/api/routes.py:158:    @router.get("/api/pcs")
+/opt/kinetics-gateway/backend/app/api/routes.py:159:    def pcs(user: User = Depends(current_user)) -> dict[str, Any]:
+/opt/kinetics-gateway/backend/app/api/routes.py:160:        """Backward-compatible primary PCS endpoint (normally pcs_1)."""
+/opt/kinetics-gateway/backend/app/api/routes.py:161:        return service.snapshot()["pcs"]
+/opt/kinetics-gateway/backend/app/api/routes.py:163:    @router.get("/api/pcs/all")
+/opt/kinetics-gateway/backend/app/api/routes.py:164:    def all_pcs(user: User = Depends(current_user)) -> dict[str, Any]:
+/opt/kinetics-gateway/backend/app/api/routes.py:165:        devices = service.snapshot().get("pcs_devices", {})
+/opt/kinetics-gateway/backend/app/api/routes.py:167:            "pcs": list(devices.values()),
+/opt/kinetics-gateway/backend/app/api/routes.py:170:            "transport": service.config.pcs.transport,
+/opt/kinetics-gateway/backend/app/api/routes.py:173:    @router.get("/api/pcs/{asset_id}")
+/opt/kinetics-gateway/backend/app/api/routes.py:174:    def pcs_asset(asset_id: str, user: User = Depends(current_user)) -> dict[str, Any]:
+/opt/kinetics-gateway/backend/app/api/routes.py:176:            return service.pcs_details(asset_id)
+/opt/kinetics-gateway/backend/app/api/routes.py:413:    @router.post("/api/control-sequence/{pair_id}/prepare-pcs-standby")
+/opt/kinetics-gateway/backend/app/api/routes.py:414:    def control_sequence_prepare_pcs_standby(
+/opt/kinetics-gateway/backend/app/api/routes.py:420:            return service.control_sequence.prepare_pcs_standby(
+/opt/kinetics-gateway/backend/app/api/routes.py:432:    @router.post("/api/control-sequence/{pair_id}/configure-pcs")
+/opt/kinetics-gateway/backend/app/api/routes.py:433:    def control_sequence_configure_pcs(
+/opt/kinetics-gateway/backend/app/api/routes.py:439:            return service.control_sequence.configure_pcs(
+/opt/kinetics-gateway/backend/app/api/routes.py:451:    @router.post("/api/control-sequence/{pair_id}/start-pcs")
+/opt/kinetics-gateway/backend/app/api/routes.py:452:    def control_sequence_start_pcs(
+/opt/kinetics-gateway/backend/app/api/routes.py:458:            return service.control_sequence.start_pcs(
+/opt/kinetics-gateway/backend/app/api/routes.py:566:        pcs = [p for p in service.pcs_catalog.points if "W" in str(p.get("access", "R")).upper()]
+/opt/kinetics-gateway/backend/app/api/routes.py:569:            "pcs_write_enabled": service.config.pcs.write_enabled,
+/opt/kinetics-gateway/backend/app/api/routes.py:571:            "pcs_points": pcs,
+/opt/kinetics-gateway/backend/app/api/routes.py:572:            "counts": {"bms": len(bms), "pcs": len(pcs)},
+/opt/kinetics-gateway/backend/app/api/routes.py:585:    @router.get("/api/protocols/pcs")
+/opt/kinetics-gateway/backend/app/api/routes.py:586:    def pcs_protocol_catalog(user: User = Depends(current_user)) -> dict[str, Any]:
+/opt/kinetics-gateway/backend/app/api/routes.py:587:        return {"summary": service.pcs_catalog.summary(), "points": list(service.pcs_catalog.points)}
+/opt/kinetics-gateway/backend/app/services/alarm_engine.py:60:            # PCS fault words and signal-category telemetry.
+/opt/kinetics-gateway/backend/app/services/alarm_engine.py:64:            direct_scope_allowed = asset_type == "pcs" or str(point.get("category") or "").lower() == "signal"
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:12:from app.assets.pcs_driver import PcsModbusDriver
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:20:PCS_STOPPED_STATE = 0x0001
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:21:PCS_SOFT_START_STATE = 0x0002
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:22:PCS_SELF_TEST_STATE = 0x0004
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:23:PCS_STANDBY_STATE = 0x0008
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:24:PCS_RUNNING_STATE_BIT = 0x0010
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:25:PCS_ENERGY_SAVING_STATE_BIT = 0x0020
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:26:PCS_GRID_CONNECTED_STATE_BIT = 0x0040
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:27:PCS_FAULT_SHUTDOWN_BIT = 0x0400
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:28:PCS_PRECHARGE_PREP_ALLOWED_STATES = {
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:29:    PCS_STOPPED_STATE,
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:30:    PCS_SOFT_START_STATE,
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:31:    PCS_SELF_TEST_STATE,
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:32:    PCS_STANDBY_STATE,
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:34:PCS_PRECHARGE_PREP_MAX_DEENERGIZED_V = 50.0
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:35:PCS_START_VALUE = 0xFF00
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:36:PCS_STOP_VALUE = 0x00FF
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:37:PCS_REMOTE_VALUE = 0x00FF
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:38:PCS_PQ_PRODUCT_MODE = 1
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:39:PCS_CONSTANT_POWER_MODE = 0
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:43:PCS_ZERO_SETPOINT_TOLERANCE_KW = 0.11
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:44:PCS_ZERO_ACTUAL_POWER_TOLERANCE_KW = 1.0
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:54:class BmsPcsControlService:
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:55:    """Field-validated BMS-to-PCS sequence controller.
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:66:        pcs_driver: PcsModbusDriver,
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:72:        self.pcs_driver = pcs_driver
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:109:        if pair.pcs_asset_id not in {device.asset_id for device in self.gateway_config.pcs.devices}:
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:110:            raise KeyError(f"PCS asset {pair.pcs_asset_id} is not configured")
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:122:            raise PermissionError("Staged BMS/PCS control is disabled in configuration")
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:127:        if not self.gateway_config.pcs.write_enabled:
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:128:            raise PermissionError("PCS writes are disabled")
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:147:            f"{pair.pair_id}:{pair.pcs_asset_id}:bms_rack_{pair.rack_id}",
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:156:            asset_id=pair.pcs_asset_id,
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:173:    def _pcs_ready_state(raw_state: int | float | None) -> bool:
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:177:        if raw & PCS_FAULT_SHUTDOWN_BIT:
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:182:                PCS_STANDBY_STATE
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:183:                | PCS_RUNNING_STATE_BIT
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:184:                | PCS_ENERGY_SAVING_STATE_BIT
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:185:                | PCS_GRID_CONNECTED_STATE_BIT
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:196:        state = summary.get("pcs_operating_state")
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:197:        pcs_configured = (
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:198:            summary.get("pcs_remote_feedback") is True
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:199:            and abs(float(summary.get("pcs_power_setpoint_kw") or 0.0)) <= PCS_ZERO_SETPOINT_TOLERANCE_KW
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:204:        # and must not be used by the normal EMS sequence. Keep the BAU bit as
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:211:            and self._voltages_match(summary.get("rack_voltage_v"), summary.get("pcs_battery_voltage_v"))
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:214:            bool(summary.get("pcs_dc_breaker_feedback_closed"))
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:215:            and bool(summary.get("pcs_dc_bus_valid"))
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:216:            and self._voltages_match(summary.get("pcs_dc_bus_voltage_v"), summary.get("pcs_battery_voltage_v"))
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:218:        pcs_ready = (
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:219:            self._pcs_ready_state(state)
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:221:            and not bool(summary.get("pcs_fault_shutdown"))
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:222:            and not bool(summary.get("pcs_dc_soft_start_fault"))
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:223:            and not bool(summary.get("pcs_dc_soft_start_relay_fault"))
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:225:        setpoint = float(summary.get("pcs_power_setpoint_kw") or 0.0)
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:226:        actual = float(summary.get("pcs_actual_power_kw") or 0.0)
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:227:        power_active = abs(setpoint) > PCS_ZERO_SETPOINT_TOLERANCE_KW
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:232:            and int(state or 0) == PCS_STOPPED_STATE
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:233:            and abs(setpoint) <= PCS_ZERO_SETPOINT_TOLERANCE_KW
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:234:            and abs(actual) <= PCS_ZERO_ACTUAL_POWER_TOLERANCE_KW
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:237:            {"key": "pcs_configured", "label": "PCS configured at 0 kW", "complete": pcs_configured},
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:245:            {"key": "pcs_input_energized", "label": "Battery voltage available at PCS input", "complete": input_energized},
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:246:            {"key": "pcs_dc_ready", "label": "PCS soft-start and DC breaker complete", "complete": dc_ready},
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:247:            {"key": "pcs_ready", "label": "PCS ready at zero power", "complete": pcs_ready},
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:256:        elif pcs_ready:
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:259:            system_state = "bms_precharged_waiting_for_pcs"
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:267:            "ready_for_power": pcs_ready,
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:268:            "pcs_ready_state": self._pcs_ready_state(state),
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:276:                or summary.get("pcs_fault_shutdown")
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:311:            ("pcs_dc_bus_voltage", self.pcs_driver.read_point, pair.pcs_asset_id, "dc_bus_voltage"),
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:312:            ("pcs_battery_voltage", self.pcs_driver.read_point, pair.pcs_asset_id, "battery_voltage"),
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:313:            ("pcs_operating_state", self.pcs_driver.read_point, pair.pcs_asset_id, "operating_state"),
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:314:            ("pcs_status_word_1", self.pcs_driver.read_point, pair.pcs_asset_id, "status_word_1"),
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:315:            ("pcs_status_word_2", self.pcs_driver.read_point, pair.pcs_asset_id, "status_word_2"),
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:316:            ("pcs_input_fault_word", self.pcs_driver.read_point, pair.pcs_asset_id, "reg_1210"),
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:317:            ("pcs_system_fault_ext3", self.pcs_driver.read_point, pair.pcs_asset_id, "reg_121a"),
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:318:            ("pcs_actual_power", self.pcs_driver.read_point, pair.pcs_asset_id, "grid_active_power"),
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:319:            ("pcs_on_off_command", self.pcs_driver.read_point, pair.pcs_asset_id, "remote_on_off_command"),
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:320:            ("pcs_remote_local_mode", self.pcs_driver.read_point, pair.pcs_asset_id, "remote_local_mode"),
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:321:            ("pcs_product_mode", self.pcs_driver.read_point, pair.pcs_asset_id, "product_run_mode"),
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:322:            ("pcs_pq_mode", self.pcs_driver.read_point, pair.pcs_asset_id, "pq_work_mode"),
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:323:            ("pcs_power_setpoint", self.pcs_driver.read_point, pair.pcs_asset_id, "active_power_setpoint"),
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:334:        pcs_dc_bus = self._value(reads["pcs_dc_bus_voltage"])
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:335:        pcs_state = self._value(reads["pcs_operating_state"])
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:336:        pcs_battery_voltage = self._value(reads["pcs_battery_voltage"])
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:337:        pcs_status_word_1 = self._value(reads["pcs_status_word_1"])
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:338:        pcs_status_word_2 = self._value(reads["pcs_status_word_2"])
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:339:        pcs_input_fault_word = self._value(reads["pcs_input_fault_word"])
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:340:        pcs_system_fault_ext3 = self._value(reads["pcs_system_fault_ext3"])
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:342:        pcs_status_word_1_raw = None if pcs_status_word_1 is None else int(pcs_status_word_1)
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:343:        pcs_status_word_2_raw = None if pcs_status_word_2 is None else int(pcs_status_word_2)
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:344:        pcs_input_fault_word_raw = None if pcs_input_fault_word is None else int(pcs_input_fault_word)
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:345:        pcs_system_fault_ext3_raw = None if pcs_system_fault_ext3 is None else int(pcs_system_fault_ext3)
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:347:        pcs_remote_feedback = (
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:348:            None if pcs_status_word_1_raw is None else bool(pcs_status_word_1_raw & (1 << 0))
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:350:        pcs_authorized = (
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:351:            None if pcs_status_word_1_raw is None else bool(pcs_status_word_1_raw & (1 << 1))
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:353:        # PCS protocol 0x1202 bit 6: 0=DC breaker closed, 1=DC breaker open.
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:354:        pcs_dc_breaker_open = (
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:355:            None if pcs_status_word_2_raw is None else bool(pcs_status_word_2_raw & (1 << 6))
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:357:        # PCS protocol 0x1210 bit 7: 0=DC breaker feedback open, 1=closed.
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:358:        pcs_dc_breaker_feedback_closed = (
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:359:            None if pcs_input_fault_word_raw is None else bool(pcs_input_fault_word_raw & (1 << 7))
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:361:        pcs_dc_soft_start_fault = (
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:362:            None if pcs_system_fault_ext3_raw is None else bool(pcs_system_fault_ext3_raw & (1 << 2))
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:364:        pcs_dc_soft_start_relay_fault = (
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:365:            None if pcs_system_fault_ext3_raw is None else bool(pcs_system_fault_ext3_raw & (1 << 3))
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:441:            "pcs_control_fault": bank_fault_bits.get("pcs_ctrl") == 1,
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:452:                "pcs_write_enabled": self.gateway_config.pcs.write_enabled,
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:479:                "pcs_dc_bus_voltage_v": pcs_dc_bus,
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:480:                "pcs_battery_voltage_v": pcs_battery_voltage,
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:481:                "pcs_status_word_1_raw": pcs_status_word_1_raw,
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:482:                "pcs_remote_feedback": pcs_remote_feedback,
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:483:                "pcs_authorized": pcs_authorized,
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:484:                "pcs_status_word_2_raw": pcs_status_word_2_raw,
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:485:                "pcs_dc_breaker_open": pcs_dc_breaker_open,
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:486:                "pcs_dc_breaker_feedback_closed": pcs_dc_breaker_feedback_closed,
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:487:                "pcs_dc_soft_start_fault": pcs_dc_soft_start_fault,
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:488:                "pcs_dc_soft_start_relay_fault": pcs_dc_soft_start_relay_fault,
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:489:                "pcs_dc_bus_valid": (
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:490:                    pcs_dc_bus is not None
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:491:                    and self.config.pcs_dc_bus_voltage_min_v <= float(pcs_dc_bus) <= self.config.pcs_dc_bus_voltage_max_v
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:493:                "pcs_operating_state": pcs_state,
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:494:                "pcs_fault_shutdown": pcs_state is not None and bool(int(pcs_state) & PCS_FAULT_SHUTDOWN_BIT),
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:495:                "pcs_actual_power_kw": self._value(reads["pcs_actual_power"]),
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:496:                "pcs_power_setpoint_kw": self._value(reads["pcs_power_setpoint"]),
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:521:            "pcs_remote_feedback": summary.get("pcs_remote_feedback") is True,
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:522:            "pcs_ready_state": self._pcs_ready_state(summary.get("pcs_operating_state")),
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:523:            "pcs_dc_breaker_feedback_closed": bool(summary.get("pcs_dc_breaker_feedback_closed")),
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:524:            "pcs_dc_bus_valid": bool(summary.get("pcs_dc_bus_valid")),
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:525:            "pcs_input_and_dc_bus_match": self._voltages_match(
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:526:                summary.get("pcs_battery_voltage_v"),
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:527:                summary.get("pcs_dc_bus_voltage_v"),
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:529:            "pcs_not_fault_shutdown": not bool(summary["pcs_fault_shutdown"]),
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:605:        0x3005-0x3008 must not be operated by the normal EMS sequence.
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:695:        pcs_state = summary.get("pcs_operating_state")
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:696:        pcs_setpoint = summary.get("pcs_power_setpoint_kw")
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:697:        pcs_actual = summary.get("pcs_actual_power_kw")
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:703:            "pcs_stopped": pcs_state is not None and int(pcs_state) == PCS_STOPPED_STATE,
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:704:            "pcs_setpoint_zero": pcs_setpoint is not None and abs(float(pcs_setpoint)) <= PCS_ZERO_SETPOINT_TOLERANCE_KW,
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:705:            "pcs_actual_power_zero": pcs_actual is not None and abs(float(pcs_actual)) <= PCS_ZERO_ACTUAL_POWER_TOLERANCE_KW,
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:814:            "pcs_stopped": int(summary.get("pcs_operating_state") or 0) == PCS_STOPPED_STATE,
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:815:            "pcs_setpoint_zero": abs(float(summary.get("pcs_power_setpoint_kw") or 0.0))
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:816:            <= PCS_ZERO_SETPOINT_TOLERANCE_KW,
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:817:            "pcs_actual_power_zero": abs(float(summary.get("pcs_actual_power_kw") or 0.0))
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:818:            <= PCS_ZERO_ACTUAL_POWER_TOLERANCE_KW,
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:823:            "pcs_not_fault_shutdown": not bool(summary.get("pcs_fault_shutdown")),
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:916:        fault, start a rack, close contactors, or start the PCS. The command
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:927:        pcs_state = summary.get("pcs_operating_state")
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:928:        pcs_setpoint = summary.get("pcs_power_setpoint_kw")
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:929:        pcs_actual = summary.get("pcs_actual_power_kw")
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:933:            "pcs_stopped": pcs_state is not None and int(pcs_state) == PCS_STOPPED_STATE,
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:934:            "pcs_setpoint_zero": pcs_setpoint is not None and abs(float(pcs_setpoint)) <= PCS_ZERO_SETPOINT_TOLERANCE_KW,
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:935:            "pcs_actual_power_zero": pcs_actual is not None and abs(float(pcs_actual)) <= PCS_ZERO_ACTUAL_POWER_TOLERANCE_KW,
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1024:                and bool(summary["pcs_dc_bus_valid"])
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1027:                and bool(summary["pcs_dc_breaker_feedback_closed"])
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1029:                    summary.get("pcs_dc_bus_voltage_v"),
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1030:                    summary.get("pcs_battery_voltage_v"),
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1032:                and self._pcs_ready_state(summary.get("pcs_operating_state"))
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1033:                and not bool(summary["pcs_fault_shutdown"])
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1034:                and not bool(summary["pcs_dc_soft_start_fault"])
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1035:                and not bool(summary["pcs_dc_soft_start_relay_fault"])
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1059:    def prepare_pcs_standby(self, username: str, pair_id: str, confirmation: str) -> dict[str, Any]:
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1062:        Hardware validation proved that this PCS must receive BMS DC input
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1063:        before the PCS Start command. Starting the PCS while the rack and BMS
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1064:        contactors are open caused fault shutdown. Use configure_pcs(), then
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1065:        start_precharge() on the selected rack BCU, then start_pcs().
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1070:            "prepare-pcs-standby is disabled: field validation requires BMS precharge/contactors first, then PCS Start at 0 kW"
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1073:    def configure_pcs(self, username: str, pair_id: str, confirmation: str) -> dict[str, Any]:
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1074:        """Configure PCS Remote/PQ/constant-power at zero while keeping it stopped.
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1076:        This matches the field-validated sequence: PCS is configured first,
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1078:        then is the PCS Start command issued.
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1084:        state = int(summary.get("pcs_operating_state") or 0)
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1087:            "pcs_stopped": state == PCS_STOPPED_STATE,
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1088:            "pcs_not_fault_shutdown": not bool(summary.get("pcs_fault_shutdown")),
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1089:            "pcs_actual_power_zero": abs(float(summary.get("pcs_actual_power_kw") or 0.0)) <= PCS_ZERO_ACTUAL_POWER_TOLERANCE_KW,
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1094:            raise ValueError(f"PCS configuration precheck failed: {[key for key, ok in checks.items() if not ok]}")
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1098:            ("remote_on_off_command", PCS_STOP_VALUE),
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1099:            ("remote_local_mode", PCS_REMOTE_VALUE),
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1100:            ("product_run_mode", PCS_PQ_PRODUCT_MODE),
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1101:            ("pq_work_mode", PCS_CONSTANT_POWER_MODE),
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1106:                writes.append(self.pcs_driver.write_point(pair.pcs_asset_id, key, value))
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1110:                "pcs_stopped": int(verified_summary.get("pcs_operating_state") or 0) == PCS_STOPPED_STATE,
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1111:                "remote_feedback": verified_summary.get("pcs_remote_feedback") is True,
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1112:                "setpoint_zero": abs(float(verified_summary.get("pcs_power_setpoint_kw") or 0.0)) <= PCS_ZERO_SETPOINT_TOLERANCE_KW,
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1113:                "actual_power_zero": abs(float(verified_summary.get("pcs_actual_power_kw") or 0.0)) <= PCS_ZERO_ACTUAL_POWER_TOLERANCE_KW,
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1116:                raise RuntimeError(f"PCS configuration readback failed: {[key for key, ok in verification.items() if not ok]}")
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1119:                "stage": "pcs_configured_stopped_zero_power",
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1125:            self._update_runtime(pair_id, stage=response["stage"], last_action="configure_pcs", last_error=None)
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1126:            self._audit(username, pair, "configure_pcs", dict(commands), response)
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1129:            self._update_runtime(pair_id, stage="error", last_action="configure_pcs", last_error=str(error))
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1130:            self._audit(username, pair, "configure_pcs", dict(commands), {"ok": False, "error": str(error), "writes": writes}, "failed")
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1133:    def start_pcs(self, username: str, pair_id: str, confirmation: str) -> dict[str, Any]:
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1134:        """Start PCS only after BMS precharge has energized the PCS input.
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1137:        BMS precharge/contactors first, then PCS Start at a 0 kW setpoint. The
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1138:        PCS progresses through soft-start/self-test and closes its internal DC
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1145:        input_voltage = summary.get("pcs_battery_voltage_v")
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1153:            "pcs_input_energized": self._voltages_match(rack_voltage, input_voltage),
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1154:            "pcs_stopped": int(summary.get("pcs_operating_state") or 0) == PCS_STOPPED_STATE,
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1155:            "pcs_setpoint_zero": abs(float(summary.get("pcs_power_setpoint_kw") or 0.0)) <= PCS_ZERO_SETPOINT_TOLERANCE_KW,
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1156:            "pcs_actual_power_zero": abs(float(summary.get("pcs_actual_power_kw") or 0.0)) <= PCS_ZERO_ACTUAL_POWER_TOLERANCE_KW,
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1159:            "pcs_not_fault_shutdown": not bool(summary.get("pcs_fault_shutdown")),
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1162:            raise ValueError(f"PCS start-after-precharge check failed: {[key for key, ok in checks.items() if not ok]}")
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1166:            write = self.pcs_driver.write_point(pair.pcs_asset_id, "remote_on_off_command", PCS_START_VALUE)
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1168:                self.config.pcs_start_timeout_seconds,
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1174:                state = int(current_summary.get("pcs_operating_state") or 0)
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1177:                    "pcs_operating_state": state,
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1178:                    "pcs_input_voltage_v": current_summary.get("pcs_battery_voltage_v"),
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1179:                    "pcs_dc_bus_voltage_v": current_summary.get("pcs_dc_bus_voltage_v"),
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1180:                    "pcs_dc_breaker_feedback_closed": current_summary.get("pcs_dc_breaker_feedback_closed"),
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1181:                    "pcs_dc_soft_start_fault": current_summary.get("pcs_dc_soft_start_fault"),
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1182:                    "pcs_dc_soft_start_relay_fault": current_summary.get("pcs_dc_soft_start_relay_fault"),
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1183:                    "pcs_actual_power_kw": current_summary.get("pcs_actual_power_kw"),
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1187:                if state & PCS_FAULT_SHUTDOWN_BIT:
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1188:                    raise RuntimeError(f"PCS entered fault shutdown during startup: {state}")
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1189:                if bool(current_summary.get("pcs_dc_soft_start_fault")) or bool(current_summary.get("pcs_dc_soft_start_relay_fault")):
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1190:                    raise RuntimeError("PCS reported a DC soft-start/relay fault")
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1192:                    raise RuntimeError("BMS main contactor feedback opened during PCS startup")
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1193:                if self._pcs_ready_state(state) and current["workflow"]["ready_for_power"]:
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1196:                        "stage": "pcs_ready_zero_power",
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1202:                    self._update_runtime(pair_id, stage=response["stage"], last_action="start_pcs", last_error=None)
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1203:                    self._audit(username, pair, "start_pcs", PCS_START_VALUE, response)
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1206:            raise TimeoutError("PCS did not complete soft-start/DC-breaker readiness before timeout")
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1209:            for key, value in (("active_power_setpoint", 0.0), ("remote_on_off_command", PCS_STOP_VALUE)):
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1211:                    safety_actions.append(self.pcs_driver.write_point(pair.pcs_asset_id, key, value))
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1214:            failure = {"ok": False, "error": str(error), "precheck": checks, "samples": samples, "automatic_pcs_safe_stop": safety_actions}
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1215:            self._update_runtime(pair_id, stage="error", last_action="start_pcs", last_error=str(error), commanded_power_kw=0.0)
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1216:            self._audit(username, pair, "start_pcs", PCS_START_VALUE, failure, "failed")
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1217:            raise RuntimeError(f"{error}; PCS zero-setpoint/stop was requested automatically") from error
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1254:        setpoint = self.pcs_driver.read_point(pair.pcs_asset_id, "active_power_setpoint")
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1255:        actual = self.pcs_driver.read_point(pair.pcs_asset_id, "grid_active_power")
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1256:        state = self.pcs_driver.read_point(pair.pcs_asset_id, "operating_state")
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1318:            {"key": "pcs_configuration", "label": "Configure PCS Remote/PQ/0 kW", "status": "pending"},
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1325:            {"key": "pcs_start", "label": "Start PCS and complete DC soft-start", "status": "pending"},
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1344:            actions.append(self.pcs_driver.write_point(pair.pcs_asset_id, "active_power_setpoint", 0.0))
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1351:                lambda item: abs(float(item["summary"].get("pcs_actual_power_kw") or 0.0))
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1352:                <= PCS_ZERO_ACTUAL_POWER_TOLERANCE_KW,
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1354:                description="PCS actual power to return to zero",
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1360:            actions.append(self.pcs_driver.write_point(pair.pcs_asset_id, "remote_on_off_command", PCS_STOP_VALUE))
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1376:                    int(summary.get("pcs_operating_state") or 0) == PCS_STOPPED_STATE
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1377:                    and abs(float(summary.get("pcs_power_setpoint_kw") or 0.0)) <= PCS_ZERO_SETPOINT_TOLERANCE_KW
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1378:                    and abs(float(summary.get("pcs_actual_power_kw") or 0.0)) <= PCS_ZERO_ACTUAL_POWER_TOLERANCE_KW
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1410:                "PCS input/DC-link voltage may decay after contactors open; shutdown success is based on "
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1411:                "zero power, PCS stopped, selected rack precharge idle and contactors open."
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1457:        write = self.pcs_driver.write_point(pair.pcs_asset_id, "active_power_setpoint", 0.0)
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1460:            lambda item: abs(float(item["summary"].get("pcs_actual_power_kw") or 0.0))
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1461:            <= PCS_ZERO_ACTUAL_POWER_TOLERANCE_KW,
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1490:            raise ValueError("BMS contactor/PCS DC readiness verification failed")
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1492:        write = self.pcs_driver.write_point(pair.pcs_asset_id, "active_power_setpoint", signed)
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1527:            self.pcs_driver.write_point(pair.pcs_asset_id, "active_power_setpoint", 0.0)
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1529:        current_point = self.pcs_driver.read_point(pair.pcs_asset_id, "active_power_setpoint")
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1532:        if current_signed * expected_sign < -PCS_ZERO_SETPOINT_TOLERANCE_KW:
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1533:            self.pcs_driver.write_point(pair.pcs_asset_id, "active_power_setpoint", 0.0)
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1564:                abs(float(item["summary"].get("pcs_power_setpoint_kw") or 0.0) - signed_target) <= 0.2
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1565:                and abs(float(item["summary"].get("pcs_actual_power_kw") or 0.0) - signed_target) <= tolerance
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1581:            raise PermissionError("BMS/PCS control sequence is disabled")
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1584:        if not self.gateway_config.bms.write_enabled or not self.gateway_config.pcs.write_enabled:
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1585:            raise PermissionError("BMS and PCS writes must both be enabled")
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1666:            self._set_run_step(pair_id, "pcs_configuration", "running")
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1667:            result = self.configure_pcs(username, pair_id, self.config.confirmation_phrase)
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1668:            self._set_run_step(pair_id, "pcs_configuration", "success", result=result)
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1689:                        item["summary"].get("pcs_battery_voltage_v"),
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1693:                description="BMS precharge/contactors and PCS input voltage",
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1698:            self._set_run_step(pair_id, "pcs_start", "running")
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1699:            result = self.start_pcs(username, pair_id, self.config.confirmation_phrase)
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1700:            self._set_run_step(pair_id, "pcs_start", "success", result=result)
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1775:        state = int(summary.get("pcs_operating_state") or 0)
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1776:        pcs_configured_stopped = (
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1777:            summary.get("pcs_remote_feedback") is True
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1778:            and state == PCS_STOPPED_STATE
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1779:            and abs(float(summary.get("pcs_power_setpoint_kw") or 0.0))
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1780:            <= PCS_ZERO_SETPOINT_TOLERANCE_KW
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1788:            current_signed = float(summary.get("pcs_power_setpoint_kw") or 0.0)
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1806:            if state == PCS_STOPPED_STATE:
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1807:                action = "start_pcs"
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1808:                result = self.start_pcs(username, pair_id, confirmation)
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1809:            elif state & PCS_FAULT_SHUTDOWN_BIT:
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1810:                raise ValueError(f"PCS is in fault shutdown state {state}")
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1812:                action = "wait_for_pcs_ready"
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1815:                    "stage": "pcs_startup_in_progress",
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1818:        elif not pcs_configured_stopped:
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1819:            action = "configure_pcs"
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1820:            result = self.configure_pcs(username, pair_id, confirmation)
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1886:                commanded = float(summary.get("pcs_power_setpoint_kw") or 0.0)
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1887:                if abs(commanded) <= PCS_ZERO_SETPOINT_TOLERANCE_KW:
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1912:                if not bool(summary.get("pcs_dc_breaker_feedback_closed")):
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1913:                    violations.append("pcs_dc_breaker_open")
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1963:            "controller": "field_validated_bms_pcs_sequence_controller",
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1974:                "PCS stopped, Remote/PQ/constant-power, 0 kW",
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1979:                "Verify rack voltage is present at PCS battery input",
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1980:                "Start PCS 0x1400=0xFF00 at 0 kW",
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1981:                "Verify PCS soft-start/self-test, DC breaker closed and DC bus matched",
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1986:                "pcs_dc_bus_voltage_v": [self.config.pcs_dc_bus_voltage_min_v, self.config.pcs_dc_bus_voltage_max_v],
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1996:                "rack_enable_control": "Not used in normal EMS runtime; vendor instructed no writes to BAU 0x3005-0x3008",
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:2002:                "fault_recovery": "BAU 0x3047, write 1 only; only while PCS stopped, rack disabled and contactors open",
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:2009:            "pcs_registers": {
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:15:from app.assets.pcs_driver import PcsModbusDriver
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:16:from app.core.catalog import ProtocolCatalog, apply_pcs_overrides
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:19:from app.services.bms_pcs_control import BmsPcsControlService
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:24:POLL_CLASSES = ("fast", "normal", "slow", "bulk")
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:32:    """Owns the complete cached plant state and independently polls each data-rate class."""
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:38:        pcs_catalog = ProtocolCatalog.load(resolve_path(config.pcs_catalog_file))
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:39:        self.pcs_catalog = apply_pcs_overrides(pcs_catalog, resolve_path(config.pcs.overrides_file))
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:40:        self.mock = MockPlant(self.bms_catalog, self.pcs_catalog, len(config.bms.racks), config.mock.seed)
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:43:        self.pcs_driver = PcsModbusDriver(config.pcs, self.pcs_catalog)
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:44:        self.control_sequence = BmsPcsControlService(
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:45:            config, self.bms_driver, self.pcs_driver, store
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:53:        self._last_poll_error: str | None = None
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:54:        self._poll_stats: dict[str, dict[str, Any]] = {
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:64:            for name in (*POLL_CLASSES, "pcs")
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:87:                "poll_status": {},
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:102:                "poll_status": {},
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:106:            # Keep the original singular `pcs` object for the existing Flutter/API
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:107:            # clients. `pcs_devices` is the new multi-PCS collection.
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:108:            "pcs": {
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:109:                "asset_id": self.config.pcs.primary_device.asset_id,
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:110:                "asset_type": "pcs",
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:114:                "poll_status": {},
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:116:            "pcs_devices": {
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:119:                    "asset_type": "pcs",
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:123:                    "disabled": (not self.config.pcs.enabled) or (not device.enabled),
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:126:                    "poll_status": {},
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:128:                for device in self.config.pcs.devices
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:131:            "polling": {},
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:140:        for poll_class in POLL_CLASSES:
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:141:            self.poll_bms_class(poll_class)
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:142:        self.poll_pcs()
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:145:    def refresh(self, *, include_slow: bool = False, include_bulk: bool | None = None) -> dict[str, Any]:
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:146:        """Compatibility refresh used by REST. Background scheduling uses poll_bms_class/poll_pcs."""
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:147:        self.poll_bms_class("fast")
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:148:        self.poll_bms_class("normal")
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:149:        if include_slow:
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:150:            self.poll_bms_class("slow")
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:151:        bulk = self.config.bms.include_bulk_in_live_snapshot if include_bulk is None else include_bulk
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:152:        if bulk:
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:153:            self.poll_bms_class("bulk")
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:154:        self.poll_pcs()
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:157:    def poll_bms_class(self, poll_class: str) -> dict[str, Any]:
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:158:        if poll_class not in POLL_CLASSES:
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:159:            raise ValueError(f"Unsupported BMS poll class: {poll_class}")
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:164:            updates = self._mock_bms_class(poll_class) if self.config.mode == "mock" else self._hardware_bms_class(poll_class)
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:167:            LOGGER.exception("BMS %s poll failed", poll_class)
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:169:                updates = self._mock_bms_class(poll_class)
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:178:                self._merge_asset(asset, poll_class)
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:179:            event = self._finalize_poll(poll_class, updates, started_at, duration_ms, error_text)
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:182:    def poll_pcs(self) -> dict[str, Any]:
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:183:        """Poll all configured PCS slaves sequentially on the shared transport."""
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:190:            mock_primary = self.mock.snapshot(include_slow=True, include_bulk=True)["pcs"]
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:192:        for device in self.config.pcs.devices:
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:194:                if not self.config.pcs.enabled or not device.enabled:
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:195:                    update = self.pcs_driver.disabled_asset(device)
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:201:                    update["transport"] = self.config.pcs.transport
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:203:                    update = self.pcs_driver.read_all(device.asset_id)
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:207:                LOGGER.exception("PCS poll failed asset=%s", device.asset_id)
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:213:                    update["transport"] = self.config.pcs.transport
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:219:                        "asset_type": "pcs",
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:222:                        "transport": self.config.pcs.transport,
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:234:                self._merge_asset(update, "pcs")
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:236:                self._finalize_poll("pcs", updates, started_at, duration_ms, error_text)
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:239:    def _hardware_bms_class(self, poll_class: str) -> list[dict[str, Any]]:
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:240:        updates = [self.bms_driver.read_asset_classes("bms_bank", {poll_class})]
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:242:            updates.append(self.bms_driver.read_asset_classes(f"bms_rack_{rack.rack_id}", {poll_class}))
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:243:        env_raw = self.bms_driver.read_asset_classes("bms_environment", {poll_class})
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:247:    def _mock_bms_class(self, poll_class: str) -> list[dict[str, Any]]:
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:248:        full = self.mock.snapshot(include_slow=True, include_bulk=True)
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:250:        bank_keys = self._keys_for("bank", poll_class)
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:251:        rack_keys = self._keys_for("rack", poll_class)
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:252:        env_keys = self._keys_for("environment", poll_class)
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:264:    def _keys_for(self, scope: str, poll_class: str) -> set[str]:
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:268:                scope=scope, poll_classes={poll_class}, include_reserved=False
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:303:        if asset_id in self._snapshot.get("pcs_devices", {}):
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:304:            return "pcs_devices", asset_id
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:309:    def _merge_asset(self, update: dict[str, Any], poll_class: str) -> None:
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:314:        elif location == "pcs_devices":
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:315:            current = self._snapshot["pcs_devices"].setdefault(
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:319:                    "asset_type": "pcs",
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:323:                    "poll_status": {},
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:337:                    "poll_status": {},
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:342:            if key not in {"telemetry", "poll_status"}:
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:344:        current.setdefault("poll_status", {})[poll_class] = {
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:350:        if poll_class in {"fast", "normal", "pcs"} or current.get("timestamp") is None:
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:353:        if location == "pcs_devices" and asset_id == self.config.pcs.primary_device.asset_id:
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:354:            self._snapshot["pcs"] = deepcopy(current)
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:356:    def _finalize_poll(
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:358:        poll_class: str,
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:372:        self._last_poll_error = error_text
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:378:            "poll_class": poll_class,
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:382:        stats = self._poll_stats[poll_class]
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:391:        self._snapshot["polling"] = deepcopy(self._poll_stats)
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:415:                "pcs": self._compact_asset(self._snapshot["pcs"]),
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:416:                "pcs_devices": {
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:418:                    for asset_id, asset in self._snapshot.get("pcs_devices", {}).items()
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:468:        pcs_assets = list(snapshot.get("pcs_devices", {}).values())
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:469:        if not pcs_assets and isinstance(snapshot.get("pcs"), dict):
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:470:            pcs_assets = [snapshot["pcs"]]
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:471:        assets = [snapshot["bank"], *snapshot["racks"], *snapshot["environment"].values(), *pcs_assets]
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:541:            if asset_id in {device.asset_id for device in self.config.pcs.devices}:
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:543:                    point = self.pcs_catalog.by_key(point_key, scope="pcs")
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:546:                    response = self.mock.write("pcs_1", point, value)
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:549:                    response = self.pcs_driver.write_point(asset_id, point_key, value)
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:570:    def pcs_details(self, asset_id: str) -> dict[str, Any]:
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:572:            devices = self._snapshot.get("pcs_devices", {})
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:574:                raise KeyError(f"PCS asset {asset_id} is not configured")
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:587:                "poll_status": asset.get("poll_status", {}),
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:594:            "fast": self.config.bms.poll_fast_seconds,
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:595:            "normal": self.config.bms.poll_normal_seconds,
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:596:            "slow": self.config.bms.poll_slow_seconds,
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:597:            "bulk": self.config.bms.poll_bulk_seconds,
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:604:        for poll_class, interval in intervals.items():
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:608:                    scope=scope, poll_classes={poll_class}, include_reserved=False
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:625:            groups[poll_class] = {
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:639:        points = sorted(self.pcs_catalog.points, key=lambda point: int(point["address"]))
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:640:        pcs_blocks: list[tuple[int, int]] = []
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:651:                if point_start > end + 1 or point_end - start > self.config.pcs.max_registers_per_request:
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:655:            pcs_blocks.append((start, end - start))
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:657:        device_count = len(self.config.pcs.enabled_devices) if self.config.pcs.enabled else 0
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:658:        pcs_requests = len(pcs_blocks) * device_count
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:659:        pcs_registers = sum(count for _, count in pcs_blocks) * device_count
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:660:        if self.config.pcs.transport == "rtu":
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:663:            per_device_bytes = sum(13 + 2 * count for _, count in pcs_blocks)
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:664:            pcs_modbus_bytes = per_device_bytes * device_count
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:665:            pcs_wire_overhead = 0.0
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:666:            pcs_transport_note = "Shared RS485 Modbus RTU; slaves are polled sequentially"
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:668:            per_device_bytes = sum(21 + 2 * count for _, count in pcs_blocks)
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:669:            pcs_modbus_bytes = per_device_bytes * device_count
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:670:            pcs_transport_note = "Persistent Modbus TCP connection(s)"
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:671:            pcs_wire_overhead = None
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:673:        pcs_cycles = 60.0 / max(self.config.pcs.poll_seconds, 0.001)
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:674:        pcs_requests_min = pcs_requests * pcs_cycles
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:675:        pcs_registers_min = pcs_registers * pcs_cycles
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:676:        pcs_payload_min = pcs_modbus_bytes * pcs_cycles
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:677:        if pcs_wire_overhead is None:
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:678:            pcs_wire_min = pcs_payload_min + pcs_requests_min * 2 * 54
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:680:            pcs_wire_min = pcs_payload_min
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:681:        groups["pcs"] = {
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:682:            "enabled": self.config.pcs.enabled,
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:683:            "transport": self.config.pcs.transport,
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:684:            "configured_devices": len(self.config.pcs.devices),
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:686:            "interval_seconds": self.config.pcs.poll_seconds,
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:687:            "requests_per_cycle": pcs_requests,
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:688:            "registers_per_cycle": pcs_registers,
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:689:            "modbus_bytes_per_cycle": pcs_modbus_bytes,
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:690:            "requests_per_minute": round(pcs_requests_min, 2),
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:691:            "registers_per_minute": round(pcs_registers_min, 2),
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:692:            "estimated_wire_bytes_per_minute": round(pcs_wire_min, 2),
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:693:            "note": pcs_transport_note,
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:695:        total_requests_per_minute += pcs_requests_min
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:696:        total_registers_per_minute += pcs_registers_min
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:697:        total_modbus_bytes_per_minute += pcs_payload_min
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:698:        total_wire_bytes_per_minute += pcs_wire_min
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:700:            "transport": f"BMS Modbus TCP + PCS Modbus {self.config.pcs.transport.upper()}",
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:708:                "BMS estimate includes Ethernet/IPv4/TCP framing. PCS RTU estimate is serial frame bytes only. "
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:715:            "fast": self.config.bms.poll_fast_seconds,
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:716:            "normal": self.config.bms.poll_normal_seconds,
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:717:            "slow": self.config.bms.poll_slow_seconds,
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:718:            "bulk": self.config.bms.poll_bulk_seconds,
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:719:            "pcs": self.config.pcs.poll_seconds,
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:724:            stats = self._poll_stats[name]
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:795:            "last_poll_error": self._last_poll_error,
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:796:            "polling": deepcopy(self._poll_stats),
+/opt/kinetics-gateway/backend/app/assets/mock_plant.py:14:    "normal",
+/opt/kinetics-gateway/backend/app/assets/mock_plant.py:22:    "pcs_fault",
+/opt/kinetics-gateway/backend/app/assets/mock_plant.py:51:    def __init__(self, bms_catalog: ProtocolCatalog, pcs_catalog: ProtocolCatalog, rack_count: int = 4, seed: int = 93) -> None:
+/opt/kinetics-gateway/backend/app/assets/mock_plant.py:53:        self.pcs_catalog = pcs_catalog
+/opt/kinetics-gateway/backend/app/assets/mock_plant.py:56:        self.scenario = "normal"
+/opt/kinetics-gateway/backend/app/assets/mock_plant.py:162:        include_slow: bool = False,
+/opt/kinetics-gateway/backend/app/assets/mock_plant.py:163:        include_bulk: bool = False,
+/opt/kinetics-gateway/backend/app/assets/mock_plant.py:165:        allowed = {"fast", "normal"}
+/opt/kinetics-gateway/backend/app/assets/mock_plant.py:166:        if include_slow:
+/opt/kinetics-gateway/backend/app/assets/mock_plant.py:167:            allowed.add("slow")
+/opt/kinetics-gateway/backend/app/assets/mock_plant.py:168:        if include_bulk:
+/opt/kinetics-gateway/backend/app/assets/mock_plant.py:169:            allowed.add("bulk")
+/opt/kinetics-gateway/backend/app/assets/mock_plant.py:171:        for point in self.bms_catalog.select(scope=scope, poll_classes=allowed):
+/opt/kinetics-gateway/backend/app/assets/mock_plant.py:206:    def snapshot(self, *, include_slow: bool = False, include_bulk: bool = False) -> dict[str, Any]:
+/opt/kinetics-gateway/backend/app/assets/mock_plant.py:213:            "telemetry": self._asset_points(scope="bank", asset_id="bms_bank", include_slow=include_slow),
+/opt/kinetics-gateway/backend/app/assets/mock_plant.py:228:                        scope="rack", asset_id=asset_id, asset_index=rack_id, include_slow=include_slow,
+/opt/kinetics-gateway/backend/app/assets/mock_plant.py:229:                        include_bulk=include_bulk,
+/opt/kinetics-gateway/backend/app/assets/mock_plant.py:233:        env_all = self._asset_points(scope="environment", asset_id="bms_environment", include_slow=include_slow)
+/opt/kinetics-gateway/backend/app/assets/mock_plant.py:245:        pcs_telemetry: dict[str, Any] = {}
+/opt/kinetics-gateway/backend/app/assets/mock_plant.py:246:        for point in self.pcs_catalog.points:
+/opt/kinetics-gateway/backend/app/assets/mock_plant.py:251:            if self.scenario == "pcs_fault" and is_fault_point and 0x0026 <= address <= 0x003B:
+/opt/kinetics-gateway/backend/app/assets/mock_plant.py:253:            pcs_telemetry[str(point["key"])] = {
+/opt/kinetics-gateway/backend/app/assets/mock_plant.py:263:        pcs = {
+/opt/kinetics-gateway/backend/app/assets/mock_plant.py:264:            "asset_id": "pcs_1",
+/opt/kinetics-gateway/backend/app/assets/mock_plant.py:265:            "asset_type": "pcs",
+/opt/kinetics-gateway/backend/app/assets/mock_plant.py:268:            "telemetry": pcs_telemetry,
+/opt/kinetics-gateway/backend/app/assets/mock_plant.py:279:            "pcs": pcs,
+/opt/kinetics-gateway/backend/app/assets/mock_plant.py:289:                scope="rack", asset_id=asset_id, asset_index=rack_id, include_slow=True, include_bulk=True
+/opt/kinetics-gateway/backend/app/assets/pcs_driver.py:8:from app.core.config import PcsConfig, PcsDeviceConfig
+/opt/kinetics-gateway/backend/app/assets/pcs_driver.py:20:class PcsModbusDriver:
+/opt/kinetics-gateway/backend/app/assets/pcs_driver.py:21:    """Transport-independent PCS driver for one or more PCS assets.
+/opt/kinetics-gateway/backend/app/assets/pcs_driver.py:23:    Modbus RTU uses one shared serial client and polls configured slave IDs
+/opt/kinetics-gateway/backend/app/assets/pcs_driver.py:28:    def __init__(self, config: PcsConfig, catalog: ProtocolCatalog) -> None:
+/opt/kinetics-gateway/backend/app/assets/pcs_driver.py:49:    def devices(self) -> list[PcsDeviceConfig]:
+/opt/kinetics-gateway/backend/app/assets/pcs_driver.py:56:    def device(self, asset_id: str | None = None) -> PcsDeviceConfig:
+/opt/kinetics-gateway/backend/app/assets/pcs_driver.py:61:            raise KeyError(f"Unknown PCS asset: {selected}") from error
+/opt/kinetics-gateway/backend/app/assets/pcs_driver.py:63:    def _client_for(self, device: PcsDeviceConfig) -> ModbusRtuClient | ModbusTcpClient:
+/opt/kinetics-gateway/backend/app/assets/pcs_driver.py:66:                raise RuntimeError("PCS Modbus RTU client is not initialized")
+/opt/kinetics-gateway/backend/app/assets/pcs_driver.py:92:            (point for point in self.catalog.points if point.get("poll_enabled", True)),
+/opt/kinetics-gateway/backend/app/assets/pcs_driver.py:164:                    "PCS read failed asset=%s transport=%s unit=%s start=%s count=%s: %s",
+/opt/kinetics-gateway/backend/app/assets/pcs_driver.py:186:            "asset_type": "pcs",
+/opt/kinetics-gateway/backend/app/assets/pcs_driver.py:215:    def disabled_asset(device: PcsDeviceConfig) -> dict[str, Any]:
+/opt/kinetics-gateway/backend/app/assets/pcs_driver.py:218:            "asset_type": "pcs",
+/opt/kinetics-gateway/backend/app/assets/pcs_driver.py:230:        """Read one PCS point directly for staged-control verification."""
+/opt/kinetics-gateway/backend/app/assets/pcs_driver.py:233:            raise PermissionError(f"PCS asset {asset_id} is disabled")
+/opt/kinetics-gateway/backend/app/assets/pcs_driver.py:234:        point = self.catalog.by_key(point_key, scope="pcs")
+/opt/kinetics-gateway/backend/app/assets/pcs_driver.py:236:            raise KeyError(f"Unknown PCS point: {point_key}")
+/opt/kinetics-gateway/backend/app/assets/pcs_driver.py:267:            raise PermissionError(f"PCS asset {asset_id} is disabled")
+/opt/kinetics-gateway/backend/app/assets/pcs_driver.py:269:            raise PermissionError("PCS writes are disabled until vendor write details are loaded")
+/opt/kinetics-gateway/backend/app/assets/pcs_driver.py:270:        point = self.catalog.by_key(point_key, scope="pcs")
+/opt/kinetics-gateway/backend/app/assets/pcs_driver.py:272:            raise KeyError(f"Unknown PCS point: {point_key}")
+/opt/kinetics-gateway/backend/app/assets/pcs_driver.py:274:            raise PermissionError(f"PCS point {point_key} is not marked writable")
+/opt/kinetics-gateway/backend/app/assets/pcs_driver.py:276:            raise ValueError("PCS data type is missing for this point")
+/opt/kinetics-gateway/backend/app/assets/pcs_driver.py:292:            raise ValueError(f"Unsupported PCS write function {write_function}")
+/opt/kinetics-gateway/backend/app/assets/bms_driver.py:89:        include_slow: bool = False,
+/opt/kinetics-gateway/backend/app/assets/bms_driver.py:90:        include_bulk: bool = False,
+/opt/kinetics-gateway/backend/app/assets/bms_driver.py:92:        poll_classes = {"fast", "normal"}
+/opt/kinetics-gateway/backend/app/assets/bms_driver.py:93:        if include_slow:
+/opt/kinetics-gateway/backend/app/assets/bms_driver.py:94:            poll_classes.add("slow")
+/opt/kinetics-gateway/backend/app/assets/bms_driver.py:95:        if include_bulk:
+/opt/kinetics-gateway/backend/app/assets/bms_driver.py:96:            poll_classes.add("bulk")
+/opt/kinetics-gateway/backend/app/assets/bms_driver.py:97:        return self.read_asset_classes(asset_id, poll_classes)
+/opt/kinetics-gateway/backend/app/assets/bms_driver.py:99:    def read_asset_classes(self, asset_id: str, poll_classes: set[str]) -> dict[str, Any]:
+/opt/kinetics-gateway/backend/app/assets/bms_driver.py:101:        points = self.catalog.select(scope=endpoint.scope, poll_classes=set(poll_classes))
+/opt/kinetics-gateway/backend/app/assets/bms_driver.py:152:            "poll_classes": sorted(poll_classes),
+/opt/kinetics-gateway/backend/app/core/config.py:41:    poll_fast_seconds: float = 1.0
+/opt/kinetics-gateway/backend/app/core/config.py:42:    poll_normal_seconds: float = 5.0
+/opt/kinetics-gateway/backend/app/core/config.py:43:    poll_slow_seconds: float = 60.0
+/opt/kinetics-gateway/backend/app/core/config.py:44:    poll_bulk_seconds: float = 30.0
+/opt/kinetics-gateway/backend/app/core/config.py:45:    include_bulk_in_live_snapshot: bool = True
+/opt/kinetics-gateway/backend/app/core/config.py:49:class PcsSerialConfig(BaseModel):
+/opt/kinetics-gateway/backend/app/core/config.py:50:    """Shared RS485 serial-bus parameters for all configured PCS slaves."""
+/opt/kinetics-gateway/backend/app/core/config.py:52:    device: str = "/dev/pcs_rs485"
+/opt/kinetics-gateway/backend/app/core/config.py:61:    def validate_serial_settings(self) -> "PcsSerialConfig":
+/opt/kinetics-gateway/backend/app/core/config.py:63:            raise ValueError("PCS serial device cannot be empty")
+/opt/kinetics-gateway/backend/app/core/config.py:65:            raise ValueError("PCS serial baudrate must be greater than zero")
+/opt/kinetics-gateway/backend/app/core/config.py:67:            raise ValueError("PCS inter-request delay cannot be negative")
+/opt/kinetics-gateway/backend/app/core/config.py:69:            raise ValueError("PCS serial retries cannot be negative")
+/opt/kinetics-gateway/backend/app/core/config.py:73:class PcsDeviceConfig(BaseModel):
+/opt/kinetics-gateway/backend/app/core/config.py:74:    """One externally addressable PCS slave on the shared Modbus RTU bus."""
+/opt/kinetics-gateway/backend/app/core/config.py:82:    def validate_device(self) -> "PcsDeviceConfig":
+/opt/kinetics-gateway/backend/app/core/config.py:83:        if not self.asset_id.startswith("pcs_"):
+/opt/kinetics-gateway/backend/app/core/config.py:84:            raise ValueError("PCS asset_id must start with 'pcs_'")
+/opt/kinetics-gateway/backend/app/core/config.py:90:class PcsConfig(BaseModel):
+/opt/kinetics-gateway/backend/app/core/config.py:91:    """PCS settings with backward-compatible Modbus TCP and new shared-bus RTU support."""
+/opt/kinetics-gateway/backend/app/core/config.py:103:    serial: PcsSerialConfig = Field(default_factory=PcsSerialConfig)
+/opt/kinetics-gateway/backend/app/core/config.py:104:    devices: list[PcsDeviceConfig] = Field(default_factory=list)
+/opt/kinetics-gateway/backend/app/core/config.py:107:    poll_seconds: float = 5.0
+/opt/kinetics-gateway/backend/app/core/config.py:109:    overrides_file: str = "configs/pcs_overrides.json"
+/opt/kinetics-gateway/backend/app/core/config.py:111:    commissioning_status: str = "pcs1_readonly_hardware_validated_2026_07_27"
+/opt/kinetics-gateway/backend/app/core/config.py:114:    def validate_and_expand_devices(self) -> "PcsConfig":
+/opt/kinetics-gateway/backend/app/core/config.py:115:        # Preserve the old one-PCS configuration shape. Existing configs that
+/opt/kinetics-gateway/backend/app/core/config.py:116:        # have only unit_id continue to expose pcs_1 exactly as before.
+/opt/kinetics-gateway/backend/app/core/config.py:118:            self.devices = [PcsDeviceConfig(asset_id="pcs_1", unit_id=self.unit_id, enabled=True)]
+/opt/kinetics-gateway/backend/app/core/config.py:123:            raise ValueError("PCS asset_id values must be unique")
+/opt/kinetics-gateway/backend/app/core/config.py:125:            raise ValueError("Enabled PCS unit_id values must be unique on one shared bus")
+/opt/kinetics-gateway/backend/app/core/config.py:127:            raise ValueError("PCS max_registers_per_request must be between 1 and 125")
+/opt/kinetics-gateway/backend/app/core/config.py:129:            raise ValueError("PCS timeout_seconds must be greater than zero")
+/opt/kinetics-gateway/backend/app/core/config.py:130:        if self.poll_seconds <= 0:
+/opt/kinetics-gateway/backend/app/core/config.py:131:            raise ValueError("PCS poll_seconds must be greater than zero")
+/opt/kinetics-gateway/backend/app/core/config.py:135:    def primary_device(self) -> PcsDeviceConfig:
+/opt/kinetics-gateway/backend/app/core/config.py:139:    def enabled_devices(self) -> list[PcsDeviceConfig]:
+/opt/kinetics-gateway/backend/app/core/config.py:146:    pcs_asset_id: str
+/opt/kinetics-gateway/backend/app/core/config.py:153:        if not self.pcs_asset_id.startswith("pcs_"):
+/opt/kinetics-gateway/backend/app/core/config.py:154:            raise ValueError("Control pair pcs_asset_id must start with 'pcs_'")
+/opt/kinetics-gateway/backend/app/core/config.py:159:    """Guarded field-validated BMS-to-PCS controller.
+/opt/kinetics-gateway/backend/app/core/config.py:161:    Hardware writes require Gateway mode ``control_enabled`` plus both BMS/PCS
+/opt/kinetics-gateway/backend/app/core/config.py:172:            ControlPairConfig(pair_id="pair_1", rack_id=1, pcs_asset_id="pcs_1", enabled=True),
+/opt/kinetics-gateway/backend/app/core/config.py:173:            ControlPairConfig(pair_id="pair_2", rack_id=2, pcs_asset_id="pcs_2", enabled=False),
+/opt/kinetics-gateway/backend/app/core/config.py:174:            ControlPairConfig(pair_id="pair_3", rack_id=3, pcs_asset_id="pcs_3", enabled=False),
+/opt/kinetics-gateway/backend/app/core/config.py:175:            ControlPairConfig(pair_id="pair_4", rack_id=4, pcs_asset_id="pcs_4", enabled=False),
+/opt/kinetics-gateway/backend/app/core/config.py:180:    pcs_dc_bus_voltage_min_v: float = 1100.0
+/opt/kinetics-gateway/backend/app/core/config.py:181:    pcs_dc_bus_voltage_max_v: float = 1500.0
+/opt/kinetics-gateway/backend/app/core/config.py:188:    pcs_start_timeout_seconds: float = 10.0
+/opt/kinetics-gateway/backend/app/core/config.py:206:        if self.pcs_dc_bus_voltage_min_v >= self.pcs_dc_bus_voltage_max_v:
+/opt/kinetics-gateway/backend/app/core/config.py:207:            raise ValueError("PCS DC-bus voltage minimum must be below maximum")
+/opt/kinetics-gateway/backend/app/core/config.py:234:        pcs_ids = [pair.pcs_asset_id for pair in self.pairs if pair.enabled]
+/opt/kinetics-gateway/backend/app/core/config.py:239:        if len(pcs_ids) != len(set(pcs_ids)):
+/opt/kinetics-gateway/backend/app/core/config.py:240:            raise ValueError("Enabled control-pair PCS IDs must be unique")
+/opt/kinetics-gateway/backend/app/core/config.py:268:    scenario: str = "normal"
+/opt/kinetics-gateway/backend/app/core/config.py:279:    pcs_interface: str = "eth1"
+/opt/kinetics-gateway/backend/app/core/config.py:292:    pcs_catalog_file: str = "generated_protocols/pcs_catalog.json"
+/opt/kinetics-gateway/backend/app/core/config.py:294:    pcs: PcsConfig = Field(default_factory=PcsConfig)
+/opt/kinetics-gateway/backend/app/core/config.py:305:            self.pcs.write_enabled = False
+/opt/kinetics-gateway/backend/app/core/catalog.py:29:        poll_classes: set[str] | None = None,
+/opt/kinetics-gateway/backend/app/core/catalog.py:39:            if poll_classes and point.get("poll_class") not in poll_classes:
+/opt/kinetics-gateway/backend/app/core/catalog.py:51:        normalized = key.strip().lower()
+/opt/kinetics-gateway/backend/app/core/catalog.py:55:            if str(point.get("key", "")).lower() == normalized or str(point.get("id", "")).lower() == normalized:
+/opt/kinetics-gateway/backend/app/core/catalog.py:79:def apply_pcs_overrides(catalog: ProtocolCatalog, overrides_path: str | Path | None) -> ProtocolCatalog:
+/opt/kinetics-gateway/backend/app/protocols/modbus_rtu.py:49:    deployments continue to start even before PCS RTU commissioning.
+/opt/kinetics-gateway/backend/app/protocols/modbus_rtu.py:95:                "pyserial is required for PCS Modbus RTU; install requirements.txt or run: pip install pyserial"
+/opt/kinetics-gateway/backend/app/protocols/modbus_rtu.py:108:            raise ModbusRtuError(f"Cannot open PCS RS485 device {self.device}: {error}") from error
+/opt/kinetics-gateway/backend/app/protocols/planner.py:23:        if point.get("reserved") or point.get("poll_class") == "disabled":
+/opt/kinetics-gateway/backend/app/storage/sqlite_store.py:69:                PRAGMA synchronous=NORMAL;
+/opt/kinetics-gateway/backend/tools/mock_smoke_test.py:12:from fastapi.testclient import TestClient
+/opt/kinetics-gateway/backend/tools/mock_smoke_test.py:30:                "pcs_points=", len(snapshot["pcs"]["telemetry"]),
+/opt/kinetics-gateway/backend/tools/hardware_read_validation.py:21:    parser = argparse.ArgumentParser(description="Run a complete read-only BMS/PCS extraction validation")
+/opt/kinetics-gateway/backend/tools/hardware_read_validation.py:40:    config.pcs.write_enabled = False
+/opt/kinetics-gateway/backend/tools/hardware_read_validation.py:51:            *snapshot.get("pcs_devices", {}).values(),
+/opt/kinetics-gateway/backend/tools/hardware_read_validation.py:59:            "pcs": config.pcs.model_dump(),
+/opt/kinetics-gateway/backend/tools/hardware_read_validation.py:68:                    "poll_status": asset.get("poll_status", {}),
+/opt/kinetics-gateway/backend/tools/hardware_read_validation.py:73:            "polling": snapshot.get("polling", {}),
+/opt/kinetics-gateway/backend/tools/extract_protocol_catalogs.py:15:    "Bank Signal": ("bank", "signal", 4, "fast"),
+/opt/kinetics-gateway/backend/tools/extract_protocol_catalogs.py:16:    "Bank Measure": ("bank", "measure", 4, "fast"),
+/opt/kinetics-gateway/backend/tools/extract_protocol_catalogs.py:17:    "Bank Control": ("bank", "control", 3, "slow"),
+/opt/kinetics-gateway/backend/tools/extract_protocol_catalogs.py:18:    "Bank Parameter Set & Read": ("bank", "parameter", 3, "slow"),
+/opt/kinetics-gateway/backend/tools/extract_protocol_catalogs.py:19:    "Rack Signal": ("rack", "signal", 4, "fast"),
+/opt/kinetics-gateway/backend/tools/extract_protocol_catalogs.py:20:    "Rack Detail": ("rack", "detail", 4, "bulk"),
+/opt/kinetics-gateway/backend/tools/extract_protocol_catalogs.py:21:    "Rack Measure": ("rack", "measure", 4, "normal"),
+/opt/kinetics-gateway/backend/tools/extract_protocol_catalogs.py:22:    "Rack Control": ("rack", "control", 3, "slow"),
+/opt/kinetics-gateway/backend/tools/extract_protocol_catalogs.py:23:    "Rack_Parameter Set & Read": ("rack", "parameter", 3, "slow"),
+/opt/kinetics-gateway/backend/tools/extract_protocol_catalogs.py:24:    "Rack_Alarm_lv4_Para Set& Read": ("rack", "parameter_lv4", 3, "slow"),
+/opt/kinetics-gateway/backend/tools/extract_protocol_catalogs.py:25:    "Env(signal)": ("environment", "signal", 4, "normal"),
+/opt/kinetics-gateway/backend/tools/extract_protocol_catalogs.py:66:    poll_class: str
+/opt/kinetics-gateway/backend/tools/extract_protocol_catalogs.py:78:    text = unicodedata.normalize("NFKD", text)
+/opt/kinetics-gateway/backend/tools/extract_protocol_catalogs.py:117:def normalize_type(value: Any) -> str:
+/opt/kinetics-gateway/backend/tools/extract_protocol_catalogs.py:163:def parse_standard_sheet(ws, scope: str, category: str, read_function: int, poll_class: str) -> list[RegisterPoint]:
+/opt/kinetics-gateway/backend/tools/extract_protocol_catalogs.py:207:        data_type = normalize_type(value(row, mapping, "数值格式"))
+/opt/kinetics-gateway/backend/tools/extract_protocol_catalogs.py:246:            poll_class="disabled" if reserved else poll_class,
+/opt/kinetics-gateway/backend/tools/extract_protocol_catalogs.py:295:                "data_type": normalize_type(value(row, mapping, "数值格式")),
+/opt/kinetics-gateway/backend/tools/extract_protocol_catalogs.py:298:                "poll_class": "disabled",
+/opt/kinetics-gateway/backend/tools/extract_protocol_catalogs.py:309:    for sheet, (scope, category, read_function, poll_class) in STANDARD_BMS_SHEETS.items():
+/opt/kinetics-gateway/backend/tools/extract_protocol_catalogs.py:310:        points.extend(parse_standard_sheet(workbook[sheet], scope, category, read_function, poll_class))
+/opt/kinetics-gateway/backend/tools/extract_protocol_catalogs.py:351:def extract_pcs(input_path: Path) -> dict[str, Any]:
+/opt/kinetics-gateway/backend/tools/extract_protocol_catalogs.py:367:                "id": f"pcs.raw.{key}",
+/opt/kinetics-gateway/backend/tools/extract_protocol_catalogs.py:369:                "scope": "pcs",
+/opt/kinetics-gateway/backend/tools/extract_protocol_catalogs.py:422:    parser.add_argument("--pcs", type=Path, required=True)
+/opt/kinetics-gateway/backend/tools/extract_protocol_catalogs.py:427:    pcs = extract_pcs(args.pcs)
+/opt/kinetics-gateway/backend/tools/extract_protocol_catalogs.py:429:    (args.out / "pcs_catalog.json").write_text(json.dumps(pcs, indent=2, ensure_ascii=False), encoding="utf-8")
+/opt/kinetics-gateway/backend/tools/extract_protocol_catalogs.py:431:    print(f"PCS points: {len(pcs['points'])}")
+/opt/kinetics-gateway/backend/tools/control_sequence_cli.py:40:    parser = argparse.ArgumentParser(description="Kinetics staged BMS/PCS control API client")
+/opt/kinetics-gateway/backend/tools/control_sequence_cli.py:44:        "prepare-pcs-standby", "configure-pcs", "start-pcs", "set-power",
+/opt/kinetics-gateway/backend/tools/control_sequence_cli.py:88:    elif args.command in {"start-insulation", "start-precharge", "recover-bms", "prepare-pcs-standby", "configure-pcs", "start-pcs"}:
+/opt/kinetics-gateway/backend/tools/control_sequence_cli.py:93:            "prepare-pcs-standby": "prepare-pcs-standby",
+/opt/kinetics-gateway/backend/tools/control_sequence_cli.py:94:            "configure-pcs": "configure-pcs",
+/opt/kinetics-gateway/backend/tools/control_sequence_cli.py:95:            "start-pcs": "start-pcs",
+/opt/kinetics-gateway/backend/tools/extract_pcs_hmi_catalog.py:50:    0x1200: ("operating_state", "PCS operating state"),
+/opt/kinetics-gateway/backend/tools/extract_pcs_hmi_catalog.py:51:    0x1201: ("status_word_1", "PCS status word 1"),
+/opt/kinetics-gateway/backend/tools/extract_pcs_hmi_catalog.py:52:    0x1202: ("status_word_2", "PCS status word 2"),
+/opt/kinetics-gateway/backend/tools/extract_pcs_hmi_catalog.py:53:    0x1203: ("status_word_3", "PCS status word 3"),
+/opt/kinetics-gateway/backend/tools/extract_pcs_hmi_catalog.py:112:def poll_class_for(category: str) -> str:
+/opt/kinetics-gateway/backend/tools/extract_pcs_hmi_catalog.py:113:    return {"measure": "normal", "status": "normal", "version": "slow"}.get(category, "slow")
+/opt/kinetics-gateway/backend/tools/extract_pcs_hmi_catalog.py:117:    if address >= 0x1400 and menu == "PCS参数设置":
+/opt/kinetics-gateway/backend/tools/extract_pcs_hmi_catalog.py:119:    if address < 0x1400 and page == "PCS运行数据":
+/opt/kinetics-gateway/backend/tools/extract_pcs_hmi_catalog.py:198:def build_catalog(pcs_xlsx: Path, cfg_sys_path: Path, cfg_alarm_path: Path) -> dict[str, Any]:
+/opt/kinetics-gateway/backend/tools/extract_pcs_hmi_catalog.py:199:    ws = load_workbook(pcs_xlsx, data_only=True)["PCS"]
+/opt/kinetics-gateway/backend/tools/extract_pcs_hmi_catalog.py:228:            "id": f"pcs.{category}.{key}",
+/opt/kinetics-gateway/backend/tools/extract_pcs_hmi_catalog.py:229:            "sheet": "PCS",
+/opt/kinetics-gateway/backend/tools/extract_pcs_hmi_catalog.py:230:            "scope": "pcs",
+/opt/kinetics-gateway/backend/tools/extract_pcs_hmi_catalog.py:257:            "poll_class": poll_class_for(category),
+/opt/kinetics-gateway/backend/tools/extract_pcs_hmi_catalog.py:258:            "poll_enabled": True,
+/opt/kinetics-gateway/backend/tools/extract_pcs_hmi_catalog.py:266:                "PCS.xlsx + cfg_sys.json"
+/opt/kinetics-gateway/backend/tools/extract_pcs_hmi_catalog.py:268:                else "PCS.xlsx" if address in workbook else "cfg_sys.json"
+/opt/kinetics-gateway/backend/tools/extract_pcs_hmi_catalog.py:277:            "source": "Working PCS Windows HMI package supplied 2026-07-27",
+/opt/kinetics-gateway/backend/tools/extract_pcs_hmi_catalog.py:278:            "workbook": pcs_xlsx.name,
+/opt/kinetics-gateway/backend/tools/extract_pcs_hmi_catalog.py:308:    parser = argparse.ArgumentParser(description="Generate PCS catalog from the working HMI files")
+/opt/kinetics-gateway/backend/tools/extract_pcs_hmi_catalog.py:309:    parser.add_argument("--pcs-xlsx", required=True)
+/opt/kinetics-gateway/backend/tools/extract_pcs_hmi_catalog.py:314:    catalog = build_catalog(Path(args.pcs_xlsx), Path(args.cfg_sys), Path(args.cfg_alarm))
+/opt/kinetics-gateway/backend/tools/pcs_rtu_probe.py:27:        description="Read-only Modbus RTU probe for the four Kinetics PCS slaves"
+/opt/kinetics-gateway/backend/tools/pcs_rtu_probe.py:29:    parser.add_argument("--device", default="/dev/pcs_rs485")

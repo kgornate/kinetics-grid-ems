@@ -1,0 +1,27 @@
+# Cloudflare Tunnel config for FRDM i.MX93 EMS Gateway #1
+# Goes on the i.MX93 device itself, NOT the Mac Mini.
+#
+# Place this file + credentials.json at /etc/cloudflared/ on the device
+# and run: cloudflared --config /etc/cloudflared/config.yml tunnel run
+
+tunnel: 6d36a25f-bfc0-4d8b-b888-8aefd4e7f3c5
+credentials-file: /etc/cloudflared/credentials.json
+
+# Don't auto-update on a constrained embedded device
+no-autoupdate: true
+
+ingress:
+  # REST + SSE API
+  - hostname: gw1-api.unityess.cloud
+    service: http://localhost:8000
+
+  # Logs / events / history
+  - hostname: gw1-logs.unityess.cloud
+    service: http://localhost:7000
+
+  # Remote SSH access — protect with Cloudflare Access (Email OTP)
+  - hostname: gw1-ssh.unityess.cloud
+    service: ssh://localhost:22
+
+  # Catch-all — anything else returns 404
+  - service: http_status:404

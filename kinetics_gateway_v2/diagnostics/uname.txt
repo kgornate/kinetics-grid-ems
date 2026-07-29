@@ -1,0 +1,1 @@
+Linux imx93-11x11-lpddr4x-frdm 6.18.2-1.0.0-gf49f45233f7b #1 SMP PREEMPT Wed Feb 11 18:37:47 UTC 2026 aarch64 GNU/Linux

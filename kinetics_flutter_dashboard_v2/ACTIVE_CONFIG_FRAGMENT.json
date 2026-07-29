@@ -1,0 +1,7 @@
+{
+  "control_sequence": {
+    "runtime_monitor_enabled": true,
+    "runtime_monitor_refresh_wait_seconds": 10.0,
+    "runtime_monitor_max_unverified_seconds": 30.0
+  }
+}

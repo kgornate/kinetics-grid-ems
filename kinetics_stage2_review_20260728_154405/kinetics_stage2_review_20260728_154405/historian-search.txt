@@ -1,0 +1,59 @@
+/opt/kinetics-gateway/backend/tests/test_scheduler_storage.py:6:from app.storage.sqlite_store import SQLiteStore
+/opt/kinetics-gateway/backend/tests/test_scheduler_storage.py:15:    return GatewayService(config, SQLiteStore(config.storage))
+/opt/kinetics-gateway/backend/tests/test_scheduler_storage.py:50:def test_compressed_sqlite_round_trip(tmp_path):
+/opt/kinetics-gateway/backend/tests/test_scheduler_storage.py:56:    assert status["compression_enabled"] is True
+/opt/kinetics-gateway/backend/tests/test_scheduler_storage.py:57:    assert status["telemetry_size"]["stored_bytes_total"] < status["telemetry_size"]["uncompressed_bytes_total"]
+/opt/kinetics-gateway/backend/tests/test_api.py:49:        export = client.get("/api/export/historian/bms_bank.csv", headers=headers)
+/opt/kinetics-gateway/backend/tests/test_mock_service.py:6:from app.storage.sqlite_store import SQLiteStore
+/opt/kinetics-gateway/backend/tests/test_mock_service.py:14:    return GatewayService(config, SQLiteStore(config.storage))
+/opt/kinetics-gateway/backend/app/main.py:18:from app.storage.sqlite_store import SQLiteStore
+/opt/kinetics-gateway/backend/app/main.py:22:store = SQLiteStore(config.storage)
+/opt/kinetics-gateway/backend/app/main.py:115:        "manual staged BMS-to-PCS control, delta WebSockets, JWT security, compressed SQLite historian and mock/hardware modes"
+/opt/kinetics-gateway/backend/app/api/routes.py:204:    @router.get("/api/historian/assets")
+/opt/kinetics-gateway/backend/app/api/routes.py:205:    def historian_assets(user: User = Depends(current_user)) -> dict[str, Any]:
+/opt/kinetics-gateway/backend/app/api/routes.py:209:    @router.get("/api/historian/{asset_id}")
+/opt/kinetics-gateway/backend/app/api/routes.py:210:    def historian(
+/opt/kinetics-gateway/backend/app/api/routes.py:633:    @router.get("/api/export/historian/{asset_id}.csv", response_class=PlainTextResponse)
+/opt/kinetics-gateway/backend/app/api/routes.py:634:    def export_historian(
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:14:from app.storage.sqlite_store import SQLiteStore
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:67:        store: SQLiteStore,
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:21:from app.storage.sqlite_store import SQLiteStore
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:34:    def __init__(self, config: GatewayConfig, store: SQLiteStore) -> None:
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:68:            "last_uncompressed_bytes": 0,
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:70:            "total_uncompressed_bytes": 0,
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:522:            raw_total += sizes["uncompressed_bytes"]
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:526:        stats["last_uncompressed_bytes"] = raw_total
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:528:        stats["total_uncompressed_bytes"] += raw_total
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:530:        stats["average_uncompressed_bytes"] = round(stats["total_uncompressed_bytes"] / stats["samples"], 2)
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:743:        history_compressed = sum(
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:744:            len(zlib.compress(json.dumps(asset, ensure_ascii=False, separators=(",", ":")).encode("utf-8"), 6))
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:747:        stored_per_sample = history_compressed if self.config.storage.compress_history else history_raw
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:767:                "uncompressed_bytes_per_complete_sample": history_raw,
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:769:                "compression_ratio": round(stored_per_sample / history_raw, 4) if history_raw else None,
+/opt/kinetics-gateway/backend/app/core/config.py:256:    compress_history: bool = True
+/opt/kinetics-gateway/backend/app/storage/sqlite_store.py:7:import sqlite3
+/opt/kinetics-gateway/backend/app/storage/sqlite_store.py:49:class SQLiteStore:
+/opt/kinetics-gateway/backend/app/storage/sqlite_store.py:56:        self._connection = sqlite3.connect(self.database_path, check_same_thread=False)
+/opt/kinetics-gateway/backend/app/storage/sqlite_store.py:57:        self._connection.row_factory = sqlite3.Row
+/opt/kinetics-gateway/backend/app/storage/sqlite_store.py:68:                PRAGMA journal_mode=WAL;
+/opt/kinetics-gateway/backend/app/storage/sqlite_store.py:77:                    uncompressed_bytes INTEGER,
+/opt/kinetics-gateway/backend/app/storage/sqlite_store.py:139:            "uncompressed_bytes": "INTEGER",
+/opt/kinetics-gateway/backend/app/storage/sqlite_store.py:152:    def _encode_payload(payload: dict[str, Any], compress: bool) -> tuple[str, bytes | None, str, int, int]:
+/opt/kinetics-gateway/backend/app/storage/sqlite_store.py:154:        if compress:
+/opt/kinetics-gateway/backend/app/storage/sqlite_store.py:155:            blob = zlib.compress(raw, level=6)
+/opt/kinetics-gateway/backend/app/storage/sqlite_store.py:161:    def _decode_payload(row: sqlite3.Row) -> dict[str, Any]:
+/opt/kinetics-gateway/backend/app/storage/sqlite_store.py:164:            return json.loads(zlib.decompress(row["payload_blob"]).decode("utf-8"))
+/opt/kinetics-gateway/backend/app/storage/sqlite_store.py:169:            payload, self.config.compress_history
+/opt/kinetics-gateway/backend/app/storage/sqlite_store.py:176:                    uncompressed_bytes, stored_bytes
+/opt/kinetics-gateway/backend/app/storage/sqlite_store.py:181:        return {"uncompressed_bytes": raw_size, "stored_bytes": stored_size}
+/opt/kinetics-gateway/backend/app/storage/sqlite_store.py:361:        for suffix in ("", "-wal", "-shm"):
+/opt/kinetics-gateway/backend/app/storage/sqlite_store.py:374:                       COALESCE(SUM(uncompressed_bytes),0) AS raw_sum,
+/opt/kinetics-gateway/backend/app/storage/sqlite_store.py:376:                       COALESCE(AVG(uncompressed_bytes),0) AS raw_avg,
+/opt/kinetics-gateway/backend/app/storage/sqlite_store.py:383:            "uncompressed_bytes_total": int(row["raw_sum"]),
+/opt/kinetics-gateway/backend/app/storage/sqlite_store.py:385:            "average_uncompressed_bytes": float(row["raw_avg"]),
+/opt/kinetics-gateway/backend/app/storage/sqlite_store.py:419:            "compression_enabled": self.config.compress_history,
+/opt/kinetics-gateway/backend/app/storage/sqlite_store.py:453:            self._connection.execute("PRAGMA wal_checkpoint(PASSIVE)")
+/opt/kinetics-gateway/backend/tools/scheduler_report.py:13:from app.storage.sqlite_store import SQLiteStore
+/opt/kinetics-gateway/backend/tools/scheduler_report.py:18:    service = GatewayService(config, SQLiteStore(config.storage))
+/opt/kinetics-gateway/backend/tools/hardware_read_validation.py:17:from app.storage.sqlite_store import SQLiteStore
+/opt/kinetics-gateway/backend/tools/hardware_read_validation.py:45:        service = GatewayService(config, SQLiteStore(config.storage))

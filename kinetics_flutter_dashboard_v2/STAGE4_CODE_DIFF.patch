@@ -1,0 +1,332 @@
+--- /tmp/gateway_controller.dart.orig	2026-07-28 19:00:49.085968837 +0000
++++ lib/core/state/gateway_controller.dart	2026-07-28 19:00:49.533968818 +0000
+@@ -40,6 +40,12 @@
+   Timer? _controlTimer;
+   Timer? _reconnectTimer;
+   int _reconnectAttempt = 0;
++  bool _controlStatusInFlight = false;
++  bool _controlStatusRefreshPending = false;
++  bool _controlPollingEnabled = false;
++  int _controlStatusGeneration = 0;
++  int controlStatusSkippedRefreshes = 0;
++  DateTime? controlStatusReceivedAt;
+   bool _disposed = false;
+ 
+   bool get authenticated => session != null;
+@@ -86,7 +92,6 @@
+     if (isInternal) {
+       await refreshControlCapabilities(silent: true);
+       await refreshControlStatus(silent: true);
+-      startControlPolling();
+     }
+     await connectTelemetry();
+     _diagnosticTimer?.cancel();
+@@ -274,20 +279,44 @@
+   }
+ 
+   Future<void> refreshControlStatus({bool silent = false}) async {
+-    if (!isInternal) return;
++    if (!isInternal || _disposed) return;
++
++    // Status polling is intentionally single-flight. Timer ticks, manual
++    // refreshes and post-command refreshes are collapsed into at most one
++    // current request plus one pending cached refresh.
++    if (_controlStatusInFlight) {
++      _controlStatusRefreshPending = true;
++      controlStatusSkippedRefreshes += 1;
++      return;
++    }
++
++    _controlStatusInFlight = true;
++    final pairId = selectedControlPair;
++    final generation = _controlStatusGeneration;
+     try {
+       final payload = await api.getJson(
+-        '/api/control-sequence/$selectedControlPair/status',
+-        query: const <String, String>{'fresh': 'true'},
+-        timeout: const Duration(seconds: 30),
++        '/api/control-sequence/$pairId/status',
++        query: const <String, String>{'fresh': 'false'},
++        timeout: const Duration(seconds: 10),
+       );
+-      controlStatus = ControlSequenceStatus.fromJson(payload);
+-      restConnected = true;
++      if (!_disposed &&
++          pairId == selectedControlPair &&
++          generation == _controlStatusGeneration) {
++        controlStatus = ControlSequenceStatus.fromJson(payload);
++        controlStatusReceivedAt = DateTime.now().toUtc();
++        restConnected = true;
++      }
+     } catch (error) {
+       if (!silent) errorMessage = error.toString();
+       if (!silent) rethrow;
+     } finally {
++      _controlStatusInFlight = false;
++      final runPending = _controlStatusRefreshPending && !_disposed;
++      _controlStatusRefreshPending = false;
+       if (!_disposed) notifyListeners();
++      if (runPending) {
++        unawaited(refreshControlStatus(silent: true));
++      }
+     }
+   }
+ 
+@@ -295,22 +324,63 @@
+     if (pairId == selectedControlPair) return;
+     selectedControlPair = pairId;
+     controlStatus = null;
++    controlStatusReceivedAt = null;
++    _controlStatusGeneration += 1;
+     notifyListeners();
+-    refreshControlStatus(silent: true);
++    unawaited(refreshControlStatus(silent: true));
+   }
+ 
+   void startControlPolling() {
+-    if (!isInternal) return;
++    if (!isInternal || _disposed) return;
++    _controlPollingEnabled = true;
+     _controlTimer?.cancel();
++    unawaited(refreshControlStatus(silent: true));
+     _controlTimer = Timer.periodic(
+-      const Duration(seconds: 2),
+-      (_) => refreshControlStatus(silent: true),
++      const Duration(seconds: 3),
++      (_) {
++        if (!controlBusy && _controlPollingEnabled) {
++          unawaited(refreshControlStatus(silent: true));
++        }
++      },
+     );
+   }
+ 
+   void stopControlPolling() {
++    _controlPollingEnabled = false;
+     _controlTimer?.cancel();
+     _controlTimer = null;
++    _controlStatusRefreshPending = false;
++  }
++
++  bool get controlPollingActive =>
++      _controlPollingEnabled && _controlTimer?.isActive == true;
++
++  bool get controlStatusRequestActive => _controlStatusInFlight;
++
++  String get controlStatusSource {
++    final refresh = controlStatus?.raw['refresh'];
++    if (refresh is Map) {
++      return refresh['source']?.toString() ?? 'cached_runtime';
++    }
++    return 'cached_runtime';
++  }
++
++  bool get controlStatusIsStale {
++    final refresh = controlStatus?.raw['refresh'];
++    if (refresh is Map && refresh['stale'] == true) return true;
++    final timestamp = controlStatus?.timestamp;
++    final parsed = timestamp == null ? null : DateTime.tryParse(timestamp);
++    if (parsed == null) return controlStatus == null;
++    return DateTime.now().toUtc().difference(parsed.toUtc()) >
++        const Duration(seconds: 20);
++  }
++
++  Duration? get controlStatusAge {
++    final timestamp = controlStatus?.timestamp;
++    final parsed = timestamp == null ? null : DateTime.tryParse(timestamp);
++    if (parsed == null) return null;
++    final age = DateTime.now().toUtc().difference(parsed.toUtc());
++    return age.isNegative ? Duration.zero : age;
+   }
+ 
+   Future<Map<String, dynamic>> automaticStart({
+@@ -412,6 +482,11 @@
+     if (!isInternal) {
+       throw const ApiException('Internal role is required for control');
+     }
++    if (controlBusy) {
++      throw const ApiException(
++        'Another control command is already in progress. Wait for its response.',
++      );
++    }
+     controlBusy = true;
+     errorMessage = null;
+     notifyListeners();
+@@ -514,6 +589,12 @@
+     assetMetadata = <Map<String, dynamic>>[];
+     controlCapabilities = null;
+     controlStatus = null;
++    controlStatusReceivedAt = null;
++    _controlStatusInFlight = false;
++    _controlStatusRefreshPending = false;
++    _controlPollingEnabled = false;
++    _controlStatusGeneration += 1;
++    controlStatusSkippedRefreshes = 0;
+     lastControlResponse = <String, dynamic>{};
+     controlBusy = false;
+     health = <String, dynamic>{};
+--- /tmp/control_sequence_screen.dart.orig	2026-07-28 19:00:49.085968837 +0000
++++ lib/screens/control_sequence_screen.dart	2026-07-28 19:00:49.533968818 +0000
+@@ -16,21 +16,22 @@
+ }
+ 
+ class _ControlSequenceScreenState extends State<ControlSequenceScreen> {
+-  final TextEditingController _power = TextEditingController(text: '50');
+-  final TextEditingController _rampStep = TextEditingController(text: '10');
+-  final TextEditingController _rampInterval = TextEditingController(text: '1');
++  final TextEditingController _power = TextEditingController(text: '0');
++  final TextEditingController _rampStep = TextEditingController(text: '0.5');
++  final TextEditingController _rampInterval = TextEditingController(text: '5');
+   String _direction = 'discharge';
+ 
+   @override
+   void initState() {
+     super.initState();
+-    widget.controller.startControlPolling();
+-    widget.controller.refreshControlCapabilities(silent: true);
+-    widget.controller.refreshControlStatus(silent: true);
++    // HomeShell starts polling only while the Control destination is visible.
++    // The screen may exist offstage inside IndexedStack, so it must not own a
++    // background timer by itself.
+   }
+ 
+   @override
+   void dispose() {
++    widget.controller.stopControlPolling();
+     _power.dispose();
+     _rampStep.dispose();
+     _rampInterval.dispose();
+@@ -69,7 +70,11 @@
+               ),
+             ),
+             const SizedBox(height: 14),
+-            _GateBanner(capabilities: capabilities, status: status),
++            _GateBanner(
++              controller: controller,
++              capabilities: capabilities,
++              status: status,
++            ),
+             const SizedBox(height: 14),
+             _SystemStateCard(status: status),
+             const SizedBox(height: 14),
+@@ -249,7 +254,7 @@
+   Future<void> _safeStop() async {
+     final confirmed = await _confirm(
+       'Complete safe shutdown?',
+-      'The gateway will set 0 kW, stop the PCS, reset BMS precharge, disable the rack and verify both main contactors open.',
++      'The gateway will quiesce runtime monitoring, set 0 kW, stop the PCS, reset the selected BCU precharge command and verify both main contactors open.',
+       dangerous: true,
+     );
+     if (!confirmed) return;
+@@ -283,8 +288,13 @@
+ }
+ 
+ class _GateBanner extends StatelessWidget {
+-  const _GateBanner({required this.capabilities, required this.status});
++  const _GateBanner({
++    required this.controller,
++    required this.capabilities,
++    required this.status,
++  });
+ 
++  final GatewayController controller;
+   final ControlSequenceCapabilities? capabilities;
+   final ControlSequenceStatus? status;
+ 
+@@ -312,10 +322,31 @@
+           icon: Icons.health_and_safety,
+         ),
+         StatusPill(
+-          label: status?.errors.isEmpty == true ? 'All required reads good' : 'Read errors present',
++          label: status?.errors.isEmpty == true
++              ? 'All required reads good'
++              : 'Read errors present',
+           good: status?.errors.isEmpty == true,
+           icon: Icons.sensors,
+         ),
++        StatusPill(
++          label: controller.controlStatusIsStale
++              ? 'Control telemetry stale'
++              : 'Control telemetry fresh',
++          good: !controller.controlStatusIsStale,
++          icon: Icons.schedule,
++        ),
++        StatusPill(
++          label: 'Source: ${controller.controlStatusSource}',
++          good: controller.controlStatusSource != 'live_hardware',
++          icon: Icons.cached,
++        ),
++        StatusPill(
++          label: controller.controlPollingActive
++              ? 'Visible-screen polling active'
++              : 'Control polling paused',
++          good: true,
++          icon: Icons.visibility,
++        ),
+       ],
+     );
+   }
+@@ -355,6 +386,11 @@
+                   Text(
+                     'Automatic run: ${_humanize(run)}${status?.runId == null ? '' : ' • ${status!.runId}'}',
+                   ),
++                  Text(
++                    status?.timestamp == null
++                        ? 'Control status timestamp unavailable'
++                        : 'Control status: ${status!.timestamp}',
++                  ),
+                   if (status?.lastError != null)
+                     Text(
+                       status!.lastError!,
+--- /tmp/home_shell.dart.orig	2026-07-28 19:00:49.085968837 +0000
++++ lib/screens/home_shell.dart	2026-07-28 19:00:49.533968818 +0000
+@@ -37,6 +37,31 @@
+         const NavigationDestination(icon: Icon(Icons.monitor_heart_outlined), selectedIcon: Icon(Icons.monitor_heart), label: 'Diagnostics'),
+       ];
+ 
++
++  bool _isControlDestination(int index) {
++    final destinations = _destinations;
++    return index >= 0 &&
++        index < destinations.length &&
++        destinations[index].label == 'Control';
++  }
++
++  void _selectDestination(int value) {
++    final showControl = _isControlDestination(value);
++    setState(() => _index = value);
++    if (showControl) {
++      widget.controller.refreshControlCapabilities(silent: true);
++      widget.controller.startControlPolling();
++    } else {
++      widget.controller.stopControlPolling();
++    }
++  }
++
++  @override
++  void dispose() {
++    widget.controller.stopControlPolling();
++    super.dispose();
++  }
++
+   List<Widget> get _screens {
+     final bank = widget.controller.plant.bank;
+     return <Widget>[
+@@ -103,7 +128,7 @@
+                   children: [
+                     NavigationRail(
+                       selectedIndex: safeIndex,
+-                      onDestinationSelected: (value) => setState(() => _index = value),
++                      onDestinationSelected: _selectDestination,
+                       labelType: NavigationRailLabelType.all,
+                       destinations: destinations
+                           .map((item) => NavigationRailDestination(
+@@ -122,7 +147,7 @@
+               ? null
+               : NavigationBar(
+                   selectedIndex: safeIndex,
+-                  onDestinationSelected: (value) => setState(() => _index = value),
++                  onDestinationSelected: _selectDestination,
+                   destinations: destinations,
+                 ),
+         );

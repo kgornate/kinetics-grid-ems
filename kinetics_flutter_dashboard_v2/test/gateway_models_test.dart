@@ -103,3 +103,47 @@ void main() {
     expect(plant.pcsDevices.first.point('grid_frequency')?.value, 50.01);
   });
 }
+
+test('Stage 3C cached control sample populates the control model', () {
+  final status = ControlSequenceStatus.fromJson({
+    'pair': {'pair_id': 'pair_1'},
+    'timestamp': '2026-07-28T19:10:00+00:00',
+    'runtime': {
+      'run_status': 'idle',
+      'stage': 'stopped_and_bms_open_verified',
+    },
+    'write_gates': {
+      'control_sequence_enabled': true,
+      'gateway_mode': 'control_enabled',
+      'bms_write_enabled': true,
+      'pcs_write_enabled': true,
+    },
+    'summary': {
+      'rack_voltage_v': 1380.8,
+      'pcs_power_setpoint_kw': 0.0,
+      'pcs_actual_power_kw': 0.0,
+      'blockers': {
+        'emergency_stop_fault': false,
+        'documented_critical_fault': false,
+      },
+    },
+    'workflow': {
+      'system_state': 'stopped_safe',
+      'stopped_safe': true,
+      'ready_for_power': false,
+      'hard_blocked': false,
+      'steps': [],
+    },
+    'refresh': {
+      'source': 'background_poll_cache',
+      'stale': false,
+    },
+    'errors': [],
+  });
+
+  expect(status.pairId, 'pair_1');
+  expect(status.systemState, 'stopped_safe');
+  expect(status.controlEnabled, isTrue);
+  expect(status.value('rack_voltage_v'), 1380.8);
+  expect(status.errors, isEmpty);
+});

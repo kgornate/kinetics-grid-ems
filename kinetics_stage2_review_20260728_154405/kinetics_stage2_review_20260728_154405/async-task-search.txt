@@ -1,0 +1,164 @@
+/opt/kinetics-gateway/backend/FIELD_VALIDATED_CONTROL_SEQUENCE_V2_5.md:77:The stale BMS summary bit in `0x1001` remains diagnostic. Energising commands use documented detailed fault registers `0x1004`, `0x1007`, `0x100C`, `0x100D`, `0x0011`, `0x0012` and `0x0015` as hard blockers.
+/opt/kinetics-gateway/backend/tests/test_bms_pcs_control.py:153:def test_bms_recovery_is_blocked_if_rack_is_enabled() -> None:
+/opt/kinetics-gateway/backend/tests/test_bms_pcs_control.py:162:        raise AssertionError("Recovery should be blocked while the rack is enabled")
+/opt/kinetics-gateway/backend/app/main.py:36:            await asyncio.to_thread(action)
+/opt/kinetics-gateway/backend/app/main.py:47:        removed = await asyncio.to_thread(store.enforce_retention)
+/opt/kinetics-gateway/backend/app/main.py:58:                asyncio.create_task(
+/opt/kinetics-gateway/backend/app/main.py:62:                asyncio.create_task(
+/opt/kinetics-gateway/backend/app/main.py:66:                asyncio.create_task(
+/opt/kinetics-gateway/backend/app/main.py:70:                asyncio.create_task(
+/opt/kinetics-gateway/backend/app/main.py:78:            asyncio.create_task(
+/opt/kinetics-gateway/backend/app/main.py:83:    tasks.append(asyncio.create_task(maintenance_loop(), name="kinetics-maintenance"))
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:74:        self._lock = threading.RLock()
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:131:        with self._lock:
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:195:        blockers = summary.get("blockers", {})
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:273:            "hard_blocked": bool(
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:274:                blockers.get("emergency_stop_fault")
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:275:                or blockers.get("documented_critical_fault")
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:283:            with self._lock:
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:420:        blockers = {
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:501:                "blockers": blockers,
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:530:            "no_emergency_stop": not bool(summary["blockers"]["emergency_stop_fault"]),
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:531:            "no_system_fault": not bool(summary["blockers"]["system_fault"]),
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:539:                summary["blockers"]["system_charge_prohibited"]
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:545:                summary["blockers"]["system_discharge_prohibited"]
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:569:                "source": summary["blockers"].get("direction_permission_source"),
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:570:                "global_summary_system_full": summary["blockers"].get("global_summary_system_full"),
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:571:                "global_summary_system_empty": summary["blockers"].get("global_summary_system_empty"),
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:572:                "global_summary_direction_bits_contradictory": summary["blockers"].get(
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:656:            "documented_critical_fault": bool(summary["blockers"]["documented_critical_fault"]),
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:657:            "emergency_stop_fault": bool(summary["blockers"]["emergency_stop_fault"]),
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:710:            "no_emergency_stop": not bool(summary["blockers"]["emergency_stop_fault"]),
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:711:            "no_documented_critical_fault": not bool(summary["blockers"]["documented_critical_fault"]),
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:734:                    "documented_critical_fault": bool(observed_summary["blockers"]["documented_critical_fault"]),
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:735:                    "emergency_stop_fault": bool(observed_summary["blockers"]["emergency_stop_fault"]),
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:819:            "no_emergency_stop": not bool(summary["blockers"]["emergency_stop_fault"]),
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:821:                summary["blockers"]["documented_critical_fault"]
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:939:            "no_emergency_stop": not bool(summary["blockers"]["emergency_stop_fault"]),
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:940:            "system_fault_present": bool(summary["blockers"]["system_fault"]),
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:966:                    "system_fault": bool(current["summary"]["blockers"]["system_fault"]),
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1036:                and not bool(summary["blockers"]["emergency_stop_fault"])
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1037:                and not bool(summary["blockers"]["system_fault"])
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1090:            "no_emergency_stop": not bool(summary["blockers"]["emergency_stop_fault"]),
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1091:            "no_documented_critical_fault": not bool(summary["blockers"]["documented_critical_fault"]),
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1157:            "no_emergency_stop": not bool(summary["blockers"]["emergency_stop_fault"]),
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1158:            "no_documented_critical_fault": not bool(summary["blockers"]["documented_critical_fault"]),
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1297:        with self._lock:
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1566:                and not bool(item["workflow"].get("hard_blocked"))
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1603:        with self._lock:
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1866:        with self._lock:
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1896:                    summary["blockers"].get("system_charge_prohibited")
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1898:                    else summary["blockers"].get("system_discharge_prohibited")
+/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py:1908:                if status["workflow"].get("hard_blocked"):
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:20:from app.protocols.planner import build_read_blocks
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:48:        self._lock = threading.RLock()
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:176:        with self._lock:
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:232:        with self._lock:
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:398:        with self._lock:
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:402:        with self._lock:
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:457:        with self._lock:
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:463:        with self._lock:
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:534:        with self._lock:
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:571:        with self._lock:
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:610:                blocks = build_read_blocks(
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:615:                requests += len(blocks) * multiplier
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:616:                registers += sum(block.count for block in blocks) * multiplier
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:618:                modbus_bytes += sum(21 + 2 * block.count for block in blocks) * multiplier
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:640:        pcs_blocks: list[tuple[int, int]] = []
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:655:            pcs_blocks.append((start, end - start))
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:658:        pcs_requests = len(pcs_blocks) * device_count
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:659:        pcs_registers = sum(count for _, count in pcs_blocks) * device_count
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:663:            per_device_bytes = sum(13 + 2 * count for _, count in pcs_blocks)
+/opt/kinetics-gateway/backend/app/services/gateway_service.py:668:            per_device_bytes = sum(21 + 2 * count for _, count in pcs_blocks)
+/opt/kinetics-gateway/backend/app/assets/bms_driver.py.before_fc16_fallback_20260728_082313:12:from app.protocols.planner import ReadBlock, build_read_blocks
+/opt/kinetics-gateway/backend/app/assets/bms_driver.py.before_fc16_fallback_20260728_082313:58:    def _read_chunked(self, client: ModbusTcpClient, endpoint: Endpoint, block: ReadBlock) -> list[int]:
+/opt/kinetics-gateway/backend/app/assets/bms_driver.py.before_fc16_fallback_20260728_082313:60:        remaining = block.count
+/opt/kinetics-gateway/backend/app/assets/bms_driver.py.before_fc16_fallback_20260728_082313:61:        address = block.start + self.config.address_offset
+/opt/kinetics-gateway/backend/app/assets/bms_driver.py.before_fc16_fallback_20260728_082313:62:        preferred = block.function_code
+/opt/kinetics-gateway/backend/app/assets/bms_driver.py.before_fc16_fallback_20260728_082313:102:        blocks = build_read_blocks(
+/opt/kinetics-gateway/backend/app/assets/bms_driver.py.before_fc16_fallback_20260728_082313:110:        for block in blocks:
+/opt/kinetics-gateway/backend/app/assets/bms_driver.py.before_fc16_fallback_20260728_082313:112:                words = self._read_chunked(client, endpoint, block)
+/opt/kinetics-gateway/backend/app/assets/bms_driver.py.before_fc16_fallback_20260728_082313:113:                for point in block.points:
+/opt/kinetics-gateway/backend/app/assets/bms_driver.py.before_fc16_fallback_20260728_082313:114:                    offset = int(point["address"]) - block.start
+/opt/kinetics-gateway/backend/app/assets/bms_driver.py.before_fc16_fallback_20260728_082313:127:                LOGGER.warning("BMS read failed asset=%s start=%s count=%s: %s", asset_id, block.start, block.count, error)
+/opt/kinetics-gateway/backend/app/assets/bms_driver.py.before_fc16_fallback_20260728_082313:128:                errors.append({"start": block.start, "count": block.count, "error": str(error)})
+/opt/kinetics-gateway/backend/app/assets/bms_driver.py.before_fc16_fallback_20260728_082313:129:                for point in block.points:
+/opt/kinetics-gateway/backend/app/assets/bms_driver.py.before_fc16_fallback_20260728_082313:145:            "online": len(errors) < max(1, len(blocks)),
+/opt/kinetics-gateway/backend/app/assets/pcs_driver.py:101:            block_points = [first]
+/opt/kinetics-gateway/backend/app/assets/pcs_driver.py:113:                block_points.append(point)
+/opt/kinetics-gateway/backend/app/assets/pcs_driver.py:123:                for point in block_points:
+/opt/kinetics-gateway/backend/app/assets/pcs_driver.py:173:                for point in block_points:
+/opt/kinetics-gateway/backend/app/assets/bms_driver.py:12:from app.protocols.planner import ReadBlock, build_read_blocks
+/opt/kinetics-gateway/backend/app/assets/bms_driver.py:58:    def _read_chunked(self, client: ModbusTcpClient, endpoint: Endpoint, block: ReadBlock) -> list[int]:
+/opt/kinetics-gateway/backend/app/assets/bms_driver.py:60:        remaining = block.count
+/opt/kinetics-gateway/backend/app/assets/bms_driver.py:61:        address = block.start + self.config.address_offset
+/opt/kinetics-gateway/backend/app/assets/bms_driver.py:62:        preferred = block.function_code
+/opt/kinetics-gateway/backend/app/assets/bms_driver.py:102:        blocks = build_read_blocks(
+/opt/kinetics-gateway/backend/app/assets/bms_driver.py:110:        for block in blocks:
+/opt/kinetics-gateway/backend/app/assets/bms_driver.py:112:                words = self._read_chunked(client, endpoint, block)
+/opt/kinetics-gateway/backend/app/assets/bms_driver.py:113:                for point in block.points:
+/opt/kinetics-gateway/backend/app/assets/bms_driver.py:114:                    offset = int(point["address"]) - block.start
+/opt/kinetics-gateway/backend/app/assets/bms_driver.py:127:                LOGGER.warning("BMS read failed asset=%s start=%s count=%s: %s", asset_id, block.start, block.count, error)
+/opt/kinetics-gateway/backend/app/assets/bms_driver.py:128:                errors.append({"start": block.start, "count": block.count, "error": str(error)})
+/opt/kinetics-gateway/backend/app/assets/bms_driver.py:129:                for point in block.points:
+/opt/kinetics-gateway/backend/app/assets/bms_driver.py:145:            "online": len(errors) < max(1, len(blocks)),
+/opt/kinetics-gateway/backend/app/protocols/modbus_rtu.py:74:        self._lock = threading.Lock()
+/opt/kinetics-gateway/backend/app/protocols/modbus_rtu.py:178:        with self._lock:
+/opt/kinetics-gateway/backend/app/protocols/planner.py:8:class ReadBlock:
+/opt/kinetics-gateway/backend/app/protocols/planner.py:15:def build_read_blocks(
+/opt/kinetics-gateway/backend/app/protocols/planner.py:20:) -> list[ReadBlock]:
+/opt/kinetics-gateway/backend/app/protocols/planner.py:28:    blocks: list[ReadBlock] = []
+/opt/kinetics-gateway/backend/app/protocols/planner.py:40:                    blocks.append(ReadBlock(function, start, end - start, tuple(current)))
+/opt/kinetics-gateway/backend/app/protocols/planner.py:43:                blocks.append(ReadBlock(function, point_start, point_count, (point,)))
+/opt/kinetics-gateway/backend/app/protocols/planner.py:54:                blocks.append(ReadBlock(function, start, end - start, tuple(current)))
+/opt/kinetics-gateway/backend/app/protocols/planner.py:58:            blocks.append(ReadBlock(function, start, end - start, tuple(current)))
+/opt/kinetics-gateway/backend/app/protocols/planner.py:59:    return blocks
+/opt/kinetics-gateway/backend/app/protocols/modbus_tcp.py:35:        self._lock = threading.Lock()
+/opt/kinetics-gateway/backend/app/protocols/modbus_tcp.py:66:        with self._lock:
+/opt/kinetics-gateway/backend/app/storage/sqlite_store.py:55:        self._lock = threading.RLock()
+/opt/kinetics-gateway/backend/app/storage/sqlite_store.py:148:        with self._lock:
+/opt/kinetics-gateway/backend/app/storage/sqlite_store.py:171:        with self._lock, self._connection:
+/opt/kinetics-gateway/backend/app/storage/sqlite_store.py:191:        with self._lock:
+/opt/kinetics-gateway/backend/app/storage/sqlite_store.py:199:        with self._lock:
+/opt/kinetics-gateway/backend/app/storage/sqlite_store.py:204:        with self._lock, self._connection:
+/opt/kinetics-gateway/backend/app/storage/sqlite_store.py:245:        with self._lock:
+/opt/kinetics-gateway/backend/app/storage/sqlite_store.py:257:        with self._lock:
+/opt/kinetics-gateway/backend/app/storage/sqlite_store.py:277:        with self._lock, self._connection:
+/opt/kinetics-gateway/backend/app/storage/sqlite_store.py:287:        with self._lock:
+/opt/kinetics-gateway/backend/app/storage/sqlite_store.py:301:        with self._lock, self._connection:
+/opt/kinetics-gateway/backend/app/storage/sqlite_store.py:321:        with self._lock:
+/opt/kinetics-gateway/backend/app/storage/sqlite_store.py:370:        with self._lock:
+/opt/kinetics-gateway/backend/app/storage/sqlite_store.py:393:            total_bytes = usage.f_blocks * usage.f_frsize
+/opt/kinetics-gateway/backend/app/storage/sqlite_store.py:397:        with self._lock:
+/opt/kinetics-gateway/backend/app/storage/sqlite_store.py:424:        with self._lock, self._connection:
+/opt/kinetics-gateway/backend/app/storage/sqlite_store.py:434:        with self._lock, self._connection:
+/opt/kinetics-gateway/backend/app/storage/sqlite_store.py:452:        with self._lock:
+/opt/kinetics-gateway/backend/PCS_RTU_INTEGRATION.md:14:- PCS devices are polled sequentially through one shared serial client and lock.
+/opt/kinetics-gateway/backend/PCS_RTU_INTEGRATION.md:59:7. Copy only the verified PCS block into `/etc/kinetics-gateway/config.json`.
+/opt/kinetics-gateway/backend/PCS_RTU_INTEGRATION.md:61:9. Enable PCS writes only after vendor command documentation and system interlocks are validated.
+/opt/kinetics-gateway/backend/generated_protocols/bms_catalog.json:7360:      "usage_en": "Hour (0--23) 24-hour clock",
+/opt/kinetics-gateway/backend/generated_protocols/bms_catalog.json:25205:      "usage_en": "Bit0:High Pressure Lock 1",
+/opt/kinetics-gateway/backend/generated_protocols/bms_catalog.json:25218:          "name_en": "Bit0:High Pressure Lock 1",
+/opt/kinetics-gateway/backend/generated_protocols/bms_catalog.json:25226:          "name_en": "Bit1:Discharge Over Temp Lock 1",
+/opt/kinetics-gateway/backend/generated_protocols/bms_catalog.json:25234:          "name_en": "Bit2:System Low Pressure Alarm Lock 1",
+/opt/kinetics-gateway/backend/generated_protocols/bms_catalog.json:25290:          "name_en": "Bit9:High Pressure Lock 2",
+/opt/kinetics-gateway/backend/generated_protocols/bms_catalog.json:25298:          "name_en": "Bit10:Discharge Over Temp Lock 2",
+/opt/kinetics-gateway/backend/generated_protocols/bms_catalog.json:25306:          "name_en": "Bit11:System Low Pressure Alarm Lock 2",
+/opt/kinetics-gateway/backend/generated_protocols/bms_catalog.json:25458:          "name_en": "Bit10:Electric Heater Fault Lock 1",
+/opt/kinetics-gateway/backend/generated_protocols/bms_catalog.json:25482:          "name_en": "Bit13:Circulation Pump Overheat Protection Lock 1",
+/opt/kinetics-gateway/backend/generated_protocols/bms_catalog.json:25490:          "name_en": "Bit14:Circulation Pump Overheat Protection Lock 2",
+/opt/kinetics-gateway/backend/generated_protocols/bms_catalog.json:25498:          "name_en": "Bit15:Circulation Pump Overload Protection Lock 1",
+/opt/kinetics-gateway/backend/generated_protocols/bms_catalog.json:25525:      "usage_en": "Bit0:Circulation Pump Overload Protection Lock 2",
+/opt/kinetics-gateway/backend/generated_protocols/bms_catalog.json:25538:          "name_en": "Bit0:Circulation Pump Overload Protection Lock 2",
+/opt/kinetics-gateway/backend/generated_protocols/bms_catalog.json:25562:          "name_en": "Bit3:Electric Heater Fault Lock",
+/opt/kinetics-gateway/backend/generated_protocols/bms_catalog.json:25594:          "name_en": "Bit7:Condensing Over Temp Lock 1",
+/opt/kinetics-gateway/backend/generated_protocols/bms_catalog.json:25602:          "name_en": "Bit8:Condensing Over Temp Lock 2",
+/opt/kinetics-gateway/backend/generated_protocols/bms_catalog.json:25610:          "name_en": "Bit9:Condensing High Pressure Lock 1",
+/opt/kinetics-gateway/backend/generated_protocols/bms_catalog.json:25618:          "name_en": "Bit10:Condensing High Pressure Lock 2",
+/opt/kinetics-gateway/backend/generated_protocols/bms_catalog.json:25626:          "name_en": "Bit11:Plate Exchanger Outlet High Pressure Lock",
+/opt/kinetics-gateway/backend/generated_protocols/bms_catalog.json:25634:          "name_en": "Bit12:No.1 External Fan Overheat Alarm Lock",
+/opt/kinetics-gateway/backend/generated_protocols/bms_catalog.json:25642:          "name_en": "Bit13:No.2 External Fan Overheat Alarm Lock",
+/opt/kinetics-gateway/backend/generated_protocols/bms_catalog.json:25650:          "name_en": "Bit14:No.3 External Fan Overheat Alarm Lock",
+/opt/kinetics-gateway/backend/generated_protocols/bms_catalog.json:25658:          "name_en": "Bit15:No.4 External Fan Overheat Alarm Lock",
+/opt/kinetics-gateway/backend/generated_protocols/bms_catalog.json:26840:      "name_en": "High Pressure Lockout",
+/opt/kinetics-gateway/backend/CONTROL_SEQUENCE_API_V2_5.md:18:- `blockers`: E-stop, documented critical faults and direction prohibitions

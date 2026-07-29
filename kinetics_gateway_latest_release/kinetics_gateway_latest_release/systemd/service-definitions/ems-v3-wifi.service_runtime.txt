@@ -1,0 +1,10 @@
+MainPID=0
+NRestarts=0
+ExecStart={ path=/root/northbound-ems/ems_boot_v3/scripts/imx93_wifi_v3.sh ; argv[]=/root/northbound-ems/ems_boot_v3/scripts/imx93_wifi_v3.sh ; ignore_errors=no ; start_time=[Wed 2026-07-29 05:10:19 UTC] ; stop_time=[Wed 2026-07-29 05:10:32 UTC] ; pid=469 ; code=exited ; status=0 }
+MemoryCurrent=8847360
+MemoryPeak=10833920
+Environment=
+ActiveState=active
+SubState=exited
+FragmentPath=/etc/systemd/system/ems-v3-wifi.service
+DropInPaths=

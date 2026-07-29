@@ -1,0 +1,10 @@
+MainPID=781
+NRestarts=0
+ExecStart={ path=/root/northbound-ems/ems_boot_v3/scripts/ems_v3_cloudflared_start.sh ; argv[]=/root/northbound-ems/ems_boot_v3/scripts/ems_v3_cloudflared_start.sh ; ignore_errors=no ; start_time=[Wed 2026-07-29 05:10:32 UTC] ; stop_time=[n/a] ; pid=781 ; code=(null) ; status=0/0 }
+MemoryCurrent=64131072
+MemoryPeak=65069056
+Environment=
+ActiveState=active
+SubState=running
+FragmentPath=/etc/systemd/system/cloudflared.service
+DropInPaths=/etc/systemd/system/cloudflared.service.d/override.conf

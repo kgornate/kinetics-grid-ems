@@ -1,0 +1,15 @@
+[Unit]
+Description=Cloudflare Tunnel - Northbound EMS Gateway
+After=ems-v3-wifi.service
+Wants=ems-v3-wifi.service
+
+[Service]
+Type=simple
+ExecStart=/root/northbound-ems/ems_boot_v3/scripts/ems_v3_cloudflared_start.sh
+Restart=always
+RestartSec=10
+TimeoutStartSec=180
+TimeoutStopSec=10
+
+[Install]
+WantedBy=multi-user.target

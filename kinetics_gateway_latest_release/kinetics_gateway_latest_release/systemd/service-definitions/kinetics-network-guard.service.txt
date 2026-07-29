@@ -1,0 +1,15 @@
+# /etc/systemd/system/kinetics-network-guard.service
+[Unit]
+Description=Kinetics Gateway Static Network Address Guard
+After=kinetics-network.service
+Requires=kinetics-network.service
+Before=kinetics-gateway.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/sbin/kinetics-network-guard.sh
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

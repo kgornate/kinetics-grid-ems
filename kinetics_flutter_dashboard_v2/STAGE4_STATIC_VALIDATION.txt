@@ -1,0 +1,17 @@
+Stage 4 source checks performed in this environment:
+- control status uses fresh=false: PASS
+- no fresh=true control polling remains: PASS
+- single-flight status guard present: PASS
+- duplicate control POST guard present: PASS
+- control polling tied to visible Control destination: PASS
+- hidden Control screen does not start its own timer: PASS
+- stale/source/timestamp UI indicators present: PASS
+- safe-stop UI wording matches gateway quiesce patch: PASS
+- Dart source delimiter scan: PASS
+
+Flutter SDK was not available in this environment, so `dart format`, `flutter analyze`, `flutter test`, and a new Windows executable were not run here. Rebuild and run those commands on the Windows Flutter build machine before operator deployment.
+
+Stage 4.1 compatibility checks:
+- complete control snapshot endpoint uses runtime-monitor cache sample: PASS
+- compact /status?fresh=false is no longer parsed as a full control snapshot: PASS
+- no fresh=true control polling remains: PASS

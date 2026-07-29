@@ -1,0 +1,10 @@
+MainPID=0
+NRestarts=0
+ExecStart={ path=/usr/local/sbin/kinetics-network-setup.sh ; argv[]=/usr/local/sbin/kinetics-network-setup.sh ; ignore_errors=no ; start_time=[Wed 2026-07-29 05:10:18 UTC] ; stop_time=[Wed 2026-07-29 05:10:19 UTC] ; pid=434 ; code=exited ; status=0 }
+MemoryCurrent=[not set]
+MemoryPeak=2088960
+Environment=
+ActiveState=active
+SubState=exited
+FragmentPath=/etc/systemd/system/kinetics-network.service
+DropInPaths=/etc/systemd/system/kinetics-network.service.d/override.conf

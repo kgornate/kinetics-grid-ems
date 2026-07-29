@@ -28,11 +28,24 @@ class GatewayController extends ChangeNotifier {
   List<Map<String, dynamic>> activeAlarms = <Map<String, dynamic>>[];
   List<Map<String, dynamic>> assetMetadata = <Map<String, dynamic>>[];
 
+  ControlSequenceCapabilities? controlCapabilities;
+  ControlSequenceStatus? controlStatus;
+  Map<String, dynamic> lastControlResponse = <String, dynamic>{};
+  bool controlBusy = false;
+  String selectedControlPair = 'pair_1';
+
   WebSocket? _telemetrySocket;
   StreamSubscription<dynamic>? _telemetrySubscription;
   Timer? _diagnosticTimer;
+  Timer? _controlTimer;
   Timer? _reconnectTimer;
   int _reconnectAttempt = 0;
+  bool _controlStatusInFlight = false;
+  bool _controlStatusRefreshPending = false;
+  bool _controlPollingEnabled = false;
+  int _controlStatusGeneration = 0;
+  int controlStatusSkippedRefreshes = 0;
+  DateTime? controlStatusReceivedAt;
   bool _disposed = false;
 
   bool get authenticated => session != null;
@@ -76,6 +89,10 @@ class GatewayController extends ChangeNotifier {
     await refreshDiagnostics();
     await refreshAlarms();
     await refreshAssetMetadata();
+    if (isInternal) {
+      await refreshControlCapabilities(silent: true);
+      await refreshControlStatus(silent: true);
+    }
     await connectTelemetry();
     _diagnosticTimer?.cancel();
     _diagnosticTimer = Timer.periodic(
@@ -239,6 +256,260 @@ class GatewayController extends ChangeNotifier {
     await refreshCompact(silent: true);
   }
 
+  Future<void> refreshControlCapabilities({bool silent = false}) async {
+    if (!isInternal) return;
+    try {
+      final payload =
+          await api.getJson('/api/control-sequence/capabilities');
+      controlCapabilities = ControlSequenceCapabilities.fromJson(payload);
+      final enabledPairs = controlCapabilities!.pairs
+          .where((pair) => pair.enabled)
+          .map((pair) => pair.pairId)
+          .toList();
+      if (enabledPairs.isNotEmpty &&
+          !enabledPairs.contains(selectedControlPair)) {
+        selectedControlPair = enabledPairs.first;
+      }
+    } catch (error) {
+      if (!silent) errorMessage = error.toString();
+      if (!silent) rethrow;
+    } finally {
+      if (!_disposed) notifyListeners();
+    }
+  }
+
+  Future<void> refreshControlStatus({bool silent = false}) async {
+    if (!isInternal || _disposed) return;
+
+    // Status polling is intentionally single-flight. Timer ticks, manual
+    // refreshes and post-command refreshes are collapsed into at most one
+    // current request plus one pending cached refresh.
+    if (_controlStatusInFlight) {
+      _controlStatusRefreshPending = true;
+      controlStatusSkippedRefreshes += 1;
+      return;
+    }
+
+    _controlStatusInFlight = true;
+    final pairId = selectedControlPair;
+    final generation = _controlStatusGeneration;
+    try {
+      // Stage 3C exposes the complete control snapshot from the shared
+      // background poll cache through this diagnostics endpoint. The normal
+      // /status?fresh=false endpoint intentionally returns only the compact
+      // automatic-run runtime object, which is not sufficient to populate the
+      // control screen's telemetry, blockers, workflow and write gates.
+      final payload = await api.getJson(
+        '/api/diagnostics/runtime-monitor/$pairId/sample',
+        timeout: const Duration(seconds: 10),
+      );
+      if (!_disposed &&
+          pairId == selectedControlPair &&
+          generation == _controlStatusGeneration) {
+        controlStatus = ControlSequenceStatus.fromJson(payload);
+        controlStatusReceivedAt = DateTime.now().toUtc();
+        restConnected = true;
+      }
+    } catch (error) {
+      if (!silent) errorMessage = error.toString();
+      if (!silent) rethrow;
+    } finally {
+      _controlStatusInFlight = false;
+      final runPending = _controlStatusRefreshPending && !_disposed;
+      _controlStatusRefreshPending = false;
+      if (!_disposed) notifyListeners();
+      if (runPending) {
+        unawaited(refreshControlStatus(silent: true));
+      }
+    }
+  }
+
+  void selectControlPair(String pairId) {
+    if (pairId == selectedControlPair) return;
+    selectedControlPair = pairId;
+    controlStatus = null;
+    controlStatusReceivedAt = null;
+    _controlStatusGeneration += 1;
+    notifyListeners();
+    unawaited(refreshControlStatus(silent: true));
+  }
+
+  void startControlPolling() {
+    if (!isInternal || _disposed) return;
+    _controlPollingEnabled = true;
+    _controlTimer?.cancel();
+    unawaited(refreshControlStatus(silent: true));
+    _controlTimer = Timer.periodic(
+      const Duration(seconds: 3),
+      (_) {
+        if (!controlBusy && _controlPollingEnabled) {
+          unawaited(refreshControlStatus(silent: true));
+        }
+      },
+    );
+  }
+
+  void stopControlPolling() {
+    _controlPollingEnabled = false;
+    _controlTimer?.cancel();
+    _controlTimer = null;
+    _controlStatusRefreshPending = false;
+  }
+
+  bool get controlPollingActive =>
+      _controlPollingEnabled && _controlTimer?.isActive == true;
+
+  bool get controlStatusRequestActive => _controlStatusInFlight;
+
+  String get controlStatusSource {
+    final refresh = controlStatus?.raw['refresh'];
+    if (refresh is Map) {
+      return refresh['source']?.toString() ?? 'cached_runtime';
+    }
+    return 'cached_runtime';
+  }
+
+  bool get controlStatusIsStale {
+    final refresh = controlStatus?.raw['refresh'];
+    if (refresh is Map && refresh['stale'] == true) return true;
+    final timestamp = controlStatus?.timestamp;
+    final parsed = timestamp == null ? null : DateTime.tryParse(timestamp);
+    if (parsed == null) return controlStatus == null;
+    return DateTime.now().toUtc().difference(parsed.toUtc()) >
+        const Duration(seconds: 20);
+  }
+
+  Duration? get controlStatusAge {
+    final timestamp = controlStatus?.timestamp;
+    final parsed = timestamp == null ? null : DateTime.tryParse(timestamp);
+    if (parsed == null) return null;
+    final age = DateTime.now().toUtc().difference(parsed.toUtc());
+    return age.isNegative ? Duration.zero : age;
+  }
+
+  Future<Map<String, dynamic>> automaticStart({
+    required String direction,
+    required double targetPowerKw,
+    double? rampStepKw,
+    double? rampIntervalSeconds,
+  }) {
+    final phrase = controlCapabilities?.automaticConfirmationPhrase ??
+        'EXECUTE_AUTOMATIC_SEQUENCE';
+    return _executeControl(
+      '/api/control-sequence/$selectedControlPair/automatic-start',
+      <String, dynamic>{
+        'direction': direction,
+        'power_kw': targetPowerKw,
+        'ramp_step_kw': rampStepKw,
+        'ramp_interval_seconds': rampIntervalSeconds,
+        'confirmation': phrase,
+      },
+      successMessage:
+          'Automatic $direction sequence accepted at ${targetPowerKw.toStringAsFixed(1)} kW.',
+    );
+  }
+
+  Future<Map<String, dynamic>> nextControlStep({
+    required String direction,
+    required double targetPowerKw,
+  }) {
+    return _executeControl(
+      '/api/control-sequence/$selectedControlPair/next-step',
+      <String, dynamic>{
+        'direction': direction,
+        'power_kw': targetPowerKw,
+        'confirmation': _stageConfirmation,
+      },
+      successMessage: 'Commissioning step executed.',
+    );
+  }
+
+  Future<Map<String, dynamic>> setControlPower({
+    required String direction,
+    required double powerKw,
+  }) {
+    return _executeControl(
+      '/api/control-sequence/$selectedControlPair/set-power',
+      <String, dynamic>{
+        'direction': direction,
+        'power_kw': powerKw,
+        'confirmation': _stageConfirmation,
+      },
+      successMessage:
+          '${direction == 'charge' ? 'Charge' : 'Discharge'} setpoint sent: ${powerKw.toStringAsFixed(1)} kW.',
+    );
+  }
+
+  Future<Map<String, dynamic>> zeroControlPower() {
+    return _executeControl(
+      '/api/control-sequence/$selectedControlPair/zero-power',
+      <String, dynamic>{'confirmation': _stageConfirmation},
+      successMessage: 'Zero-power command sent and verified.',
+    );
+  }
+
+  Future<Map<String, dynamic>> safeStopControl({bool openBms = true}) {
+    return _executeControl(
+      '/api/control-sequence/$selectedControlPair/safe-stop',
+      <String, dynamic>{
+        'confirmation': _stageConfirmation,
+        'open_bms': openBms,
+      },
+      successMessage: openBms
+          ? 'Safe shutdown completed; PCS stopped and BMS opened.'
+          : 'PCS safe stop completed.',
+      timeout: const Duration(seconds: 60),
+    );
+  }
+
+  Future<Map<String, dynamic>> abortControl({bool openBms = true}) {
+    return _executeControl(
+      '/api/control-sequence/$selectedControlPair/abort',
+      <String, dynamic>{
+        'confirmation': _stageConfirmation,
+        'open_bms': openBms,
+      },
+      successMessage: 'Sequence abort requested and safe-stop executed.',
+      timeout: const Duration(seconds: 60),
+    );
+  }
+
+  String get _stageConfirmation =>
+      controlCapabilities?.confirmationPhrase ?? 'EXECUTE_STAGE_WRITE';
+
+  Future<Map<String, dynamic>> _executeControl(
+    String path,
+    Map<String, dynamic> body, {
+    required String successMessage,
+    Duration timeout = const Duration(seconds: 90),
+  }) async {
+    if (!isInternal) {
+      throw const ApiException('Internal role is required for control');
+    }
+    if (controlBusy) {
+      throw const ApiException(
+        'Another control command is already in progress. Wait for its response.',
+      );
+    }
+    controlBusy = true;
+    errorMessage = null;
+    notifyListeners();
+    try {
+      body.removeWhere((key, value) => value == null);
+      final result = await api.postJson(path, body: body, timeout: timeout);
+      lastControlResponse = result;
+      lastEventMessage = successMessage;
+      await refreshControlStatus(silent: true);
+      return result;
+    } catch (error) {
+      errorMessage = error.toString();
+      rethrow;
+    } finally {
+      controlBusy = false;
+      if (!_disposed) notifyListeners();
+    }
+  }
+
   Future<void> connectTelemetry() async {
     await _closeSocket();
     try {
@@ -313,11 +584,23 @@ class GatewayController extends ChangeNotifier {
   Future<void> logout() async {
     _diagnosticTimer?.cancel();
     _diagnosticTimer = null;
+    stopControlPolling();
     await _closeSocket();
     session = null;
     api.token = null;
     plant.assets.clear();
     activeAlarms = <Map<String, dynamic>>[];
+    assetMetadata = <Map<String, dynamic>>[];
+    controlCapabilities = null;
+    controlStatus = null;
+    controlStatusReceivedAt = null;
+    _controlStatusInFlight = false;
+    _controlStatusRefreshPending = false;
+    _controlPollingEnabled = false;
+    _controlStatusGeneration += 1;
+    controlStatusSkippedRefreshes = 0;
+    lastControlResponse = <String, dynamic>{};
+    controlBusy = false;
     health = <String, dynamic>{};
     storage = <String, dynamic>{};
     polling = <String, dynamic>{};
@@ -332,6 +615,7 @@ class GatewayController extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     _diagnosticTimer?.cancel();
+    _controlTimer?.cancel();
     _reconnectTimer?.cancel();
     _telemetrySubscription?.cancel();
     _telemetrySocket?.close();

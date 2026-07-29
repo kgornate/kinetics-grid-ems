@@ -1,0 +1,208 @@
+{
+  "gateway_id": "kinetics_gateway_1",
+  "mode": "control_enabled",
+  "api_host": "0.0.0.0",
+  "api_port": 8000,
+  "telemetry_interval_seconds": 1.0,
+  "bms_catalog_file": "generated_protocols/bms_catalog.json",
+  "pcs_catalog_file": "generated_protocols/pcs_catalog.json",
+  "bms": {
+    "enabled": true,
+    "architecture": "three_level",
+    "host": "192.168.111.22",
+    "source_ip": "192.168.111.2",
+    "timeout_seconds": 2.0,
+    "address_offset": 0,
+    "connection_mode": "separate_ports",
+    "bau": {
+      "port": 503,
+      "unit_id": 1,
+      "read_function_fallback": true
+    },
+    "racks": [
+      {
+        "rack_id": 1,
+        "port": 503,
+        "unit_id": 2,
+        "read_function_fallback": true
+      },
+      {
+        "rack_id": 2,
+        "port": 504,
+        "unit_id": 2,
+        "read_function_fallback": true
+      },
+      {
+        "rack_id": 3,
+        "port": 505,
+        "unit_id": 2,
+        "read_function_fallback": true
+      },
+      {
+        "rack_id": 4,
+        "port": 506,
+        "unit_id": 2,
+        "read_function_fallback": true
+      }
+    ],
+    "power_environment": {
+      "port": 503,
+      "unit_id": 127,
+      "read_function_fallback": true
+    },
+    "max_registers_per_request": 120,
+    "max_gap_registers": 2,
+    "poll_fast_seconds": 1.0,
+    "poll_normal_seconds": 5.0,
+    "poll_slow_seconds": 60.0,
+    "poll_bulk_seconds": 30.0,
+    "include_bulk_in_live_snapshot": true,
+    "write_enabled": true
+  },
+  "pcs": {
+    "enabled": true,
+    "transport": "rtu",
+    "serial": {
+      "device": "/dev/ttyUSB0",
+      "baudrate": 38400,
+      "bytesize": 8,
+      "parity": "N",
+      "stopbits": 1,
+      "inter_request_delay_ms": 50.0,
+      "retries": 1
+    },
+    "devices": [
+      {
+        "asset_id": "pcs_1",
+        "unit_id": 1,
+        "enabled": true,
+        "label": "PCS 1"
+      },
+      {
+        "asset_id": "pcs_2",
+        "unit_id": 2,
+        "enabled": true,
+        "label": "PCS 2"
+      },
+      {
+        "asset_id": "pcs_3",
+        "unit_id": 3,
+        "enabled": true,
+        "label": "PCS 3"
+      },
+      {
+        "asset_id": "pcs_4",
+        "unit_id": 4,
+        "enabled": true,
+        "label": "PCS 4"
+      }
+    ],
+    "timeout_seconds": 1.5,
+    "address_offset": 0,
+    "poll_seconds": 5.0,
+    "write_enabled": true,
+    "overrides_file": "configs/pcs_overrides.json",
+    "max_registers_per_request": 120,
+    "commissioning_status": "PCS1 hardware validated read-only at 38400 8N1; PCS2-PCS4 disabled pending IDs"
+  },
+  "storage": {
+    "preferred_root": "/mnt/ems-logs/kinetics-gateway",
+    "preferred_mount_point": "/mnt/ems-logs",
+    "require_preferred_mount": false,
+    "fallback_root": "data",
+    "database_name": "kinetics_gateway.db",
+    "log_name": "kinetics_gateway.log",
+    "telemetry_retention_days": 90,
+    "sample_interval_seconds": 5.0,
+    "quota_gb": 25.0,
+    "quota_high_watermark_percent": 90.0,
+    "compact_history": true,
+    "compress_history": true,
+    "store_raw_when_distinct": true,
+    "fallback_sample_interval_seconds": 30.0,
+    "fallback_telemetry_retention_days": 3,
+    "fallback_quota_gb": 0.5,
+    "update_buffer_events": 200,
+    "status_refresh_seconds": 60.0,
+    "compression_level": 1
+  },
+  "security": {
+    "jwt_secret_env": "KINETICS_JWT_SECRET",
+    "jwt_algorithm": "HS256",
+    "token_expiry_minutes": 720,
+    "allow_dev_default_credentials": false
+  },
+  "mock": {
+    "scenario": "normal",
+    "seed": 93,
+    "full_array_length": true
+  },
+  "network": {
+    "topology": "shared_switch",
+    "field_interface": "eth1",
+    "pc_interface": "eth0",
+    "wifi_interface": "mlan0",
+    "bms_interface": "eth1",
+    "pcs_interface": "eth1",
+    "pc_api_cidr": "192.168.10.2/24",
+    "field_primary_cidr": "192.168.111.2/24",
+    "field_secondary_cidrs": [
+      "192.168.1.2/24"
+    ]
+  },
+  "control_sequence": {
+    "enabled": true,
+    "allow_full_automatic_sequence": true,
+    "confirmation_phrase": "EXECUTE_STAGE_WRITE",
+    "pairs": [
+      {
+        "pair_id": "pair_1",
+        "rack_id": 1,
+        "pcs_asset_id": "pcs_1",
+        "enabled": true
+      },
+      {
+        "pair_id": "pair_2",
+        "rack_id": 2,
+        "pcs_asset_id": "pcs_2",
+        "enabled": true
+      },
+      {
+        "pair_id": "pair_3",
+        "rack_id": 3,
+        "pcs_asset_id": "pcs_3",
+        "enabled": true
+      },
+      {
+        "pair_id": "pair_4",
+        "rack_id": 4,
+        "pcs_asset_id": "pcs_4",
+        "enabled": true
+      }
+    ],
+    "bms_rack_voltage_min_v": 1100.0,
+    "bms_rack_voltage_max_v": 1500.0,
+    "pcs_dc_bus_voltage_min_v": 1100.0,
+    "pcs_dc_bus_voltage_max_v": 1500.0,
+    "max_abs_power_kw": 240.0,
+    "minimum_bms_current_limit_a": 0.1,
+    "enforce_dynamic_bms_power_limit": true,
+    "valid_samples_required": 3,
+    "sample_interval_seconds": 1.0,
+    "contactor_close_timeout_seconds": 60.0,
+    "pcs_start_timeout_seconds": 120.0,
+    "require_positive_and_negative_contactors": true,
+    "require_precharge_success": true,
+    "automatic_confirmation_phrase": "EXECUTE_AUTOMATIC_SEQUENCE",
+    "automatic_stage_timeout_seconds": 120.0,
+    "power_tracking_timeout_seconds": 60.0,
+    "safe_stop_timeout_seconds": 30.0,
+    "ready_voltage_match_tolerance_v": 75.0,
+    "power_tracking_tolerance_kw": 5.0,
+    "automatic_power_ramp_step_kw": 10.0,
+    "automatic_power_ramp_interval_seconds": 1.0,
+    "runtime_monitor_enabled": true,
+    "runtime_monitor_interval_seconds": 2.0,
+    "validation_dc_bus_threshold_v": 50.0
+  }
+}

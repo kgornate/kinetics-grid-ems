@@ -1,7 +1,0 @@
-lo               UNKNOWN        127.0.0.1/8 ::1/128 
-eth0             DOWN           192.168.10.2/24 
-eth1             UP             192.168.111.2/24 fe80::92a9:f7ff:fe80:4016/64 
-mlan0            UP             192.168.1.100/24 2409:4042:2d4d:2408:82a1:97ff:fe50:376d/64 fe80::82a1:97ff:fe50:376d/64 
-uap0             DOWN           
-wfd0             DOWN           
-can0             DOWN           

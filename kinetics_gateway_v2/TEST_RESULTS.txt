@@ -1,0 +1,14 @@
+KINETICS GATEWAY SNAPSHOT TEST RESULTS
+
+Capture time: 2026-07-29T05:13:47+00:00
+
+Service active:
+inactive
+
+Service enabled:
+enabled
+
+API health:
+curl: (7) Failed to connect to 127.0.0.1 port 8000 after 0 ms: Could not connect to server
+
+HTTP_STATUS=000

@@ -1,0 +1,43 @@
+Jul 29 05:10:32 imx93-11x11-lpddr4x-frdm systemd[1]: Started Cloudflare Tunnel - Northbound EMS Gateway.
+Jul 29 05:10:32 imx93-11x11-lpddr4x-frdm ems_v3_cloudflared_start.sh[781]: 2026-07-29 05:10:32 [ems-v3-cloudflared] Starting /bin/cloudflared with /etc/cloudflared/config.yml
+Jul 29 05:10:32 imx93-11x11-lpddr4x-frdm ems_v3_cloudflared_start.sh[781]: 2026-07-29T05:10:32Z INF Starting tunnel tunnelID=6d36a25f-bfc0-4d8b-b888-8aefd4e7f3c5
+Jul 29 05:10:32 imx93-11x11-lpddr4x-frdm ems_v3_cloudflared_start.sh[781]: 2026-07-29T05:10:32Z INF Version 2026.7.2 (Checksum 405df476437e027fc6d18729a5a77155c0a33a6082aeee60a799a688f3052e66)
+Jul 29 05:10:32 imx93-11x11-lpddr4x-frdm ems_v3_cloudflared_start.sh[781]: 2026-07-29T05:10:32Z INF GOOS: linux, GOVersion: go1.26.4, GoArch: arm64
+Jul 29 05:10:32 imx93-11x11-lpddr4x-frdm ems_v3_cloudflared_start.sh[781]: 2026-07-29T05:10:32Z INF Settings: map[config:/etc/cloudflared/config.yml cred-file:/etc/cloudflared/credentials.json credentials-file:/etc/cloudflared/credentials.json no-autoupdate:true]
+Jul 29 05:10:32 imx93-11x11-lpddr4x-frdm ems_v3_cloudflared_start.sh[781]: 2026-07-29T05:10:32Z INF Generated Connector ID: 8a7f0395-a3d7-4b77-a098-19d962be867d
+Jul 29 05:10:32 imx93-11x11-lpddr4x-frdm ems_v3_cloudflared_start.sh[781]: 2026-07-29T05:10:32Z INF Initial protocol quic
+Jul 29 05:10:32 imx93-11x11-lpddr4x-frdm ems_v3_cloudflared_start.sh[781]: 2026-07-29T05:10:32Z INF ICMP proxy will use 192.168.1.100 as source for IPv4
+Jul 29 05:10:32 imx93-11x11-lpddr4x-frdm ems_v3_cloudflared_start.sh[781]: 2026-07-29T05:10:32Z INF ICMP proxy will use fe80::82a1:97ff:fe50:376d in zone mlan0 as source for IPv6
+Jul 29 05:10:33 imx93-11x11-lpddr4x-frdm ems_v3_cloudflared_start.sh[781]: 2026-07-29T05:10:33Z INF ICMP proxy will use 192.168.1.100 as source for IPv4
+Jul 29 05:10:33 imx93-11x11-lpddr4x-frdm ems_v3_cloudflared_start.sh[781]: 2026-07-29T05:10:33Z INF ICMP proxy will use fe80::82a1:97ff:fe50:376d in zone mlan0 as source for IPv6
+Jul 29 05:10:33 imx93-11x11-lpddr4x-frdm ems_v3_cloudflared_start.sh[781]: 2026-07-29T05:10:33Z INF Starting metrics server on 127.0.0.1:20241/metrics
+Jul 29 05:10:33 imx93-11x11-lpddr4x-frdm ems_v3_cloudflared_start.sh[781]: 2026-07-29T05:10:33Z INF Tunnel connection curve preferences: [X25519MLKEM768 CurveID(65074) CurveP256] connIndex=0 event=0 ip=198.41.200.113
+Jul 29 05:10:34 imx93-11x11-lpddr4x-frdm ems_v3_cloudflared_start.sh[781]: 2026-07-29T05:10:34Z INF Registered tunnel connection connIndex=0 connection=ae11f4a4-2e31-4e12-8911-057cbe515b20 event=0 ip=198.41.200.113 location=bom11 protocol=quic
+Jul 29 05:10:34 imx93-11x11-lpddr4x-frdm ems_v3_cloudflared_start.sh[781]: 2026-07-29T05:10:34Z INF Tunnel connection curve preferences: [X25519MLKEM768 CurveID(65074) CurveP256] connIndex=1 event=0 ip=198.41.192.67
+Jul 29 05:10:35 imx93-11x11-lpddr4x-frdm ems_v3_cloudflared_start.sh[781]: 2026-07-29T05:10:35Z INF Registered tunnel connection connIndex=1 connection=c5875468-9fc8-4b72-a9a4-f1afd490f671 event=0 ip=198.41.192.67 location=nag01 protocol=quic
+Jul 29 05:10:35 imx93-11x11-lpddr4x-frdm ems_v3_cloudflared_start.sh[781]: 2026-07-29T05:10:35Z INF Tunnel connection curve preferences: [X25519MLKEM768 CurveID(65074) CurveP256] connIndex=2 event=0 ip=198.41.200.23
+Jul 29 05:10:35 imx93-11x11-lpddr4x-frdm ems_v3_cloudflared_start.sh[781]: 2026-07-29T05:10:35Z INF Registered tunnel connection connIndex=2 connection=f0ce5730-f1b5-45d6-b63f-e74318ae81d2 event=0 ip=198.41.200.23 location=bom08 protocol=quic
+Jul 29 05:10:36 imx93-11x11-lpddr4x-frdm ems_v3_cloudflared_start.sh[781]: 2026-07-29T05:10:36Z INF Tunnel connection curve preferences: [X25519MLKEM768 CurveID(65074) CurveP256] connIndex=3 event=0 ip=198.41.192.77
+Jul 29 05:10:36 imx93-11x11-lpddr4x-frdm ems_v3_cloudflared_start.sh[781]: 2026-07-29T05:10:36Z INF Registered tunnel connection connIndex=3 connection=dc3b5a64-7104-43cd-901f-d485ca6d3520 event=0 ip=198.41.192.77 location=nag01 protocol=quic
+Jul 29 05:10:39 imx93-11x11-lpddr4x-frdm ems_v3_cloudflared_start.sh[781]: 2026-07-29T05:10:39Z INF +-------------------------------------------------------------------------------------+
+Jul 29 05:10:39 imx93-11x11-lpddr4x-frdm ems_v3_cloudflared_start.sh[781]: 2026-07-29T05:10:39Z INF |                               CONNECTIVITY PRE-CHECKS                               |
+Jul 29 05:10:39 imx93-11x11-lpddr4x-frdm ems_v3_cloudflared_start.sh[781]: 2026-07-29T05:10:39Z INF +-------------------------------------------------------------------------------------+
+Jul 29 05:10:39 imx93-11x11-lpddr4x-frdm ems_v3_cloudflared_start.sh[781]: 2026-07-29T05:10:39Z INF |  COMPONENT         TARGET                     STATUS  DETAILS                       |
+Jul 29 05:10:39 imx93-11x11-lpddr4x-frdm ems_v3_cloudflared_start.sh[781]: 2026-07-29T05:10:39Z INF |  DNS Resolution    region1.v2.argotunnel.com  PASS    DNS Resolved successfully     |
+Jul 29 05:10:39 imx93-11x11-lpddr4x-frdm ems_v3_cloudflared_start.sh[781]: 2026-07-29T05:10:39Z INF |  DNS Resolution    region2.v2.argotunnel.com  PASS    DNS Resolved successfully     |
+Jul 29 05:10:39 imx93-11x11-lpddr4x-frdm ems_v3_cloudflared_start.sh[781]: 2026-07-29T05:10:39Z INF |  UDP Connectivity  region1.v2.argotunnel.com  PASS    QUIC connection successful    |
+Jul 29 05:10:39 imx93-11x11-lpddr4x-frdm ems_v3_cloudflared_start.sh[781]: 2026-07-29T05:10:39Z INF |  UDP Connectivity  region2.v2.argotunnel.com  PASS    QUIC connection successful    |
+Jul 29 05:10:39 imx93-11x11-lpddr4x-frdm ems_v3_cloudflared_start.sh[781]: 2026-07-29T05:10:39Z INF |  TCP Connectivity  region1.v2.argotunnel.com  PASS    HTTP/2 connection successful  |
+Jul 29 05:10:39 imx93-11x11-lpddr4x-frdm ems_v3_cloudflared_start.sh[781]: 2026-07-29T05:10:39Z INF |  TCP Connectivity  region2.v2.argotunnel.com  PASS    HTTP/2 connection successful  |
+Jul 29 05:10:39 imx93-11x11-lpddr4x-frdm ems_v3_cloudflared_start.sh[781]: 2026-07-29T05:10:39Z INF |  Cloudflare API    api.cloudflare.com:443     PASS    API is reachable              |
+Jul 29 05:10:39 imx93-11x11-lpddr4x-frdm ems_v3_cloudflared_start.sh[781]: 2026-07-29T05:10:39Z INF |                                                                                     |
+Jul 29 05:10:39 imx93-11x11-lpddr4x-frdm ems_v3_cloudflared_start.sh[781]: 2026-07-29T05:10:39Z INF |  SUMMARY: Environment is healthy. cloudflared will use 'quic' as primary protocol.  |
+Jul 29 05:10:39 imx93-11x11-lpddr4x-frdm ems_v3_cloudflared_start.sh[781]: 2026-07-29T05:10:39Z INF +-------------------------------------------------------------------------------------+
+Jul 29 05:10:39 imx93-11x11-lpddr4x-frdm ems_v3_cloudflared_start.sh[781]: 2026-07-29T05:10:39Z INF precheck component="DNS Resolution" details="DNS Resolved successfully" run_id=db0b2d0d-3afe-4b94-90ce-d99837bc1b75 status=pass target=region1.v2.argotunnel.com
+Jul 29 05:10:39 imx93-11x11-lpddr4x-frdm ems_v3_cloudflared_start.sh[781]: 2026-07-29T05:10:39Z INF precheck component="DNS Resolution" details="DNS Resolved successfully" run_id=db0b2d0d-3afe-4b94-90ce-d99837bc1b75 status=pass target=region2.v2.argotunnel.com
+Jul 29 05:10:39 imx93-11x11-lpddr4x-frdm ems_v3_cloudflared_start.sh[781]: 2026-07-29T05:10:39Z INF precheck component="UDP Connectivity" details="QUIC connection successful" run_id=db0b2d0d-3afe-4b94-90ce-d99837bc1b75 status=pass target=region1.v2.argotunnel.com
+Jul 29 05:10:39 imx93-11x11-lpddr4x-frdm ems_v3_cloudflared_start.sh[781]: 2026-07-29T05:10:39Z INF precheck component="UDP Connectivity" details="QUIC connection successful" run_id=db0b2d0d-3afe-4b94-90ce-d99837bc1b75 status=pass target=region2.v2.argotunnel.com
+Jul 29 05:10:39 imx93-11x11-lpddr4x-frdm ems_v3_cloudflared_start.sh[781]: 2026-07-29T05:10:39Z INF precheck component="TCP Connectivity" details="HTTP/2 connection successful" run_id=db0b2d0d-3afe-4b94-90ce-d99837bc1b75 status=pass target=region1.v2.argotunnel.com
+Jul 29 05:10:39 imx93-11x11-lpddr4x-frdm ems_v3_cloudflared_start.sh[781]: 2026-07-29T05:10:39Z INF precheck component="TCP Connectivity" details="HTTP/2 connection successful" run_id=db0b2d0d-3afe-4b94-90ce-d99837bc1b75 status=pass target=region2.v2.argotunnel.com
+Jul 29 05:10:39 imx93-11x11-lpddr4x-frdm ems_v3_cloudflared_start.sh[781]: 2026-07-29T05:10:39Z INF precheck component="Cloudflare API" details="API is reachable" run_id=db0b2d0d-3afe-4b94-90ce-d99837bc1b75 status=pass target=api.cloudflare.com:443
+Jul 29 05:10:39 imx93-11x11-lpddr4x-frdm ems_v3_cloudflared_start.sh[781]: 2026-07-29T05:10:39Z INF precheck complete hard_fail=false run_id=db0b2d0d-3afe-4b94-90ce-d99837bc1b75 suggested_protocol=quic

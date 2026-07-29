@@ -1,0 +1,10 @@
+MainPID=515
+NRestarts=0
+ExecStart={ path=/usr/local/sbin/kinetics-network-guard.sh ; argv[]=/usr/local/sbin/kinetics-network-guard.sh ; ignore_errors=no ; start_time=[Wed 2026-07-29 05:10:20 UTC] ; stop_time=[n/a] ; pid=515 ; code=(null) ; status=0/0 }
+MemoryCurrent=794624
+MemoryPeak=1921024
+Environment=
+ActiveState=active
+SubState=running
+FragmentPath=/etc/systemd/system/kinetics-network-guard.service
+DropInPaths=

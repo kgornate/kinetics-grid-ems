@@ -1,23 +1,33 @@
-# Kinetics Gateway Flutter Dashboard V2
+# Kinetics Gateway Flutter Dashboard V2.6
 
-Read-only commissioning and monitoring application for the Kinetics Gateway V2 backend.
+Windows/Android monitoring and internal commissioning application for the Kinetics Gateway backend.
 
 ## Current scope
 
-- Connect through direct Ethernet, Wi-Fi, or Cloudflare by changing only the API base URL.
-- JWT login for `internal` and `customer` roles.
-- REST bootstrap and health checks.
-- Delta WebSocket telemetry with automatic reconnect.
-- BAU/bank telemetry covering every point returned by the gateway.
-- Four rack/BCU assets and complete rack detail reads, including bulk arrays.
-- HVAC, liquid cooling, energy meter, dehumidifiers, safety/fire I/O, and other environment assets.
-- Active alarms and alarm history.
-- SQLite historian browser.
-- Scheduler, storage, and bandwidth diagnostics.
-- Internal-user mock scenario selection when the gateway is in mock or mixed mode.
-- One-button complete BMS extraction for commissioning.
-- PCS screen support is dynamic; it displays disabled status now and automatically displays data when PCS is enabled.
-- No BMS or PCS write controls are exposed in this read-only application.
+- Direct Ethernet, Wi-Fi or Cloudflare API connection by changing only the base URL.
+- JWT login with internal and customer roles.
+- REST bootstrap plus delta WebSocket telemetry and reconnect.
+- BAU/bank, Rack 1-4, environment assets, PCS 1-4, alarms, historian and diagnostics.
+- Five-minute timeouts for full hardware extraction where needed.
+- Internal-only BESS Control screen for the field-validated Rack 1 ↔ PCS 1 sequence.
+- Customer users remain read-only.
+
+## BESS Control screen
+
+Backend requirement: Kinetics Gateway V2.5.0 or newer.
+
+The internal Control screen provides:
+
+- live BMS/PCS readiness and safety gates
+- automatic charge/discharge startup with target power and configurable ramp
+- step-by-step commissioning with **Execute next step**
+- direct set-power command after gateway readiness verification
+- zero-power command
+- complete safe shutdown
+- automatic-sequence abort
+- live progress stepper and latest raw gateway response
+
+Automatic mode is shown but disabled until the backend reports `full_automatic_sequence_allowed = true`.
 
 ## Gateway URLs
 
@@ -25,14 +35,12 @@ Read-only commissioning and monitoring application for the Kinetics Gateway V2 b
 - Wi-Fi: `http://<FRDM_WIFI_IP>:8000`
 - Cloudflare: `https://<YOUR_KINETICS_HOSTNAME>`
 
-All three routes expose the same REST and WebSocket API contract.
-
 ## Temporary commissioning accounts
 
 - Internal: `internal` / `Internal@123`
 - Customer: `customer` / `Customer@123`
 
-The passwords come from the gateway environment file and must be changed after commissioning.
+Change temporary passwords after commissioning.
 
 ## Build and run on Windows
 
@@ -40,43 +48,34 @@ The passwords come from the gateway environment file and must be changed after c
 cd C:\path\to\kinetics_flutter_dashboard_v2
 flutter clean
 flutter pub get
+flutter analyze
 flutter test
 flutter run -d windows
 ```
 
-Build a release executable:
+Build a release bundle:
 
 ```powershell
 flutter build windows --release
 ```
 
-The release bundle will be under:
+Output:
 
 ```text
 build\windows\x64\runner\Release\
 ```
 
-## Tomorrow's BMS test flow
+## Control validation checklist
 
-1. Install and run the BMS-only gateway backend.
-2. Connect the PC to FRDM `eth0` and set the PC IP to `192.168.10.10/24`.
-3. Confirm `ping 192.168.10.2` and TCP port 8000.
-4. Run this Flutter app and connect to `http://192.168.10.2:8000`.
-5. Sign in as `internal`.
-6. Confirm REST and Live indicators are green.
-7. Open Diagnostics and select **Run total extraction**.
-8. Check BAU, Rack 1-4, Environment, Alarms, Historian, Polling, and Storage screens.
-9. Compare key values against the BAU/HMI.
+1. Deploy Gateway V2.5.0 and verify `/api/control-sequence/capabilities`.
+2. Sign in as `internal`.
+3. Open **Control**.
+4. Confirm write gates, pair mapping, E-stop, faults and communication are healthy.
+5. Use **Execute next step** for commissioning, or enable the independently gated automatic sequence after field approval.
+6. Keep the physical E-stop accessible during energized tests.
+7. Use **Zero power** before changing direction.
+8. Use **Safe shutdown** to stop PCS and open/disable the BMS rack.
 
 ## Platform note
 
-The networking client uses `dart:io`, so this source is intended for Windows desktop and Android. Flutter Web is not enabled for live API use in this version.
-
-## V2.3 stability update
-
-The BAU, environment asset, and generic telemetry "All points" expansion panels now have explicit Material/Card ancestors. This fixes the intermittent red-screen error that could require closing and reopening a view. See `PATCH_NOTES_V2_3.md`.
-
-
-## V2.5 PCS topology
-
-The PCS area supports four physical PCS units connected to one RS485 bus through Modbus RTU slave IDs 1–4. The gateway must publish the devices in `pcs_devices`; the legacy single `pcs` field remains supported.
+The networking client uses `dart:io`; this source targets Windows desktop and Android. Flutter Web is not enabled for live API use.
