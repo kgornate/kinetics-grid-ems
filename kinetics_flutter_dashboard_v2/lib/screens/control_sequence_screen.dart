@@ -17,9 +17,9 @@ class ControlSequenceScreen extends StatefulWidget {
 
 class _ControlSequenceScreenState extends State<ControlSequenceScreen> {
   final TextEditingController _power = TextEditingController(text: '0');
-  final TextEditingController _rampStep = TextEditingController(text: '0.5');
-  final TextEditingController _rampInterval = TextEditingController(text: '5');
-  String _direction = 'discharge';
+  final TextEditingController _rampStep = TextEditingController(text: '10');
+  final TextEditingController _rampInterval = TextEditingController(text: '1');
+  String _direction = 'charge';
 
   @override
   void initState() {
@@ -57,13 +57,14 @@ class _ControlSequenceScreenState extends State<ControlSequenceScreen> {
             SectionHeader(
               'BESS control sequence',
               subtitle:
-                  'Field-validated Rack 1 ↔ PCS 1 startup, charge/discharge and safe-shutdown workflow. The gateway performs every Modbus write and verifies each feedback.',
+                  'Independent Pair 1–4 startup, charge/discharge and pair-safe shutdown. Each pair uses BAU 0x3001 on its own BMS TCP port while the gateway verifies BCU and PCS feedback.',
               trailing: FilledButton.tonalIcon(
                 onPressed: controller.controlBusy
                     ? null
                     : () async {
                         await controller.refreshControlCapabilities();
                         await controller.refreshControlStatus();
+                        await controller.refreshSelectedControlStatusFresh();
                       },
                 icon: const Icon(Icons.refresh),
                 label: const Text('Refresh'),
@@ -74,6 +75,11 @@ class _ControlSequenceScreenState extends State<ControlSequenceScreen> {
               controller: controller,
               capabilities: capabilities,
               status: status,
+            ),
+            const SizedBox(height: 14),
+            _PairOverview(
+              controller: controller,
+              capabilities: capabilities,
             ),
             const SizedBox(height: 14),
             _SystemStateCard(status: status),
@@ -94,6 +100,7 @@ class _ControlSequenceScreenState extends State<ControlSequenceScreen> {
               onSetPower: _setPower,
               onZero: _zeroPower,
               onSafeStop: _safeStop,
+              onSafeStopAll: _safeStopAll,
               onAbort: _abort,
             ),
             const SizedBox(height: 20),
@@ -187,7 +194,7 @@ class _ControlSequenceScreenState extends State<ControlSequenceScreen> {
       final interval = _readPositive(_rampInterval, 'Ramp interval');
       final confirmed = await _confirm(
         'Start automatic sequence?',
-        'The gateway will configure the PCS, enable the rack, precharge the BMS, start the PCS and ramp to ${_direction == 'charge' ? '-' : '+'}${power.toStringAsFixed(1)} kW. Keep the physical E-stop accessible.',
+        'The gateway will configure the selected PCS, connect its pair-specific BAU through 0x3001, verify BCU precharge/contactors, start the PCS at 0 kW and ramp to ${_direction == 'charge' ? '-' : '+'}${power.toStringAsFixed(1)} kW. Keep the physical E-stop accessible.',
         dangerous: true,
       );
       if (!confirmed) return;
@@ -254,12 +261,26 @@ class _ControlSequenceScreenState extends State<ControlSequenceScreen> {
   Future<void> _safeStop() async {
     final confirmed = await _confirm(
       'Complete safe shutdown?',
-      'The gateway will quiesce runtime monitoring, set 0 kW, stop the PCS, reset the selected BCU precharge command and verify both main contactors open.',
+      'The gateway will quiesce this pair’s runtime monitor, return the PCS to 0 kW, stop it, write BAU 0x3001 = 2 on this pair’s BMS port and verify both main contactors open.',
       dangerous: true,
     );
     if (!confirmed) return;
     try {
       await widget.controller.safeStopControl(openBms: true);
+    } catch (error) {
+      _showError(error);
+    }
+  }
+
+  Future<void> _safeStopAll() async {
+    final confirmed = await _confirm(
+      'Safe-stop every enabled pair?',
+      'The gateway will process pairs sequentially. For each pair it will command 0 kW, verify actual power is zero, stop the PCS, then cut off only that pair’s BAU 0x3001 and verify its contactors open.',
+      dangerous: true,
+    );
+    if (!confirmed) return;
+    try {
+      await widget.controller.safeStopAllControl(openBms: true);
     } catch (error) {
       _showError(error);
     }
@@ -283,6 +304,138 @@ class _ControlSequenceScreenState extends State<ControlSequenceScreen> {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(error.toString())),
+    );
+  }
+}
+
+class _PairOverview extends StatelessWidget {
+  const _PairOverview({
+    required this.controller,
+    required this.capabilities,
+  });
+
+  final GatewayController controller;
+  final ControlSequenceCapabilities? capabilities;
+
+  @override
+  Widget build(BuildContext context) {
+    final pairs = capabilities?.pairs.where((pair) => pair.enabled).toList() ??
+        const <ControlPairSummary>[];
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Multi-pair live overview',
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleLarge
+                        ?.copyWith(fontWeight: FontWeight.w800),
+                  ),
+                ),
+                Text(
+                  'Plant setpoint ${controller.totalControlSetpointKw.toStringAsFixed(1)} kW  •  '
+                  'actual ${controller.totalControlActualPowerKw.toStringAsFixed(1)} kW',
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            if (pairs.isEmpty)
+              const Text('Waiting for enabled control pairs...')
+            else
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: pairs.map((pair) {
+                  final status = controller.controlStatusFor(pair.pairId);
+                  final actual = status?.value('pcs_actual_power_kw');
+                  final setpoint = status?.value('pcs_power_setpoint_kw');
+                  final pcsState = status?.value('pcs_operating_state');
+                  final precharge = status?.value('precharge_state');
+                  final fault = status?.flag('pcs_fault_shutdown') == true ||
+                      status?.hardBlocked == true;
+                  final refresh = status?.raw['refresh'];
+                  final source = refresh is Map
+                      ? refresh['source']?.toString() ?? 'cache'
+                      : 'cache';
+                  final stale = refresh is Map && refresh['stale'] == true;
+                  final selected = pair.pairId == controller.selectedControlPair;
+                  final busy = controller.isControlPairBusy(pair.pairId);
+                  return SizedBox(
+                    width: 245,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(12),
+                      onTap: () => controller.selectControlPair(pair.pairId),
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: selected
+                                ? Theme.of(context).colorScheme.primary
+                                : Theme.of(context).dividerColor,
+                            width: selected ? 2 : 1,
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    '${pair.pairId} • Rack ${pair.rackId} / ${pair.pcsAssetId}',
+                                    style: const TextStyle(fontWeight: FontWeight.w700),
+                                  ),
+                                ),
+                                if (busy)
+                                  const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  )
+                                else
+                                  Icon(
+                                    fault ? Icons.error : Icons.check_circle,
+                                    size: 18,
+                                    color: fault
+                                        ? Theme.of(context).colorScheme.error
+                                        : Theme.of(context).colorScheme.primary,
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              'Set ${setpoint?.toStringAsFixed(1) ?? '--'} kW  •  '
+                              'Actual ${actual?.toStringAsFixed(1) ?? '--'} kW',
+                            ),
+                            Text(
+                              'PCS ${pcsState?.toStringAsFixed(0) ?? '--'}  •  '
+                              'Precharge ${precharge?.toStringAsFixed(0) ?? '--'}',
+                            ),
+                            Text(
+                              '${stale ? 'STALE • ' : ''}$source',
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: stale
+                                        ? Theme.of(context).colorScheme.error
+                                        : Theme.of(context).colorScheme.onSurfaceVariant,
+                                  ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -337,7 +490,7 @@ class _GateBanner extends StatelessWidget {
         ),
         StatusPill(
           label: 'Source: ${controller.controlStatusSource}',
-          good: controller.controlStatusSource != 'live_hardware',
+          good: !controller.controlStatusIsStale,
           icon: Icons.cached,
         ),
         StatusPill(
@@ -501,6 +654,7 @@ class _CommandPanel extends StatelessWidget {
     required this.onSetPower,
     required this.onZero,
     required this.onSafeStop,
+    required this.onSafeStopAll,
     required this.onAbort,
   });
 
@@ -517,6 +671,7 @@ class _CommandPanel extends StatelessWidget {
   final VoidCallback onSetPower;
   final VoidCallback onZero;
   final VoidCallback onSafeStop;
+  final VoidCallback onSafeStopAll;
   final VoidCallback onAbort;
 
   @override
@@ -642,7 +797,7 @@ class _CommandPanel extends StatelessWidget {
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : const Icon(Icons.auto_mode),
-                  label: const Text('Start automatic sequence'),
+                  label: const Text('Start automatic ramp'),
                 ),
                 FilledButton.tonalIcon(
                   onPressed: enabled ? onNextStep : null,
@@ -654,7 +809,7 @@ class _CommandPanel extends StatelessWidget {
                       ? onSetPower
                       : null,
                   icon: const Icon(Icons.speed),
-                  label: const Text('Set power'),
+                  label: const Text('Set power directly'),
                 ),
                 OutlinedButton.icon(
                   onPressed: enabled ? onZero : null,
@@ -669,6 +824,11 @@ class _CommandPanel extends StatelessWidget {
                   onPressed: enabled ? onSafeStop : null,
                   icon: const Icon(Icons.power_settings_new),
                   label: const Text('Safe shutdown'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: controller.anyControlBusy ? null : onSafeStopAll,
+                  icon: const Icon(Icons.power_off),
+                  label: const Text('Safe stop all pairs'),
                 ),
                 OutlinedButton.icon(
                   onPressed: enabled && status?.automaticRunning == true

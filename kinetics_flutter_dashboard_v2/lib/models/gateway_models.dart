@@ -281,7 +281,7 @@ class PlantSnapshot {
   List<AssetSnapshot> get environment {
     final result = assets.values
         .where((asset) =>
-            asset.assetId != 'bms_bank' &&
+            asset.assetType != 'bms_bank' &&
             asset.assetType != 'bms_rack' &&
             asset.assetType != 'pcs')
         .toList();
@@ -308,6 +308,13 @@ class PlantSnapshot {
 
     final bankJson = message['bank'];
     if (bankJson is Map) _upsert(Map<String, dynamic>.from(bankJson));
+
+    final banksJson = message['bms_banks'];
+    if (banksJson is Map) {
+      for (final item in banksJson.values.whereType<Map>()) {
+        _upsert(Map<String, dynamic>.from(item));
+      }
+    }
 
     final rackJson = message['racks'];
     if (rackJson is List) {

@@ -1,0 +1,6 @@
+Flutter V3.0.0 source validation
+lib/core/state/gateway_controller.dart PASS
+lib/screens/control_sequence_screen.dart PASS
+lib/models/gateway_models.dart PASS
+Dart lexical balance: PASS
+flutter analyze/build: NOT RUN (Flutter SDK unavailable in this environment)

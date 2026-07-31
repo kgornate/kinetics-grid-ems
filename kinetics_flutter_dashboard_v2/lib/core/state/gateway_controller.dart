@@ -30,8 +30,11 @@ class GatewayController extends ChangeNotifier {
 
   ControlSequenceCapabilities? controlCapabilities;
   ControlSequenceStatus? controlStatus;
+  final Map<String, ControlSequenceStatus> controlStatuses =
+      <String, ControlSequenceStatus>{};
+  Map<String, dynamic> controlPlantSummary = <String, dynamic>{};
   Map<String, dynamic> lastControlResponse = <String, dynamic>{};
-  bool controlBusy = false;
+  final Set<String> _controlBusyPairs = <String>{};
   String selectedControlPair = 'pair_1';
 
   WebSocket? _telemetrySocket;
@@ -281,9 +284,9 @@ class GatewayController extends ChangeNotifier {
   Future<void> refreshControlStatus({bool silent = false}) async {
     if (!isInternal || _disposed) return;
 
-    // Status polling is intentionally single-flight. Timer ticks, manual
-    // refreshes and post-command refreshes are collapsed into at most one
-    // current request plus one pending cached refresh.
+    // Multi-pair overview polling is cache-only and single-flight. It never
+    // requests direct Modbus reads, so telemetry display cannot compete with
+    // startup, safe-stop or runtime safety monitoring.
     if (_controlStatusInFlight) {
       _controlStatusRefreshPending = true;
       controlStatusSkippedRefreshes += 1;
@@ -291,25 +294,46 @@ class GatewayController extends ChangeNotifier {
     }
 
     _controlStatusInFlight = true;
-    final pairId = selectedControlPair;
     final generation = _controlStatusGeneration;
     try {
-      // Stage 3C exposes the complete control snapshot from the shared
-      // background poll cache through this diagnostics endpoint. The normal
-      // /status?fresh=false endpoint intentionally returns only the compact
-      // automatic-run runtime object, which is not sufficient to populate the
-      // control screen's telemetry, blockers, workflow and write gates.
       final payload = await api.getJson(
-        '/api/diagnostics/runtime-monitor/$pairId/sample',
+        '/api/control-sequence/status/all',
         timeout: const Duration(seconds: 10),
       );
-      if (!_disposed &&
-          pairId == selectedControlPair &&
-          generation == _controlStatusGeneration) {
-        controlStatus = ControlSequenceStatus.fromJson(payload);
-        controlStatusReceivedAt = DateTime.now().toUtc();
-        restConnected = true;
+      if (_disposed || generation != _controlStatusGeneration) return;
+
+      final parsed = <String, ControlSequenceStatus>{};
+      final byPair = payload['by_pair_id'];
+      if (byPair is Map) {
+        for (final entry in byPair.entries) {
+          if (entry.value is Map) {
+            final status = ControlSequenceStatus.fromJson(
+              Map<String, dynamic>.from(entry.value as Map),
+            );
+            parsed[entry.key.toString()] = status;
+          }
+        }
+      } else {
+        final pairs = payload['pairs'];
+        if (pairs is List) {
+          for (final item in pairs.whereType<Map>()) {
+            final status = ControlSequenceStatus.fromJson(
+              Map<String, dynamic>.from(item),
+            );
+            parsed[status.pairId] = status;
+          }
+        }
       }
+
+      controlStatuses
+        ..clear()
+        ..addAll(parsed);
+      controlPlantSummary = payload['summary'] is Map
+          ? Map<String, dynamic>.from(payload['summary'] as Map)
+          : <String, dynamic>{};
+      controlStatus = controlStatuses[selectedControlPair];
+      controlStatusReceivedAt = DateTime.now().toUtc();
+      restConnected = true;
     } catch (error) {
       if (!silent) errorMessage = error.toString();
       if (!silent) rethrow;
@@ -324,11 +348,34 @@ class GatewayController extends ChangeNotifier {
     }
   }
 
+  Future<void> refreshSelectedControlStatusFresh({bool silent = false}) async {
+    if (!isInternal || _disposed) return;
+    final pairId = selectedControlPair;
+    try {
+      final payload = await api.getJson(
+        '/api/control-sequence/$pairId/status',
+        query: const <String, String>{'fresh': 'true'},
+        timeout: const Duration(seconds: 120),
+      );
+      if (_disposed || pairId != selectedControlPair) return;
+      final status = ControlSequenceStatus.fromJson(payload);
+      controlStatuses[pairId] = status;
+      controlStatus = status;
+      controlStatusReceivedAt = DateTime.now().toUtc();
+      restConnected = true;
+    } catch (error) {
+      if (!silent) errorMessage = error.toString();
+      if (!silent) rethrow;
+    } finally {
+      if (!_disposed) notifyListeners();
+    }
+  }
+
   void selectControlPair(String pairId) {
     if (pairId == selectedControlPair) return;
     selectedControlPair = pairId;
-    controlStatus = null;
-    controlStatusReceivedAt = null;
+    controlStatus = controlStatuses[pairId];
+    controlStatusReceivedAt = controlStatus == null ? null : DateTime.now().toUtc();
     _controlStatusGeneration += 1;
     notifyListeners();
     unawaited(refreshControlStatus(silent: true));
@@ -340,9 +387,9 @@ class GatewayController extends ChangeNotifier {
     _controlTimer?.cancel();
     unawaited(refreshControlStatus(silent: true));
     _controlTimer = Timer.periodic(
-      const Duration(seconds: 3),
+      const Duration(seconds: 2),
       (_) {
-        if (!controlBusy && _controlPollingEnabled) {
+        if (_controlPollingEnabled) {
           unawaited(refreshControlStatus(silent: true));
         }
       },
@@ -360,6 +407,21 @@ class GatewayController extends ChangeNotifier {
       _controlPollingEnabled && _controlTimer?.isActive == true;
 
   bool get controlStatusRequestActive => _controlStatusInFlight;
+
+  bool get controlBusy => _controlBusyPairs.contains(selectedControlPair);
+
+  bool get anyControlBusy => _controlBusyPairs.isNotEmpty;
+
+  bool isControlPairBusy(String pairId) => _controlBusyPairs.contains(pairId);
+
+  ControlSequenceStatus? controlStatusFor(String pairId) =>
+      controlStatuses[pairId];
+
+  double get totalControlSetpointKw =>
+      _asControllerDouble(controlPlantSummary['total_setpoint_kw']) ?? 0.0;
+
+  double get totalControlActualPowerKw =>
+      _asControllerDouble(controlPlantSummary['total_actual_power_kw']) ?? 0.0;
 
   String get controlStatusSource {
     final refresh = controlStatus?.raw['refresh'];
@@ -462,6 +524,47 @@ class GatewayController extends ChangeNotifier {
     );
   }
 
+  Future<Map<String, dynamic>> safeStopAllControl({bool openBms = true}) async {
+    if (!isInternal) {
+      throw const ApiException('Internal role is required for control');
+    }
+    if (_controlBusyPairs.isNotEmpty) {
+      throw const ApiException(
+        'Wait for active pair commands to finish before Safe Stop All.',
+      );
+    }
+    final pairIds = controlCapabilities?.pairs
+            .where((pair) => pair.enabled)
+            .map((pair) => pair.pairId)
+            .toSet() ??
+        <String>{'pair_1', 'pair_2', 'pair_3', 'pair_4'};
+    _controlBusyPairs.addAll(pairIds);
+    errorMessage = null;
+    notifyListeners();
+    try {
+      final result = await api.postJson(
+        '/api/control-sequence/safe-stop-all',
+        body: <String, dynamic>{
+          'confirmation': _stageConfirmation,
+          'open_bms': openBms,
+        },
+        timeout: const Duration(minutes: 5),
+      );
+      lastControlResponse = result;
+      lastEventMessage = result['ok'] == true
+          ? 'All enabled pairs were safely stopped.'
+          : 'Safe Stop All completed with one or more pair failures.';
+      await refreshControlStatus(silent: true);
+      return result;
+    } catch (error) {
+      errorMessage = error.toString();
+      rethrow;
+    } finally {
+      _controlBusyPairs.removeAll(pairIds);
+      if (!_disposed) notifyListeners();
+    }
+  }
+
   Future<Map<String, dynamic>> abortControl({bool openBms = true}) {
     return _executeControl(
       '/api/control-sequence/$selectedControlPair/abort',
@@ -481,17 +584,18 @@ class GatewayController extends ChangeNotifier {
     String path,
     Map<String, dynamic> body, {
     required String successMessage,
-    Duration timeout = const Duration(seconds: 90),
+    Duration timeout = const Duration(seconds: 150),
   }) async {
     if (!isInternal) {
       throw const ApiException('Internal role is required for control');
     }
-    if (controlBusy) {
-      throw const ApiException(
-        'Another control command is already in progress. Wait for its response.',
+    final pairId = selectedControlPair;
+    if (_controlBusyPairs.contains(pairId)) {
+      throw ApiException(
+        'A control command is already in progress for $pairId.',
       );
     }
-    controlBusy = true;
+    _controlBusyPairs.add(pairId);
     errorMessage = null;
     notifyListeners();
     try {
@@ -505,7 +609,7 @@ class GatewayController extends ChangeNotifier {
       errorMessage = error.toString();
       rethrow;
     } finally {
-      controlBusy = false;
+      _controlBusyPairs.remove(pairId);
       if (!_disposed) notifyListeners();
     }
   }
@@ -593,14 +697,16 @@ class GatewayController extends ChangeNotifier {
     assetMetadata = <Map<String, dynamic>>[];
     controlCapabilities = null;
     controlStatus = null;
+    controlStatuses.clear();
+    controlPlantSummary = <String, dynamic>{};
     controlStatusReceivedAt = null;
+    _controlBusyPairs.clear();
     _controlStatusInFlight = false;
     _controlStatusRefreshPending = false;
     _controlPollingEnabled = false;
     _controlStatusGeneration += 1;
     controlStatusSkippedRefreshes = 0;
     lastControlResponse = <String, dynamic>{};
-    controlBusy = false;
     health = <String, dynamic>{};
     storage = <String, dynamic>{};
     polling = <String, dynamic>{};
@@ -622,4 +728,10 @@ class GatewayController extends ChangeNotifier {
     api.close();
     super.dispose();
   }
+}
+
+
+double? _asControllerDouble(dynamic value) {
+  if (value is num) return value.toDouble();
+  return double.tryParse(value?.toString() ?? '');
 }
