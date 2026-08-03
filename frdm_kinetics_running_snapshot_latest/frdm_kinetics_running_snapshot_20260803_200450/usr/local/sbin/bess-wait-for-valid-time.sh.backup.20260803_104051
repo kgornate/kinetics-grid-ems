@@ -1,0 +1,86 @@
+#!/bin/sh
+
+MAX_WAIT_SECONDS=1800
+CHECK_INTERVAL_SECONDS=15
+MAX_ALLOWED_DRIFT_SECONDS=300
+
+elapsed=0
+
+echo "TIME-GUARD: waiting for NTP synchronization and valid external time"
+
+while [ "$elapsed" -lt "$MAX_WAIT_SECONDS" ]; do
+    synced="$(timedatectl show -p NTPSynchronized --value 2>/dev/null)"
+
+    if [ "$synced" = "yes" ]; then
+        remote_date=""
+
+        for url in \
+            "https://www.google.com/generate_204" \
+            "https://www.cloudflare.com/"
+        do
+            remote_date="$(
+                curl -sSI \
+                    --max-time 10 \
+                    -H 'Cache-Control: no-cache' \
+                    "$url" 2>/dev/null |
+                tr -d '\r' |
+                grep -i '^date:' |
+                head -n 1 |
+                cut -d: -f2- |
+                sed 's/^[[:space:]]*//'
+            )"
+
+            [ -n "$remote_date" ] && break
+        done
+
+        if [ -n "$remote_date" ]; then
+            remote_epoch="$(
+                python3 - "$remote_date" <<'PY'
+import email.utils
+import sys
+
+value = sys.argv[1].strip()
+dt = email.utils.parsedate_to_datetime(value)
+
+if dt.tzinfo is None:
+    raise SystemExit(1)
+
+print(int(dt.timestamp()))
+PY
+            )"
+
+            case "$remote_epoch" in
+                ''|*[!0-9]*)
+                    echo "TIME-GUARD: unable to parse external time"
+                    ;;
+                *)
+                    local_epoch="$(date +%s)"
+                    drift=$((local_epoch - remote_epoch))
+
+                    if [ "$drift" -lt 0 ]; then
+                        drift=$((-drift))
+                    fi
+
+                    echo "TIME-GUARD: NTP=yes external drift=${drift}s"
+
+                    if [ "$drift" -le "$MAX_ALLOWED_DRIFT_SECONDS" ]; then
+                        echo "TIME-GUARD: system time validation passed"
+                        exit 0
+                    fi
+
+                    echo "TIME-GUARD: clock drift exceeds ${MAX_ALLOWED_DRIFT_SECONDS}s"
+                    ;;
+            esac
+        else
+            echo "TIME-GUARD: external time header unavailable"
+        fi
+    else
+        echo "TIME-GUARD: NTP not synchronized; waited ${elapsed}s"
+    fi
+
+    sleep "$CHECK_INTERVAL_SECONDS"
+    elapsed=$((elapsed + CHECK_INTERVAL_SECONDS))
+done
+
+echo "TIME-GUARD ERROR: valid synchronized time not established"
+exit 1

@@ -1,0 +1,20 @@
+default via 192.168.1.1 dev mlan0 metric 10 
+192.168.1.0/24 dev mlan0 proto kernel scope link src 192.168.1.100 
+192.168.10.0/24 dev eth0 proto kernel scope link src 192.168.10.2 linkdown 
+192.168.111.0/24 dev eth1 proto kernel scope link src 192.168.111.2 
+local 127.0.0.0/8 dev lo table local proto kernel scope host src 127.0.0.1 
+local 127.0.0.1 dev lo table local proto kernel scope host src 127.0.0.1 
+broadcast 127.255.255.255 dev lo table local proto kernel scope link src 127.0.0.1 
+local 192.168.1.100 dev mlan0 table local proto kernel scope host src 192.168.1.100 
+broadcast 192.168.1.255 dev mlan0 table local proto kernel scope link src 192.168.1.100 
+local 192.168.10.2 dev eth0 table local proto kernel scope host src 192.168.10.2 
+broadcast 192.168.10.255 dev eth0 table local proto kernel scope link src 192.168.10.2 linkdown 
+local 192.168.111.2 dev eth1 table local proto kernel scope host src 192.168.111.2 
+broadcast 192.168.111.255 dev eth1 table local proto kernel scope link src 192.168.111.2 
+local ::1 dev lo proto kernel metric 0 pref medium
+local fe80::82a1:97ff:fe50:376d dev mlan0 proto kernel metric 0 pref medium
+local fe80::92a9:f7ff:fe80:4016 dev eth1 proto kernel metric 0 pref medium
+fe80::/64 dev eth1 proto kernel metric 256 pref medium
+fe80::/64 dev mlan0 proto kernel metric 256 pref medium
+multicast ff00::/8 dev eth1 proto kernel metric 256 pref medium
+multicast ff00::/8 dev mlan0 proto kernel metric 256 pref medium

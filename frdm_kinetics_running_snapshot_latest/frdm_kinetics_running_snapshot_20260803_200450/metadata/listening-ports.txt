@@ -1,0 +1,1 @@
+/root/build_current_gateway_snapshot.sh: line 244: ss: command not found

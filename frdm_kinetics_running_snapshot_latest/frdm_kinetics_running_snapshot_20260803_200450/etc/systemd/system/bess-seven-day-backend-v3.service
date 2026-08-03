@@ -1,0 +1,27 @@
+[Unit]
+Description=BESS Seven-Day Scheduler Using Kinetics Backend V3 APIs
+Wants=network-online.target time-sync.target
+After=network-online.target time-sync.target kinetics-gateway.service
+Requires=kinetics-gateway.service
+PartOf=kinetics-gateway.service
+ConditionPathIsMountPoint=/mnt/ems-logs
+StartLimitIntervalSec=900
+StartLimitBurst=3
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/bess-seven-day-backend-v3.env
+Environment=PYTHONUNBUFFERED=1
+WorkingDirectory=/opt/kinetics-gateway/backend
+ExecStartPre=/usr/bin/test -x /root/bess_seven_day_backend_v3_scheduler.py
+ExecStart=/usr/bin/python3 /root/bess_seven_day_backend_v3_scheduler.py
+Restart=on-failure
+RestartSec=60
+KillSignal=SIGTERM
+KillMode=control-group
+TimeoutStopSec=900
+SendSIGKILL=no
+OOMScoreAdjust=-500
+
+[Install]
+WantedBy=multi-user.target kinetics-gateway.service

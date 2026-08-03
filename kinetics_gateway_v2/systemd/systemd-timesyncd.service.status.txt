@@ -1,0 +1,4 @@
+○ systemd-timesyncd.service - Network Time Synchronization
+     Loaded: loaded (/usr/lib/systemd/system/systemd-timesyncd.service; disabled; preset: enabled)
+     Active: inactive (dead)
+       Docs: man:systemd-timesyncd.service(8)

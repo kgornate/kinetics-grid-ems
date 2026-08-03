@@ -1,0 +1,1 @@
+/root/build_current_gateway_snapshot.sh: line 265: ntpq: command not found

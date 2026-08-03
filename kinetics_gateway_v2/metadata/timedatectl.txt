@@ -1,0 +1,7 @@
+               Local time: Mon 2026-08-03 20:04:55 IST
+           Universal time: Mon 2026-08-03 14:34:55 UTC
+                 RTC time: Mon 2026-08-03 14:34:55
+                Time zone: Asia/Kolkata (IST, +0530)
+System clock synchronized: yes
+              NTP service: active
+          RTC in local TZ: no

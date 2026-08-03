@@ -1,0 +1,156 @@
+UID          PID    PPID  C STIME TTY          TIME CMD
+root           1       0  0 10:25 ?        00:00:23 /sbin/init
+root           2       0  0 10:25 ?        00:00:01 [kthreadd]
+root           3       2  0 10:25 ?        00:00:00 [pool_workqueue_release]
+root           4       2  0 10:25 ?        00:00:00 [kworker/R-rcu_gp]
+root           5       2  0 10:25 ?        00:00:00 [kworker/R-sync_wq]
+root           6       2  0 10:25 ?        00:00:00 [kworker/R-kvfree_rcu_reclaim]
+root           7       2  0 10:25 ?        00:00:00 [kworker/R-slub_flushwq]
+root           8       2  0 10:25 ?        00:00:00 [kworker/R-netns]
+root          13       2  0 10:25 ?        00:00:00 [kworker/R-mm_percpu_wq]
+root          14       2  0 10:25 ?        00:00:01 [ksoftirqd/0]
+root          15       2  0 10:25 ?        00:00:26 [rcu_preempt]
+root          16       2  0 10:25 ?        00:00:00 [rcu_exp_par_gp_kthread_worker/0]
+root          17       2  0 10:25 ?        00:00:00 [rcu_exp_gp_kthread_worker]
+root          18       2  0 10:25 ?        00:00:00 [migration/0]
+root          19       2  0 10:25 ?        00:00:00 [cpuhp/0]
+root          20       2  0 10:25 ?        00:00:00 [cpuhp/1]
+root          21       2  0 10:25 ?        00:00:00 [migration/1]
+root          22       2  0 10:25 ?        00:00:00 [ksoftirqd/1]
+root          25       2  0 10:25 ?        00:00:00 [kdevtmpfs]
+root          26       2  0 10:25 ?        00:00:00 [kworker/R-inet_frag_wq]
+root          27       2  0 10:25 ?        00:00:00 [rcu_tasks_kthread]
+root          28       2  0 10:25 ?        00:00:00 [rcu_tasks_trace_kthread]
+root          29       2  0 10:25 ?        00:00:00 [kauditd]
+root          30       2  0 10:25 ?        00:00:00 [oom_reaper]
+root          31       2  0 10:25 ?        00:00:00 [kworker/R-writeback]
+root          32       2  0 10:25 ?        00:00:33 [kcompactd0]
+root          33       2  0 10:25 ?        00:00:00 [ksmd]
+root          34       2  0 10:25 ?        00:00:03 [khugepaged]
+root          35       2  0 10:25 ?        00:00:00 [kworker/R-kblockd]
+root          36       2  0 10:25 ?        00:00:00 [kworker/R-blkcg_punt_bio]
+root          37       2  0 10:25 ?        00:00:00 [kworker/R-kintegrityd]
+root          39       2  0 10:25 ?        00:00:00 [kworker/R-tpm_dev_wq]
+root          41       2  0 10:25 ?        00:00:00 [kworker/R-ata_sff]
+root          42       2  0 10:25 ?        00:00:00 [kworker/R-edac-poller]
+root          43       2  0 10:25 ?        00:00:00 [kworker/R-devfreq_wq]
+root          44       2  0 10:25 ?        00:00:00 [watchdogd]
+root          46       2  0 10:25 ?        00:00:00 [kworker/R-quota_events_unbound]
+root          48       2  0 10:25 ?        00:00:00 [kworker/R-rpciod]
+root          49       2  0 10:25 ?        00:00:00 [kworker/R-xprtiod]
+root          50       2  0 10:25 ?        00:00:00 [kworker/R-cfg80211]
+root          51       2  0 10:25 ?        00:01:14 [kswapd0]
+root          52       2  0 10:25 ?        00:00:00 [kworker/R-nfsiod]
+root          53       2  0 10:25 ?        00:00:00 [kworker/R-kpcitest]
+root          62       2  0 10:25 ?        00:00:00 [kworker/R-nvme-wq]
+root          63       2  0 10:25 ?        00:00:00 [kworker/R-nvme-reset-wq]
+root          64       2  0 10:25 ?        00:00:00 [kworker/R-nvme-delete-wq]
+root          65       2  0 10:25 ?        00:00:00 [kworker/R-vfio-irqfd-cleanup]
+root          66       2  0 10:25 ?        00:00:00 [kworker/R-uas]
+root          68       2  0 10:25 ?        00:00:00 [kworker/R-sdhci]
+root          69       2  0 10:25 ?        00:00:00 [irq/24-mmc0]
+root          70       2  0 10:25 ?        00:00:00 [hwrng]
+root          71       2  0 10:25 ?        00:00:00 [kworker/R-mmc_complete]
+root          72       2  0 10:25 ?        00:00:00 [kworker/R-tls-strp]
+root          73       2  0 10:25 ?        00:00:00 [kworker/R-mld]
+root          74       2  0 10:25 ?        00:00:00 [kworker/R-ipv6_addrconf]
+root          75       2  0 10:25 ?        00:00:00 [kworker/R-dsa_ordered]
+root          76       2  0 10:25 ?        00:00:00 [krfcommd]
+root          77       2  0 10:25 ?        00:00:00 [kworker/R-kstrp]
+root          78       2  0 10:25 ?        00:00:00 [pxp_dispatch]
+root          86       2  0 10:25 ?        00:00:00 [kworker/R-ci_otg]
+root          87       2  0 10:25 ?        00:00:00 [irq/111-1-0022]
+root          88       2  0 10:25 ?        00:00:00 [2-0050]
+root          89       2  0 10:25 ?        00:00:00 [irq/111-2-0050]
+root          91       2  0 10:25 ?        00:00:00 [kworker/R-remoteproc-cm33]
+root          97       2  0 10:25 ?        00:00:00 [kworker/R-stmmac_wq]
+root          99       2  0 10:25 ?        00:00:00 [card0-crtc0]
+root         101       2  0 10:25 ?        00:00:00 [card0-crtc1]
+root         102       2  0 10:25 ?        00:00:00 [card0-crtc2]
+root         103       2  0 10:25 ?        00:00:00 [kworker/R-sdhci]
+root         104       2  0 10:25 ?        00:00:00 [irq/115-mmc1]
+root         106       2  0 10:25 ?        00:00:00 [card0-crtc3]
+root         107       2  0 10:25 ?        00:00:00 [kworker/R-sdhci]
+root         108       2  0 10:25 ?        00:00:05 [irq/116-mmc2]
+root         109       2  0 10:25 ?        00:00:00 [irq/117-42860000.mmc cd]
+root         111       2  0 10:25 ?        00:00:00 [kworker/R-mmc_complete]
+root         112       2  0 10:25 ?        00:00:00 [spi2]
+root         116       2  0 10:25 ?        00:00:00 [jbd2/mmcblk0p2-8]
+root         117       2  0 10:25 ?        00:00:00 [kworker/R-ext4-rsv-conversion]
+root         146       1  0 10:25 ?        00:00:27 /usr/lib/systemd/systemd-journald
+root         160       2  0 10:25 ?        00:00:00 [kworker/R-MOAL_HANG_WORK_QUEUE]
+root         162       2  0 10:25 ?        00:00:00 [kworker/R-MOAL_WORK_QUEUE]
+root         163       2  0 10:25 ?        00:00:00 [kworker/R-MOAL_EVT_WORK_QUEUE]
+root         164       2  0 10:25 ?        00:00:00 [kworker/R-MOAL_RX_WORK_QUEUE]
+root         165       2  0 10:25 ?        00:00:00 [kworker/R-MOAL_TX_WORK_QUEUE]
+root         166       2  0 10:25 ?        00:00:00 [woal_reassoc_service]
+root         191       1  0 10:25 ?        00:00:00 /usr/lib/systemd/systemd-udevd
+root         217       2  0 10:25 ?        00:00:00 [kworker/R-CSAmlan-2090683423]
+root         218       2  0 10:25 ?        00:00:00 [kworker/R-MCLIST_WORK_QUEUE]
+root         220       2  0 10:25 ?        00:00:00 [kworker/R-CSAuap-2090683424]
+root         221       2  0 10:25 ?        00:00:00 [kworker/R-MCLIST_WORK_QUEUE]
+root         233       2  0 10:25 ?        00:00:00 [kworker/R-CSAwfd-2090683424]
+root         234       2  0 10:25 ?        00:00:00 [kworker/R-MCLIST_WORK_QUEUE]
+root         236       2  0 10:25 ?        00:00:00 [irq/121-wifi_oob_wakeup]
+rpc          255       1  0 10:25 ?        00:00:00 /usr/sbin/rpcbind -w -f
+systemd+     315       1  0 10:25 ?        00:00:00 /usr/lib/systemd/systemd-resolved
+root         319       1  0 10:25 ?        00:00:00 /usr/lib/systemd/systemd-userdbd
+root         444       1  0 10:25 ?        00:00:00 /usr/sbin/ModemManager
+root         445       1  0 10:25 ?        00:00:00 /usr/sbin/atd -f
+avahi        449       1  0 10:25 ?        00:00:00 avahi-daemon: running [imx93-11x11-lpddr4x-frdm.local]
+root         451       1  0 10:25 ?        00:00:00 /usr/sbin/crond -n
+message+     452       1  0 10:25 ?        00:00:04 /usr/bin/dbus-daemon --system --address=systemd: --nofork --nopidfile --systemd-activation --syslog-only
+root         454       1  0 10:25 ?        00:00:00 /usr/bin/firmwared -d /lib/firmware
+root         458       1  0 10:25 ?        00:00:00 /usr/sbin/ofonod -n
+parsec       461       1  0 10:25 ?        00:03:19 /usr/libexec/parsec/parsec --config /etc/parsec/config.toml
+root         462       1  0 10:25 ?        00:00:00 seatd -g seat
+root         465       1  0 10:25 ?        00:00:10 /usr/sbin/syslogd -F
+root         467       1  0 10:25 ?        00:00:01 /usr/lib/systemd/systemd-logind
+avahi        485     449  0 10:25 ?        00:00:00 avahi-daemon: chroot helper
+systemd+     489       1  0 10:25 ?        00:00:00 /usr/lib/systemd/systemd-networkd
+root         506       1  0 10:25 ?        00:00:35 /bin/sh /usr/local/sbin/kinetics-network-guard.sh
+root         542       1  0 10:25 ?        00:00:37 /usr/bin/containerd
+root         550       2  0 10:25 ?        00:00:02 [jbd2/mmcblk1p1-8]
+root         551       2  0 10:25 ?        00:00:00 [kworker/R-ext4-rsv-conversion]
+root         555       1  0 10:25 tty1     00:00:00 /sbin/agetty -o -- \u --noreset --noclear - linux
+root         556       1  0 10:25 ttyLP0   00:00:00 /sbin/agetty -o -- \u --noreset --noclear --keep-baud 115200,57600,38400,9600 - vt220
+teesuppl     592       1  0 10:25 ?        00:00:00 /usr/sbin/tee-supplicant
+root         856       1  0 10:26 ?        00:00:00 wpa_supplicant -B -Dnl80211 -i mlan0 -c /run/ems-wpa-mlan0.conf
+root         942       1  3 10:26 ?        00:20:35 /bin/cloudflared --no-autoupdate --config /etc/cloudflared/config.yml tunnel run
+ntp         2368       1  0 10:36 ?        00:00:06 /usr/sbin/ntpd -u ntp:ntp -n -g
+root       50014       1 40 18:26 ?        00:40:19 /opt/kinetics-gateway/venv/bin/python3 /opt/kinetics-gateway/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
+root       55027       2  0 19:20 ?        00:00:00 [kworker/u8:0-events_unbound]
+root       55757       2  0 19:28 ?        00:00:00 [kworker/1:1H-kblockd]
+root       56318       2  0 19:35 ?        00:00:00 [kworker/0:1-events]
+root       56779       2  0 19:40 ?        00:00:00 [kworker/u9:0-MOAL_RX_WORK_QUEUE]
+root       57219       2  0 19:46 ?        00:00:00 [kworker/u9:2-MOAL_WORK_QUEUE]
+root       57623       2  0 19:50 ?        00:00:00 [kworker/u8:1-events_unbound]
+root       57666       2  0 19:51 ?        00:00:00 [kworker/0:0H-kblockd]
+root       57676       1  0 19:51 ?        00:00:00 /usr/lib/systemd/systemd --user
+root       57677       2  0 19:51 ?        00:00:00 [kworker/1:2-cgroup_free]
+root       57679   57676  0 19:51 ?        00:00:00 (sd-pam)
+root       57686   57676  0 19:51 ?        00:00:00 /usr/bin/dbus-daemon --session --address=systemd: --nofork --nopidfile --systemd-activation --syslog-only
+root       57687       2  0 19:51 ?        00:00:00 [kworker/1:3-cgroup_free]
+root       57688   57676  0 19:51 ?        00:00:00 /usr/bin/pipewire
+root       57690   57676  0 19:51 ?        00:00:00 /usr/bin/wireplumber
+root       57691   57676  0 19:51 ?        00:00:00 /usr/bin/pipewire -c filter-chain.conf
+root       57692   57676  0 19:51 ?        00:00:00 /usr/bin/pipewire-pulse
+root       57721       1  0 19:51 ?        00:00:00 sshd-session: root [priv]
+root       57722   57721  0 19:51 ?        00:00:00 [sshd] <defunct>
+root       57726   57721  0 19:51 ?        00:00:00 sshd-session: root@pts/0
+root       57727   57726  0 19:51 pts/0    00:00:00 -sh
+root       58163       2  0 19:56 ?        00:00:00 [kworker/u9:1-MOAL_RX_WORK_QUEUE]
+root       58212       2  0 19:56 ?        00:00:00 [kworker/0:0-mm_percpu_wq]
+root       58351       2  0 19:57 ?        00:00:00 [kworker/0:1H-mmc_complete]
+root       58352       2  0 19:57 ?        00:00:00 [kworker/1:2H-kblockd]
+root       58371       2  0 19:57 ?        00:00:00 [kworker/u8:2-flush-179:96]
+root       58464       2  0 19:57 ?        00:00:00 [kworker/u8:4]
+root       58561       1  0 19:57 ?        00:00:00 /usr/bin/python3 /root/bess_seven_day_v302_compatible_scheduler.py
+root       58995     319  0 20:01 ?        00:00:00 systemd-userwork: waiting...
+root       59031       2  0 20:02 ?        00:00:00 [kworker/0:2-events]
+root       59067     319  0 20:02 ?        00:00:00 systemd-userwork: waiting...
+root       59110     319  0 20:03 ?        00:00:00 systemd-userwork: waiting...
+root       59254   57727  3 20:04 pts/0    00:00:00 bash /root/build_current_gateway_snapshot.sh
+root       59255   57727  0 20:04 pts/0    00:00:00 tee /root/current_gateway_snapshot_build.log
+root       59431     506  0 20:04 ?        00:00:00 sleep 5
+root       59529   59254  0 20:04 pts/0    00:00:00 ps -ef

@@ -1,0 +1,8 @@
+NAME         FSTYPE FSVER LABEL    UUID                                 FSAVAIL FSUSE% MOUNTPOINTS
+mmcblk0                                                                                
+|-mmcblk0p1  vfat         boot     D444-9659                             220.1M    14% /run/media/boot-mmcblk0p1
+`-mmcblk0p2  ext4         root     a10be95f-d8bf-4c02-b61e-b782acec92ce    1.3G    79% /
+mmcblk0boot0                                                                           
+mmcblk0boot1                                                                           
+mmcblk1                                                                                
+`-mmcblk1p1  ext4         EMS_LOGS 7f3648bd-f229-4e3a-bb1a-f81429ce748f   95.4G    11% /mnt/ems-logs

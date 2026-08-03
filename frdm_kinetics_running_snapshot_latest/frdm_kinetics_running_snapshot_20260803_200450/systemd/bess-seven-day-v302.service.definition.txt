@@ -1,0 +1,45 @@
+# /etc/systemd/system/bess-seven-day-v302.service
+[Unit]
+Description=BESS Seven-Day V3.0.2 Reviewed Lean Sequential Scheduler
+Wants=network-online.target kinetics-gateway.service
+After=network-online.target kinetics-gateway.service
+RequiresMountsFor=/mnt/ems-logs
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/bess-seven-day-v302.env
+Environment=PYTHONUNBUFFERED=1
+Environment=MALLOC_ARENA_MAX=2
+WorkingDirectory=/opt/kinetics-gateway/backend
+ExecStartPre=/usr/bin/test -x /root/bess_seven_day_v302_compatible_scheduler.py
+ExecStart=/usr/bin/python3 /root/bess_seven_day_v302_compatible_scheduler.py
+ExecStopPost=-/usr/bin/python3 /root/bess_seven_day_v302_compatible_scheduler.py --safe-stop-now
+Restart=no
+KillSignal=SIGTERM
+KillMode=control-group
+TimeoutStopSec=900
+SendSIGKILL=yes
+OOMScoreAdjust=500
+MemoryAccounting=yes
+MemoryHigh=128M
+MemoryMax=256M
+CPUAccounting=yes
+CPUWeight=50
+TasksMax=32
+Nice=5
+
+[Install]
+WantedBy=multi-user.target
+
+# /etc/systemd/system/bess-seven-day-v302.service.d/20-time-sync-guard.conf
+[Unit]
+Wants=network-online.target ntpd.service kinetics-gateway.service
+After=network-online.target ntpd.service kinetics-gateway.service
+StartLimitIntervalSec=0
+
+[Service]
+ExecStartPre=/usr/local/sbin/bess-wait-for-valid-time.sh
+TimeoutStartSec=1900
+Restart=on-failure
+RestartSec=60

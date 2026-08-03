@@ -1,0 +1,121 @@
+{
+  "_note": "Official three-phase three-wire PCS protocol write metadata. Only the five whitelisted staged-control registers are made writable. The runtime controller still enforces control_enabled mode, write gates, confirmation phrase, stage order, BMS limits, 1100-1500 V checks, and the 240 kW absolute cap.",
+  "points": {
+    "0X1400": {
+      "key": "remote_on_off_command",
+      "name_en": "Remote start/stop command",
+      "access": "R/W",
+      "range_text": "[0~65535]",
+      "write_function": 6,
+      "enum": {
+        "65280": "Start",
+        "255": "Stop"
+      },
+      "hardware_validation": "protocol_confirmed_write_not_yet_hardware_validated"
+    },
+    "0X1402": {
+      "key": "remote_local_mode",
+      "name_en": "Remote/local mode",
+      "access": "R/W",
+      "range_text": "[0~65535]",
+      "write_function": 6,
+      "enum": {
+        "65280": "Local",
+        "255": "Remote"
+      },
+      "hardware_validation": "protocol_confirmed_write_not_yet_hardware_validated"
+    },
+    "0X1406": {
+      "key": "product_run_mode",
+      "name_en": "Product operating mode",
+      "access": "R/W",
+      "range_text": "[0~5]",
+      "write_function": 6,
+      "enum": {
+        "0": "Independent inverter",
+        "1": "PQ mode",
+        "2": "Aging mode",
+        "3": "VSG mode",
+        "4": "AC voltage-source mode",
+        "5": "Test mode"
+      },
+      "hardware_validation": "protocol_confirmed_write_not_yet_hardware_validated"
+    },
+    "0X1407": {
+      "key": "pq_work_mode",
+      "name_en": "PQ work mode",
+      "access": "R/W",
+      "range_text": "[0~10]",
+      "write_function": 6,
+      "enum": {
+        "0": "Constant power",
+        "1": "Constant DC voltage",
+        "2": "Constant DC current",
+        "3": "Constant grid voltage",
+        "4": "Constant AC current",
+        "5": "Smart mode",
+        "6": "Scheduled dispatch",
+        "7": "Island mode",
+        "8": "Frequency regulation",
+        "9": "Low-voltage ride-through",
+        "10": "High-voltage ride-through"
+      },
+      "hardware_validation": "protocol_confirmed_write_not_yet_hardware_validated"
+    },
+    "0X1409": {
+      "key": "active_power_setpoint",
+      "name_en": "Active power setpoint",
+      "access": "R/W",
+      "range_text": "[-240~240]",
+      "write_function": 6,
+      "scale": 0.1,
+      "unit": "kW",
+      "notes": "Positive means discharge; negative means charge. Project safety cap is +/-240 kW.",
+      "hardware_validation": "protocol_confirmed_write_not_yet_hardware_validated"
+    }
+  },
+  "control_sequence": {
+    "enabled": false,
+    "allow_full_automatic_sequence": false,
+    "confirmation_phrase": "EXECUTE_STAGE_WRITE",
+    "pairs": [
+      {
+        "pair_id": "pair_1",
+        "rack_id": 1,
+        "pcs_asset_id": "pcs_1",
+        "enabled": true
+      },
+      {
+        "pair_id": "pair_2",
+        "rack_id": 2,
+        "pcs_asset_id": "pcs_2",
+        "enabled": false
+      },
+      {
+        "pair_id": "pair_3",
+        "rack_id": 3,
+        "pcs_asset_id": "pcs_3",
+        "enabled": false
+      },
+      {
+        "pair_id": "pair_4",
+        "rack_id": 4,
+        "pcs_asset_id": "pcs_4",
+        "enabled": false
+      }
+    ],
+    "bms_rack_voltage_min_v": 1100.0,
+    "bms_rack_voltage_max_v": 1500.0,
+    "pcs_dc_bus_voltage_min_v": 1100.0,
+    "pcs_dc_bus_voltage_max_v": 1500.0,
+    "max_abs_power_kw": 240.0,
+    "minimum_bms_current_limit_a": 0.1,
+    "enforce_dynamic_bms_power_limit": true,
+    "valid_samples_required": 3,
+    "sample_interval_seconds": 0.5,
+    "contactor_close_timeout_seconds": 10.0,
+    "pcs_start_timeout_seconds": 10.0,
+    "require_positive_and_negative_contactors": true,
+    "require_precharge_success": true
+  }
+}

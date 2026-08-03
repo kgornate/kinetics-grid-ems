@@ -1,0 +1,25 @@
+● bess-seven-day-v302.service - BESS Seven-Day V3.0.2 Reviewed Lean Sequential Scheduler
+     Loaded: loaded (/etc/systemd/system/bess-seven-day-v302.service; enabled; preset: disabled)
+    Drop-In: /etc/systemd/system/bess-seven-day-v302.service.d
+             └─20-time-sync-guard.conf
+     Active: active (running) since Mon 2026-08-03 19:57:58 IST; 6min ago
+ Invocation: cee32477af0448a6a34191dcf079abf0
+    Process: 58535 ExecStartPre=/usr/bin/test -x /root/bess_seven_day_v302_compatible_scheduler.py (code=exited, status=0/SUCCESS)
+    Process: 58536 ExecStartPre=/usr/local/sbin/bess-wait-for-valid-time.sh (code=exited, status=0/SUCCESS)
+   Main PID: 58561 (python3)
+      Tasks: 1 (limit: 32)
+     Memory: 19.2M (high: 128M, max: 256M, available: 108.7M, peak: 21.2M)
+        CPU: 1.131s
+     CGroup: /system.slice/bess-seven-day-v302.service
+             └─58561 /usr/bin/python3 /root/bess_seven_day_v302_compatible_scheduler.py
+
+Aug 03 19:58:00 imx93-11x11-lpddr4x-frdm python3[58561]: [2026-08-03 19:58:00 IST] Gateway authentication successful as internal
+Aug 03 19:58:00 imx93-11x11-lpddr4x-frdm python3[58561]: [2026-08-03 19:58:00 IST] Gateway API recovered for scheduler startup; health=ok
+Aug 03 19:58:01 imx93-11x11-lpddr4x-frdm python3[58561]: [2026-08-03 19:58:01 IST] Backend validated: controller=field_validated_bms_pcs_sequence_controller, version=3.0.2-reliable-multi-pair, pairs=['pair_1', 'pair_2', 'pair_3', 'pair_4']
+Aug 03 19:58:01 imx93-11x11-lpddr4x-frdm python3[58561]: [2026-08-03 19:58:01 IST] P1: SOC=? PRE=0 CONTACTORS=False/False PCS=1 SET=0.0 kW ACT=0.0 kW CHG_LIMIT=0.0 A DSG_LIMIT=0.0 A FAULT=False
+Aug 03 19:58:04 imx93-11x11-lpddr4x-frdm python3[58561]: [2026-08-03 19:58:04 IST] P2: SOC=? PRE=0 CONTACTORS=False/False PCS=1 SET=0.0 kW ACT=0.0 kW CHG_LIMIT=0.0 A DSG_LIMIT=0.0 A FAULT=False
+Aug 03 19:58:07 imx93-11x11-lpddr4x-frdm python3[58561]: [2026-08-03 19:58:07 IST] P3: SOC=? PRE=0 CONTACTORS=False/False PCS=1 SET=0.0 kW ACT=0.0 kW CHG_LIMIT=0.0 A DSG_LIMIT=0.0 A FAULT=False
+Aug 03 19:58:10 imx93-11x11-lpddr4x-frdm python3[58561]: [2026-08-03 19:58:10 IST] P4: SOC=? PRE=0 CONTACTORS=False/False PCS=1 SET=0.0 kW ACT=0.0 kW CHG_LIMIT=0.0 A DSG_LIMIT=0.0 A FAULT=False
+Aug 03 19:58:10 imx93-11x11-lpddr4x-frdm python3[58561]: [2026-08-03 19:58:10 IST] Startup reconciliation: all four pairs are safely stopped
+Aug 03 19:58:10 imx93-11x11-lpddr4x-frdm python3[58561]: [2026-08-03 19:58:10 IST] Lean sequential scheduler armed; build=v302-lean-sequential-20260803-r3-reviewed
+Aug 03 19:58:10 imx93-11x11-lpddr4x-frdm python3[58561]: [2026-08-03 19:58:10 IST] Waiting for charge preparation at 2026-08-04T09:20:00+05:30

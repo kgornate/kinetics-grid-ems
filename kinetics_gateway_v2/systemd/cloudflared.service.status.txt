@@ -1,0 +1,23 @@
+● cloudflared.service - Cloudflare Tunnel - Northbound EMS Gateway
+     Loaded: loaded (/etc/systemd/system/cloudflared.service; enabled; preset: disabled)
+    Drop-In: /etc/systemd/system/cloudflared.service.d
+             └─override.conf
+     Active: active (running) since Sun 2026-08-02 01:53:52 IST; 1 day 18h ago
+ Invocation: 91aab3a450fc4e248f1e3e70fcb6b0d0
+   Main PID: 942 (cloudflared)
+      Tasks: 11 (limit: 2062)
+     Memory: 51.8M (peak: 62.1M)
+        CPU: 20min 35.042s
+     CGroup: /system.slice/cloudflared.service
+             └─942 /bin/cloudflared --no-autoupdate --config /etc/cloudflared/config.yml tunnel run
+
+Aug 03 18:59:23 imx93-11x11-lpddr4x-frdm ems_v3_cloudflared_start.sh[942]: 2026-08-03T13:29:23Z INF Tunnel connection curve preferences: [X25519MLKEM768 CurveID(65074) CurveP256] connIndex=2 event=0 ip=198.41.200.193
+Aug 03 18:59:23 imx93-11x11-lpddr4x-frdm ems_v3_cloudflared_start.sh[942]: 2026-08-03T13:29:23Z INF Registered tunnel connection connIndex=1 connection=913b8e9c-dfeb-44c6-b301-69fb59c7dcf1 event=0 ip=198.41.200.63 location=bom12 protocol=quic
+Aug 03 18:59:23 imx93-11x11-lpddr4x-frdm ems_v3_cloudflared_start.sh[942]: 2026-08-03T13:29:23Z INF Registered tunnel connection connIndex=2 connection=2d36c358-e441-474e-bb2a-01bace55c4c0 event=0 ip=198.41.200.193 location=bom09 protocol=quic
+Aug 03 19:13:43 imx93-11x11-lpddr4x-frdm systemd[1]: /etc/systemd/system/cloudflared.service.d/override.conf:8: Unknown key 'StartLimitIntervalSec' in section [Service], ignoring.
+Aug 03 19:13:44 imx93-11x11-lpddr4x-frdm systemd[1]: /etc/systemd/system/cloudflared.service.d/override.conf:8: Unknown key 'StartLimitIntervalSec' in section [Service], ignoring.
+Aug 03 19:13:45 imx93-11x11-lpddr4x-frdm systemd[1]: /etc/systemd/system/cloudflared.service.d/override.conf:8: Unknown key 'StartLimitIntervalSec' in section [Service], ignoring.
+Aug 03 19:57:33 imx93-11x11-lpddr4x-frdm systemd[1]: /etc/systemd/system/cloudflared.service.d/override.conf:8: Unknown key 'StartLimitIntervalSec' in section [Service], ignoring.
+Aug 03 19:57:35 imx93-11x11-lpddr4x-frdm systemd[1]: /etc/systemd/system/cloudflared.service.d/override.conf:8: Unknown key 'StartLimitIntervalSec' in section [Service], ignoring.
+Aug 03 19:57:36 imx93-11x11-lpddr4x-frdm systemd[1]: /etc/systemd/system/cloudflared.service.d/override.conf:8: Unknown key 'StartLimitIntervalSec' in section [Service], ignoring.
+Aug 03 19:57:52 imx93-11x11-lpddr4x-frdm systemd[1]: /etc/systemd/system/cloudflared.service.d/override.conf:8: Unknown key 'StartLimitIntervalSec' in section [Service], ignoring.

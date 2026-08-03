@@ -1,0 +1,23 @@
+{
+  "active_pairs": [],
+  "backend_profile": "kinetics_gateway_post_v3",
+  "completed": false,
+  "completed_sessions": [],
+  "current_date": "2026-08-01",
+  "current_session": "charge",
+  "last_update": "2026-07-31T23:35:35.576760+05:30",
+  "phase": "waiting_charge_preparation",
+  "prepared_pairs": [],
+  "schedule_dates": [
+    "2026-08-01",
+    "2026-08-02",
+    "2026-08-03",
+    "2026-08-04",
+    "2026-08-05",
+    "2026-08-06",
+    "2026-08-07"
+  ],
+  "version": 4,
+  "window_start": "2026-08-01T11:15:00+05:30",
+  "window_stop": "2026-08-01T12:45:00+05:30"
+}

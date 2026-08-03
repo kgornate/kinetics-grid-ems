@@ -1,0 +1,9 @@
+bess-all-pairs-scheduler.service            disabled        disabled
+bess-seven-day-backend-v3.service           disabled        disabled
+bess-seven-day-v302.service                 enabled         disabled
+bess-stop-after-90m.service                 static          -
+cloudflared.service                         enabled         disabled
+ems-v3-wifi.service                         enabled         disabled
+kinetics-gateway.service                    enabled         disabled
+kinetics-network-guard.service              enabled         disabled
+kinetics-network.service                    enabled         disabled

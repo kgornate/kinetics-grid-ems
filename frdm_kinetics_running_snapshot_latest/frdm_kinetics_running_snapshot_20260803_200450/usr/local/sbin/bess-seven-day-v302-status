@@ -1,0 +1,23 @@
+#!/bin/sh
+set -u
+echo "===== TIME ====="
+date
+echo
+echo "===== SERVICES ====="
+systemctl status kinetics-gateway.service bess-seven-day-v302.service --no-pager -l || true
+echo
+echo "===== RESOURCE USE ====="
+systemctl show bess-seven-day-v302.service -p MainPID -p MemoryCurrent -p MemoryPeak -p CPUUsageNSec -p ActiveState -p SubState || true
+PID=$(systemctl show -p MainPID --value bess-seven-day-v302.service 2>/dev/null || echo 0)
+if [ "${PID:-0}" -gt 0 ] 2>/dev/null; then
+    grep -E '^(VmRSS|VmPeak|Threads):' "/proc/$PID/status" 2>/dev/null || true
+fi
+echo
+echo "===== CONFIG ====="
+grep -E '^(SCHEDULE_DATES|CHARGE_START_TIME|CHARGE_STOP_TIME|CHARGE_KW|DISCHARGE_START_TIME|DISCHARGE_STOP_TIME|DISCHARGE_KW|CHARGE_STOP_SOC|MIN_DISCHARGE_SOC|PREPARE_LEAD_MINUTES|MONITOR_CYCLE_SECONDS|SOC_REFRESH_SECONDS|SOC_MAX_STALE_SECONDS|SOC_ERROR_LIMIT|PAIR_STATUS_POLL_SECONDS|PAIR_COMMAND_SPACING_SECONDS|MIN_START_REMAINING_SECONDS|GATEWAY_ACTIVE_OUTAGE_LIMIT_SECONDS|SETPOINT_TOLERANCE_KW|POWER_TRACK_MAX_FRACTION)=' /etc/bess-seven-day-v302.env || true
+echo
+echo "===== STATE ====="
+python3 -m json.tool /mnt/ems-logs/scheduler/bess-seven-day-v302/state.json 2>/dev/null || true
+echo
+echo "===== RECENT LOGS ====="
+journalctl -u bess-seven-day-v302.service -n 160 --no-pager -o cat || true

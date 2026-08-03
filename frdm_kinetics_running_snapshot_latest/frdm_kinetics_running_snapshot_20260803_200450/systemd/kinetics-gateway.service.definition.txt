@@ -1,0 +1,54 @@
+# /etc/systemd/system/kinetics-gateway.service
+[Unit]
+Description=Kinetics EMS Gateway V2
+After=network-online.target kinetics-network.service
+Wants=network-online.target kinetics-network.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/kinetics-gateway/backend
+EnvironmentFile=-/etc/kinetics-gateway/kinetics-gateway.env
+Environment=KINETICS_CONFIG=/etc/kinetics-gateway/config.json
+ExecStart=/opt/kinetics-gateway/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
+Restart=always
+RestartSec=5
+TimeoutStopSec=15
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+UMask=0077
+ReadWritePaths=/mnt/ems-logs/kinetics-gateway /opt/kinetics-gateway/backend/data
+
+[Install]
+WantedBy=multi-user.target
+
+# /etc/systemd/system/kinetics-gateway.service.d/20-sd-storage.conf
+[Unit]
+Wants=mnt-ems\x2dlogs.mount
+After=mnt-ems\x2dlogs.mount
+
+# /etc/systemd/system/kinetics-gateway.service.d/network-guard.conf
+[Unit]
+Requires=kinetics-network.service kinetics-network-guard.service
+After=kinetics-network.service kinetics-network-guard.service
+
+# /etc/systemd/system/kinetics-gateway.service.d/override.conf
+[Unit]
+Requires=kinetics-network.service
+After=kinetics-network.service local-fs.target
+Wants=cloudflared.service
+
+[Service]
+WorkingDirectory=/opt/kinetics-gateway/backend
+EnvironmentFile=/etc/kinetics-gateway/kinetics-gateway.env
+
+ExecStartPre=/bin/mkdir -p /opt/kinetics-gateway/backend/data
+ExecStartPre=/bin/mkdir -p /mnt/ems-logs/kinetics-gateway
+ExecStartPre=/bin/mkdir -p /var/log/kinetics-gateway
+
+Restart=always
+RestartSec=5
+TimeoutStartSec=90
+StartLimitIntervalSec=0

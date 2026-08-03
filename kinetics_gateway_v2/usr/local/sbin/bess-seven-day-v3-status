@@ -1,0 +1,30 @@
+#!/bin/sh
+set -u
+
+echo "===== TIME ====="
+date
+
+echo
+echo "===== NTP ====="
+timedatectl show -p NTPSynchronized -p Timezone 2>/dev/null || true
+
+echo
+echo "===== SERVICE ====="
+systemctl status bess-seven-day-backend-v3.service --no-pager -l || true
+
+echo
+echo "===== STATE ====="
+STATE=/mnt/ems-logs/scheduler/bess-seven-day-backend-v3/state.json
+if [ -f "$STATE" ]; then
+    python3 -m json.tool "$STATE"
+else
+    echo "State file has not been created yet."
+fi
+
+echo
+echo "===== LATEST LOGS ====="
+journalctl -u bess-seven-day-backend-v3.service -n 100 --no-pager -l || true
+
+echo
+echo "===== FILESYSTEMS ====="
+df -h / /mnt/ems-logs

@@ -1,0 +1,23 @@
+● kinetics-gateway.service - Kinetics EMS Gateway V2
+     Loaded: loaded (/etc/systemd/system/kinetics-gateway.service; enabled; preset: disabled)
+    Drop-In: /etc/systemd/system/kinetics-gateway.service.d
+             └─20-sd-storage.conf, network-guard.conf, override.conf
+     Active: active (running) since Mon 2026-08-03 18:26:08 IST; 1h 38min ago
+ Invocation: e492ae41e1d94ec0b1db10e6141c815b
+   Main PID: 50014 (uvicorn)
+      Tasks: 13 (limit: 2062)
+     Memory: 1.2G (peak: 1.3G)
+        CPU: 40min 17.899s
+     CGroup: /system.slice/kinetics-gateway.service
+             └─50014 /opt/kinetics-gateway/venv/bin/python3 /opt/kinetics-gateway/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
+
+Aug 03 19:58:01 imx93-11x11-lpddr4x-frdm uvicorn[50014]: 2026-08-03 19:58:01,008 INFO kinetics.http GET /api/control-sequence/capabilities status=200 elapsed_ms=17.9
+Aug 03 19:58:01 imx93-11x11-lpddr4x-frdm uvicorn[50014]: INFO:     127.0.0.1:48456 - "GET /api/control-sequence/capabilities HTTP/1.1" 200 OK
+Aug 03 19:58:01 imx93-11x11-lpddr4x-frdm uvicorn[50014]: 2026-08-03 19:58:01,169 INFO kinetics.http GET /api/control-sequence/pair_1/status status=200 elapsed_ms=146.6
+Aug 03 19:58:01 imx93-11x11-lpddr4x-frdm uvicorn[50014]: INFO:     127.0.0.1:48472 - "GET /api/control-sequence/pair_1/status?fresh=false HTTP/1.1" 200 OK
+Aug 03 19:58:04 imx93-11x11-lpddr4x-frdm uvicorn[50014]: 2026-08-03 19:58:04,284 INFO kinetics.http GET /api/control-sequence/pair_2/status status=200 elapsed_ms=89.5
+Aug 03 19:58:04 imx93-11x11-lpddr4x-frdm uvicorn[50014]: INFO:     127.0.0.1:48484 - "GET /api/control-sequence/pair_2/status?fresh=false HTTP/1.1" 200 OK
+Aug 03 19:58:07 imx93-11x11-lpddr4x-frdm uvicorn[50014]: 2026-08-03 19:58:07,406 INFO kinetics.http GET /api/control-sequence/pair_3/status status=200 elapsed_ms=109.0
+Aug 03 19:58:07 imx93-11x11-lpddr4x-frdm uvicorn[50014]: INFO:     127.0.0.1:48486 - "GET /api/control-sequence/pair_3/status?fresh=false HTTP/1.1" 200 OK
+Aug 03 19:58:10 imx93-11x11-lpddr4x-frdm uvicorn[50014]: 2026-08-03 19:58:10,627 INFO kinetics.http GET /api/control-sequence/pair_4/status status=200 elapsed_ms=191.2
+Aug 03 19:58:10 imx93-11x11-lpddr4x-frdm uvicorn[50014]: INFO:     127.0.0.1:54030 - "GET /api/control-sequence/pair_4/status?fresh=false HTTP/1.1" 200 OK

@@ -1,0 +1,7 @@
+ID=fsl-imx-xwayland
+NAME="NXP i.MX Release Distro"
+VERSION="6.18-whinlatter (whinlatter)"
+VERSION_ID=6.18-whinlatter
+VERSION_CODENAME="whinlatter"
+PRETTY_NAME="NXP i.MX Release Distro 6.18-whinlatter (whinlatter)"
+CPE_NAME="cpe:/o:openembedded:fsl-imx-xwayland:6.18-whinlatter"
