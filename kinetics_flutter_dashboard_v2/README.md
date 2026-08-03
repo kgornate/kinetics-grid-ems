@@ -1,4 +1,4 @@
-# Kinetics Gateway Flutter Dashboard V3.0.0
+# Kinetics Gateway Flutter Dashboard V3.0.2
 
 Windows/Android monitoring and internal commissioning application for the Kinetics Gateway backend.
 
@@ -14,7 +14,7 @@ Windows/Android monitoring and internal commissioning application for the Kineti
 
 ## BESS Control screen
 
-Backend requirement: Kinetics EMS Gateway V3.0.0.
+Backend requirement: Kinetics EMS Gateway V3.0.2.
 
 The internal Control screen provides:
 
@@ -69,7 +69,7 @@ build\windows\x64\runner\Release\
 
 ## Control validation checklist
 
-1. Deploy Gateway V3.0.0 and verify `/api/control-sequence/capabilities` and `/api/control-sequence/status/all`.
+1. Deploy Gateway V3.0.2 and verify `/api/control-sequence/capabilities` and `/api/control-sequence/status/all/compact`.
 2. Sign in as `internal`.
 3. Open **Control**.
 4. Confirm write gates, pair mapping, E-stop, faults and communication are healthy.

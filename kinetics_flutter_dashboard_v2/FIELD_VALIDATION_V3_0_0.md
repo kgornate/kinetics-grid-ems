@@ -1,4 +1,4 @@
-# Flutter V3.0.0 hardware validation
+# Flutter V3.0.2 hardware validation
 
 1. Log in as Internal and verify all four pair cards appear.
 2. Verify each card updates while another pair is starting or carrying power.

@@ -105,13 +105,13 @@ class _ControlSequenceScreenState extends State<ControlSequenceScreen> {
             ),
             const SizedBox(height: 20),
             _SequenceSteps(status: status),
-            if (controller.lastEventMessage != null) ...[
+            if (controller.controlEventFor(controller.selectedControlPair) != null) ...[
               const SizedBox(height: 14),
               Card(
                 child: ListTile(
                   leading: const Icon(Icons.check_circle_outline),
                   title: const Text('Latest control event'),
-                  subtitle: Text(controller.lastEventMessage!),
+                  subtitle: Text(controller.controlEventFor(controller.selectedControlPair)!),
                 ),
               ),
             ],
@@ -126,14 +126,14 @@ class _ControlSequenceScreenState extends State<ControlSequenceScreen> {
                 ),
               ),
             ],
-            if (controller.lastControlResponse.isNotEmpty) ...[
+            if (controller.controlResponseFor(controller.selectedControlPair).isNotEmpty) ...[
               const SizedBox(height: 14),
               Card(
                 child: ExpansionTile(
                   title: const Text('Latest gateway response'),
                   subtitle: Text(
-                    controller.lastControlResponse['stage']?.toString() ??
-                        controller.lastControlResponse['run_id']?.toString() ??
+                    controller.controlResponseFor(controller.selectedControlPair)['stage']?.toString() ??
+                        controller.controlResponseFor(controller.selectedControlPair)['run_id']?.toString() ??
                         'Response details',
                   ),
                   children: [
@@ -141,7 +141,7 @@ class _ControlSequenceScreenState extends State<ControlSequenceScreen> {
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                       child: SelectableText(
                         const JsonEncoder.withIndent('  ')
-                            .convert(controller.lastControlResponse),
+                            .convert(controller.controlResponseFor(controller.selectedControlPair)),
                         style: const TextStyle(fontFamily: 'monospace'),
                       ),
                     ),
@@ -261,7 +261,7 @@ class _ControlSequenceScreenState extends State<ControlSequenceScreen> {
   Future<void> _safeStop() async {
     final confirmed = await _confirm(
       'Complete safe shutdown?',
-      'The gateway will quiesce this pair’s runtime monitor, return the PCS to 0 kW, stop it, write BAU 0x3001 = 2 on this pair’s BMS port and verify both main contactors open.',
+      'The gateway will quiesce this pair’s runtime monitor, return the PCS to 0 kW, stop it, write BAU 0x3001 = 0 on this pair’s BMS port and verify both main contactors open.',
       dangerous: true,
     );
     if (!confirmed) return;
@@ -512,8 +512,14 @@ class _SystemStateCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final state = status?.systemState ?? 'loading';
     final run = status?.runStatus ?? 'idle';
+    final runtimeStage = status?.runtimeStage ?? 'idle';
+    final state = status?.automaticRunning == true &&
+            (status?.systemState == 'stopped_safe' ||
+                status?.systemState == 'loading' ||
+                status?.systemState == 'unknown')
+        ? runtimeStage
+        : status?.systemState ?? 'loading';
     final good = status != null && !status!.hardBlocked;
     return Card(
       child: Padding(
@@ -676,8 +682,13 @@ class _CommandPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final enabled = status?.controlEnabled == true && !controller.controlBusy;
-    final automaticEnabled = enabled && capabilities?.fullAutomaticAllowed == true;
+    final requestBusy = controller.controlBusy;
+    final automaticActive =
+        status?.automaticRunning == true || controller.selectedAutomaticTracking;
+    final enabled = status?.controlEnabled == true && !requestBusy;
+    final startupCommandEnabled = enabled && !automaticActive;
+    final automaticEnabled = startupCommandEnabled &&
+        capabilities?.fullAutomaticAllowed == true;
     final pairs = capabilities?.pairs.where((pair) => pair.enabled).toList() ??
         const <ControlPairSummary>[];
     return Card(
@@ -714,7 +725,7 @@ class _CommandPanel extends StatelessWidget {
                                   '${pair.pairId}: Rack ${pair.rackId} / ${pair.pcsAssetId}'),
                             ))
                         .toList(),
-                    onChanged: enabled
+                    onChanged: pairs.isNotEmpty
                         ? (value) {
                             if (value != null) controller.selectControlPair(value);
                           }
@@ -800,12 +811,12 @@ class _CommandPanel extends StatelessWidget {
                   label: const Text('Start automatic ramp'),
                 ),
                 FilledButton.tonalIcon(
-                  onPressed: enabled ? onNextStep : null,
+                  onPressed: startupCommandEnabled ? onNextStep : null,
                   icon: const Icon(Icons.skip_next),
                   label: const Text('Execute next step'),
                 ),
                 FilledButton.tonalIcon(
-                  onPressed: enabled && status?.readyForPower == true
+                  onPressed: startupCommandEnabled && status?.readyForPower == true
                       ? onSetPower
                       : null,
                   icon: const Icon(Icons.speed),
@@ -831,9 +842,7 @@ class _CommandPanel extends StatelessWidget {
                   label: const Text('Safe stop all pairs'),
                 ),
                 OutlinedButton.icon(
-                  onPressed: enabled && status?.automaticRunning == true
-                      ? onAbort
-                      : null,
+                  onPressed: enabled && automaticActive ? onAbort : null,
                   icon: const Icon(Icons.cancel),
                   label: const Text('Abort sequence'),
                 ),

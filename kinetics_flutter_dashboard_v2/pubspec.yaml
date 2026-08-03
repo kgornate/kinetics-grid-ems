@@ -1,7 +1,7 @@
 name: kinetics_gateway_dashboard
-description: Kinetics Gateway V2 read-only BMS and PCS monitoring dashboard.
+description: Kinetics Gateway V3.0.2 reliable multi-pair BMS and PCS control dashboard.
 publish_to: 'none'
-version: 3.0.0+8
+version: 3.0.2+10
 
 environment:
   sdk: '>=3.3.0 <4.0.0'

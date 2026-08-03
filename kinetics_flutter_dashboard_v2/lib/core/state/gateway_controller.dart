@@ -20,6 +20,7 @@ class GatewayController extends ChangeNotifier {
   bool wsConnected = false;
   String? errorMessage;
   String? lastEventMessage;
+  final Map<String, String> lastEventMessagesByPair = <String, String>{};
 
   Map<String, dynamic> health = <String, dynamic>{};
   Map<String, dynamic> storage = <String, dynamic>{};
@@ -34,7 +35,13 @@ class GatewayController extends ChangeNotifier {
       <String, ControlSequenceStatus>{};
   Map<String, dynamic> controlPlantSummary = <String, dynamic>{};
   Map<String, dynamic> lastControlResponse = <String, dynamic>{};
+  final Map<String, Map<String, dynamic>> lastControlResponsesByPair =
+      <String, Map<String, dynamic>>{};
   final Set<String> _controlBusyPairs = <String>{};
+  final Set<String> _automaticTrackingPairs = <String>{};
+  final Map<String, Timer> _automaticTrackers = <String, Timer>{};
+  final Map<String, DateTime> _pairStatusReceivedAt = <String, DateTime>{};
+  final Map<String, DateTime> _pairPayloadTimestamps = <String, DateTime>{};
   String selectedControlPair = 'pair_1';
 
   WebSocket? _telemetrySocket;
@@ -99,7 +106,7 @@ class GatewayController extends ChangeNotifier {
     await connectTelemetry();
     _diagnosticTimer?.cancel();
     _diagnosticTimer = Timer.periodic(
-      const Duration(seconds: 8),
+      const Duration(seconds: 30),
       (_) {
         refreshDiagnostics(silent: true);
       },
@@ -297,7 +304,7 @@ class GatewayController extends ChangeNotifier {
     final generation = _controlStatusGeneration;
     try {
       final payload = await api.getJson(
-        '/api/control-sequence/status/all',
+        '/api/control-sequence/status/all/compact',
         timeout: const Duration(seconds: 10),
       );
       if (_disposed || generation != _controlStatusGeneration) return;
@@ -325,9 +332,22 @@ class GatewayController extends ChangeNotifier {
         }
       }
 
-      controlStatuses
-        ..clear()
-        ..addAll(parsed);
+      for (final entry in parsed.entries) {
+        final currentPayloadTime = _pairPayloadTimestamps[entry.key];
+        final incomingTime = entry.value.timestamp == null
+            ? null
+            : DateTime.tryParse(entry.value.timestamp!);
+        if (currentPayloadTime != null &&
+            incomingTime != null &&
+            incomingTime.toUtc().isBefore(currentPayloadTime)) {
+          continue;
+        }
+        controlStatuses[entry.key] = entry.value;
+        if (incomingTime != null) {
+          _pairPayloadTimestamps[entry.key] = incomingTime.toUtc();
+        }
+        _pairStatusReceivedAt[entry.key] = DateTime.now().toUtc();
+      }
       controlPlantSummary = payload['summary'] is Map
           ? Map<String, dynamic>.from(payload['summary'] as Map)
           : <String, dynamic>{};
@@ -360,8 +380,15 @@ class GatewayController extends ChangeNotifier {
       if (_disposed || pairId != selectedControlPair) return;
       final status = ControlSequenceStatus.fromJson(payload);
       controlStatuses[pairId] = status;
+      final payloadTime = status.timestamp == null
+          ? null
+          : DateTime.tryParse(status.timestamp!);
+      if (payloadTime != null) {
+        _pairPayloadTimestamps[pairId] = payloadTime.toUtc();
+      }
+      _pairStatusReceivedAt[pairId] = DateTime.now().toUtc();
       controlStatus = status;
-      controlStatusReceivedAt = DateTime.now().toUtc();
+      controlStatusReceivedAt = _pairStatusReceivedAt[pairId];
       restConnected = true;
     } catch (error) {
       if (!silent) errorMessage = error.toString();
@@ -375,7 +402,7 @@ class GatewayController extends ChangeNotifier {
     if (pairId == selectedControlPair) return;
     selectedControlPair = pairId;
     controlStatus = controlStatuses[pairId];
-    controlStatusReceivedAt = controlStatus == null ? null : DateTime.now().toUtc();
+    controlStatusReceivedAt = _pairStatusReceivedAt[pairId];
     _controlStatusGeneration += 1;
     notifyListeners();
     unawaited(refreshControlStatus(silent: true));
@@ -387,7 +414,7 @@ class GatewayController extends ChangeNotifier {
     _controlTimer?.cancel();
     unawaited(refreshControlStatus(silent: true));
     _controlTimer = Timer.periodic(
-      const Duration(seconds: 2),
+      const Duration(seconds: 5),
       (_) {
         if (_controlPollingEnabled) {
           unawaited(refreshControlStatus(silent: true));
@@ -412,7 +439,16 @@ class GatewayController extends ChangeNotifier {
 
   bool get anyControlBusy => _controlBusyPairs.isNotEmpty;
 
-  bool isControlPairBusy(String pairId) => _controlBusyPairs.contains(pairId);
+  bool get selectedAutomaticTracking =>
+      _automaticTrackingPairs.contains(selectedControlPair);
+
+  bool isControlPairBusy(String pairId) =>
+      _controlBusyPairs.contains(pairId) || _automaticTrackingPairs.contains(pairId);
+
+  Map<String, dynamic> controlResponseFor(String pairId) =>
+      lastControlResponsesByPair[pairId] ?? const <String, dynamic>{};
+
+  String? controlEventFor(String pairId) => lastEventMessagesByPair[pairId];
 
   ControlSequenceStatus? controlStatusFor(String pairId) =>
       controlStatuses[pairId];
@@ -454,11 +490,12 @@ class GatewayController extends ChangeNotifier {
     required double targetPowerKw,
     double? rampStepKw,
     double? rampIntervalSeconds,
-  }) {
+  }) async {
+    final pairId = selectedControlPair;
     final phrase = controlCapabilities?.automaticConfirmationPhrase ??
         'EXECUTE_AUTOMATIC_SEQUENCE';
-    return _executeControl(
-      '/api/control-sequence/$selectedControlPair/automatic-start',
+    final result = await _executeControl(
+      '/api/control-sequence/$pairId/automatic-start',
       <String, dynamic>{
         'direction': direction,
         'power_kw': targetPowerKw,
@@ -467,8 +504,16 @@ class GatewayController extends ChangeNotifier {
         'confirmation': phrase,
       },
       successMessage:
-          'Automatic $direction sequence accepted at ${targetPowerKw.toStringAsFixed(1)} kW.',
+          'Automatic $direction sequence accepted for $pairId at ${targetPowerKw.toStringAsFixed(1)} kW.',
+      pairIdOverride: pairId,
+      refreshAfter: false,
+      timeout: const Duration(seconds: 15),
     );
+    if (result['accepted'] == true) {
+      _startAutomaticTracking(pairId);
+      await _refreshOneControlPair(pairId, silent: true);
+    }
+    return result;
   }
 
   Future<Map<String, dynamic>> nextControlStep({
@@ -585,11 +630,13 @@ class GatewayController extends ChangeNotifier {
     Map<String, dynamic> body, {
     required String successMessage,
     Duration timeout = const Duration(seconds: 150),
+    String? pairIdOverride,
+    bool refreshAfter = true,
   }) async {
     if (!isInternal) {
       throw const ApiException('Internal role is required for control');
     }
-    final pairId = selectedControlPair;
+    final pairId = pairIdOverride ?? selectedControlPair;
     if (_controlBusyPairs.contains(pairId)) {
       throw ApiException(
         'A control command is already in progress for $pairId.',
@@ -602,8 +649,12 @@ class GatewayController extends ChangeNotifier {
       body.removeWhere((key, value) => value == null);
       final result = await api.postJson(path, body: body, timeout: timeout);
       lastControlResponse = result;
+      lastControlResponsesByPair[pairId] = Map<String, dynamic>.from(result);
       lastEventMessage = successMessage;
-      await refreshControlStatus(silent: true);
+      lastEventMessagesByPair[pairId] = successMessage;
+      if (refreshAfter) {
+        await _refreshOneControlPair(pairId, silent: true);
+      }
       return result;
     } catch (error) {
       errorMessage = error.toString();
@@ -612,6 +663,66 @@ class GatewayController extends ChangeNotifier {
       _controlBusyPairs.remove(pairId);
       if (!_disposed) notifyListeners();
     }
+  }
+
+  Future<void> _refreshOneControlPair(
+    String pairId, {
+    bool silent = false,
+  }) async {
+    try {
+      final payload = await api.getJson(
+        '/api/control-sequence/$pairId/status',
+        query: const <String, String>{'fresh': 'false'},
+        timeout: const Duration(seconds: 12),
+      );
+      if (_disposed) return;
+      final status = ControlSequenceStatus.fromJson(payload);
+      final incomingTime = status.timestamp == null
+          ? null
+          : DateTime.tryParse(status.timestamp!);
+      final currentPayloadTime = _pairPayloadTimestamps[pairId];
+      if (currentPayloadTime == null ||
+          incomingTime == null ||
+          !incomingTime.toUtc().isBefore(currentPayloadTime)) {
+        controlStatuses[pairId] = status;
+        if (incomingTime != null) {
+          _pairPayloadTimestamps[pairId] = incomingTime.toUtc();
+        }
+      }
+      _pairStatusReceivedAt[pairId] = DateTime.now().toUtc();
+      if (selectedControlPair == pairId) {
+        controlStatus = status;
+        controlStatusReceivedAt = _pairStatusReceivedAt[pairId];
+      }
+      if (!status.automaticRunning &&
+          status.runStatus != 'accepted' &&
+          status.runStatus != 'queued') {
+        _stopAutomaticTracking(pairId);
+      }
+      restConnected = true;
+    } catch (error) {
+      if (!silent) {
+        errorMessage = error.toString();
+        rethrow;
+      }
+    } finally {
+      if (!_disposed) notifyListeners();
+    }
+  }
+
+  void _startAutomaticTracking(String pairId) {
+    _automaticTrackingPairs.add(pairId);
+    _automaticTrackers.remove(pairId)?.cancel();
+    _automaticTrackers[pairId] = Timer.periodic(
+      const Duration(seconds: 2),
+      (_) => unawaited(_refreshOneControlPair(pairId, silent: true)),
+    );
+    if (!_disposed) notifyListeners();
+  }
+
+  void _stopAutomaticTracking(String pairId) {
+    _automaticTrackingPairs.remove(pairId);
+    _automaticTrackers.remove(pairId)?.cancel();
   }
 
   Future<void> connectTelemetry() async {
@@ -698,6 +809,7 @@ class GatewayController extends ChangeNotifier {
     controlCapabilities = null;
     controlStatus = null;
     controlStatuses.clear();
+    _pairPayloadTimestamps.clear();
     controlPlantSummary = <String, dynamic>{};
     controlStatusReceivedAt = null;
     _controlBusyPairs.clear();
@@ -722,6 +834,10 @@ class GatewayController extends ChangeNotifier {
     _disposed = true;
     _diagnosticTimer?.cancel();
     _controlTimer?.cancel();
+    for (final timer in _automaticTrackers.values) {
+      timer.cancel();
+    }
+    _automaticTrackers.clear();
     _reconnectTimer?.cancel();
     _telemetrySubscription?.cancel();
     _telemetrySocket?.close();

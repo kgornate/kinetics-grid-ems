@@ -1,7 +1,7 @@
-# Kinetics Flutter Dashboard V3.0.0
+# Kinetics Flutter Dashboard V3.0.2
 
 - Independent command busy state for Pair 1-4; one pair no longer blocks another.
-- Cache-only `/api/control-sequence/status/all` overview polling every two seconds.
+- Cache-only `/api/control-sequence/status/all/compact` overview polling every two seconds.
 - Explicit selected-pair live refresh only on operator request, preventing fieldbus contention.
 - Canonical top-level control status parsing; no recursive/nested workflow snapshot selection.
 - Pair cards show setpoint, actual power, PCS/precharge state, source and stale status.

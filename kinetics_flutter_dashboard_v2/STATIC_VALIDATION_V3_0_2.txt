@@ -1,0 +1,12 @@
+Kinetics Flutter Dashboard V3.0.2 static validation
+- Version metadata: 3.0.2+10
+- Compact overview endpoint: /api/control-sequence/status/all/compact
+- Compact overview interval: 5 seconds
+- Per-active-pair cached status interval: 2 seconds
+- Per-pair busy/response/event/run tracking: present
+- Older payload timestamp rejection: present
+- queued/accepted/running treated as active: present
+- Direct power / next-step / abort / safe-stop controls retained
+- BAU safe-stop operator text: 0x3001 = 0
+- Stale 0x3001 = 2 production text in lib/: none
+- Flutter SDK was not available in the build container; run flutter analyze and flutter test on Windows before field use.

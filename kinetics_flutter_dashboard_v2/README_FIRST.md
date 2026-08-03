@@ -1,6 +1,6 @@
-# Kinetics Flutter Dashboard V3.0.0
+# Kinetics Flutter Dashboard V3.0.2
 
-This source is paired with Kinetics EMS Gateway V3.0.0.
+This source is paired with Kinetics EMS Gateway V3.0.2.
 
 Recommended Windows build:
 

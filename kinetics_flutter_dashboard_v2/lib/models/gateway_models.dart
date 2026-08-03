@@ -562,12 +562,14 @@ class ControlSequenceStatus {
 
   String get systemState => workflow['system_state']?.toString() ?? 'unknown';
   String get runStatus => runtime['run_status']?.toString() ?? 'idle';
+  String get runtimeStage => runtime['stage']?.toString() ?? 'idle';
   String? get runId => runtime['run_id']?.toString();
   String? get lastError => runtime['last_error']?.toString();
   bool get stoppedSafe => _asBool(workflow['stopped_safe']) ?? false;
   bool get readyForPower => _asBool(workflow['ready_for_power']) ?? false;
   bool get hardBlocked => _asBool(workflow['hard_blocked']) ?? false;
-  bool get automaticRunning => runStatus == 'running';
+  bool get automaticRunning =>
+      runStatus == 'queued' || runStatus == 'accepted' || runStatus == 'running';
   bool get controlEnabled =>
       (_asBool(writeGates['control_sequence_enabled']) ?? false) &&
       writeGates['gateway_mode']?.toString() == 'control_enabled' &&
