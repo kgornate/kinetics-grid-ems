@@ -1,0 +1,47 @@
+===== LIVE DATABASE =====
+Analysis time: 2026-08-05T00:12:10.229973+05:30
+Path: /mnt/ems-logs/kinetics-gateway/kinetics_gateway.db
+Size MiB: 5865.31
+
+===== TABLE COUNTS AND COVERAGE =====
+alarm_history: rows=6846, oldest=2026-07-28T16:25:01.862621+00:00, newest=2026-08-04T16:35:58.855353+00:00
+alarms: rows=164
+command_audit: rows=788, oldest=2026-07-28T18:18:50.880078+00:00, newest=2026-08-04T12:26:44.573400+00:00
+events: rows=1166, oldest=2026-07-28T16:25:07.119569+00:00, newest=2026-08-04T12:26:44.605344+00:00
+telemetry: rows=1704259, oldest=2026-07-28T16:25:05.825345+00:00, newest=2026-08-04T18:42:16.485406+00:00
+
+===== TELEMETRY STORAGE =====
+rows: 1704316
+original_bytes: 22836333141
+stored_bytes: 3997506726
+avg_original: 13399.119142811543
+avg_stored: 2345.5196841430816
+
+===== TELEMETRY BY ASSET =====
+{'asset_id': 'bms_rack_1', 'rows': 95901, 'oldest': '2026-07-28T16:25:05.825345+00:00', 'newest': '2026-08-04T18:43:37.903609+00:00', 'stored_bytes': 529375948, 'avg_stored': 5520.025317775623}
+{'asset_id': 'bms_rack_3', 'rows': 95901, 'oldest': '2026-07-28T16:25:05.825345+00:00', 'newest': '2026-08-04T18:43:37.903609+00:00', 'stored_bytes': 522790917, 'avg_stored': 5451.360434197766}
+{'asset_id': 'bms_rack_2', 'rows': 95901, 'oldest': '2026-07-28T16:25:05.825345+00:00', 'newest': '2026-08-04T18:43:37.903609+00:00', 'stored_bytes': 519290281, 'avg_stored': 5414.85783255649}
+{'asset_id': 'bms_rack_4', 'rows': 95901, 'oldest': '2026-07-28T16:25:05.825345+00:00', 'newest': '2026-08-04T18:43:37.903609+00:00', 'stored_bytes': 517399768, 'avg_stored': 5395.1446595968755}
+{'asset_id': 'pcs_2', 'rows': 95877, 'oldest': '2026-07-28T16:25:05.825345+00:00', 'newest': '2026-08-04T18:43:37.903609+00:00', 'stored_bytes': 260376434, 'avg_stored': 2715.734055091419}
+{'asset_id': 'pcs_4', 'rows': 95877, 'oldest': '2026-07-28T16:25:05.825345+00:00', 'newest': '2026-08-04T18:43:37.903609+00:00', 'stored_bytes': 260027687, 'avg_stored': 2712.0966133692127}
+{'asset_id': 'pcs_3', 'rows': 95877, 'oldest': '2026-07-28T16:25:05.825345+00:00', 'newest': '2026-08-04T18:43:37.903609+00:00', 'stored_bytes': 259717524, 'avg_stored': 2708.8616039300355}
+{'asset_id': 'pcs_1', 'rows': 95901, 'oldest': '2026-07-28T16:25:05.825345+00:00', 'newest': '2026-08-04T18:43:37.903609+00:00', 'stored_bytes': 259557134, 'avg_stored': 2706.511235544989}
+{'asset_id': 'bms_bank', 'rows': 95901, 'oldest': '2026-07-28T16:25:05.825345+00:00', 'newest': '2026-08-04T18:43:37.903609+00:00', 'stored_bytes': 234747394, 'avg_stored': 2447.8096578763516}
+{'asset_id': 'bms_bank_3', 'rows': 56753, 'oldest': '2026-07-31T16:15:30.416227+00:00', 'newest': '2026-08-04T18:43:37.903609+00:00', 'stored_bytes': 138888906, 'avg_stored': 2447.252233362113}
+{'asset_id': 'bms_bank_4', 'rows': 56753, 'oldest': '2026-07-31T16:15:30.416227+00:00', 'newest': '2026-08-04T18:43:37.903609+00:00', 'stored_bytes': 138814876, 'avg_stored': 2445.9478089264003}
+{'asset_id': 'bms_bank_2', 'rows': 56753, 'oldest': '2026-07-31T16:15:30.416227+00:00', 'newest': '2026-08-04T18:43:37.903609+00:00', 'stored_bytes': 138772706, 'avg_stored': 2445.204764505841}
+{'asset_id': 'liquid_cooling', 'rows': 95898, 'oldest': '2026-07-28T16:25:05.825345+00:00', 'newest': '2026-08-04T18:43:37.903609+00:00', 'stored_bytes': 63190851, 'avg_stored': 658.9381530376024}
+{'asset_id': 'energy_meter', 'rows': 95898, 'oldest': '2026-07-28T16:25:05.825345+00:00', 'newest': '2026-08-04T18:43:37.903609+00:00', 'stored_bytes': 45009612, 'avg_stored': 469.3488081086154}
+{'asset_id': 'hvac', 'rows': 95898, 'oldest': '2026-07-28T16:25:05.825345+00:00', 'newest': '2026-08-04T18:43:37.903609+00:00', 'stored_bytes': 34608156, 'avg_stored': 360.88506538196833}
+{'asset_id': 'dehumidifier_2', 'rows': 95898, 'oldest': '2026-07-28T16:25:05.825345+00:00', 'newest': '2026-08-04T18:43:37.903609+00:00', 'stored_bytes': 24137822, 'avg_stored': 251.7030803562118}
+{'asset_id': 'dehumidifier_1', 'rows': 95898, 'oldest': '2026-07-28T16:25:05.825345+00:00', 'newest': '2026-08-04T18:43:37.903609+00:00', 'stored_bytes': 24077766, 'avg_stored': 251.0768316336107}
+{'asset_id': 'safety_io', 'rows': 95898, 'oldest': '2026-07-28T16:25:05.825345+00:00', 'newest': '2026-08-04T18:43:37.903609+00:00', 'stored_bytes': 14229984, 'avg_stored': 148.38666082712882}
+{'asset_id': 'environment_other', 'rows': 95898, 'oldest': '2026-07-28T16:25:05.825345+00:00', 'newest': '2026-08-04T18:43:37.903609+00:00', 'stored_bytes': 13115818, 'avg_stored': 136.7684206135686}
+
+===== LARGE TEXT/JSON PAYLOADS =====
+telemetry.payload_json: rows=1706900, total=0, average=0.0, maximum=0
+telemetry.payload_blob: rows=1707356, total=4004627991, average=2345.514345572921, maximum=5962
+command_audit.response_json: rows=788, total=512436579, average=650300.2271573604, maximum=92095213
+alarm_history.payload_json: rows=6846, total=2385422, average=348.4402570844289, maximum=496
+alarms.payload_json: rows=164, total=58561, average=357.0792682926829, maximum=496
+events.payload_json: rows=1166, total=420412989, average=360560.02487135504, maximum=16321763

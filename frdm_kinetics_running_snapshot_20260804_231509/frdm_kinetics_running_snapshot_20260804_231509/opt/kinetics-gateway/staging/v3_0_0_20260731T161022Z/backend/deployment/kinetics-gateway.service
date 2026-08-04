@@ -1,0 +1,24 @@
+[Unit]
+Description=Kinetics EMS Gateway V2
+After=network-online.target kinetics-network.service
+Wants=network-online.target kinetics-network.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/kinetics-gateway/backend
+EnvironmentFile=-/etc/kinetics-gateway/kinetics-gateway.env
+Environment=KINETICS_CONFIG=/etc/kinetics-gateway/config.json
+ExecStart=/opt/kinetics-gateway/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
+Restart=always
+RestartSec=5
+TimeoutStopSec=15
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+UMask=0077
+ReadWritePaths=/mnt/ems-logs/kinetics-gateway /opt/kinetics-gateway/backend/data
+
+[Install]
+WantedBy=multi-user.target

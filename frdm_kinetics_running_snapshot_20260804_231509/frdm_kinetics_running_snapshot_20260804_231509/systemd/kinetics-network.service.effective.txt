@@ -1,0 +1,23 @@
+# /etc/systemd/system/kinetics-network.service
+[Unit]
+Description=Kinetics Gateway Field Network Setup
+After=local-fs.target
+Before=network-online.target kinetics-gateway.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/kinetics-network-setup.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+
+# /etc/systemd/system/kinetics-network.service.d/override.conf
+[Unit]
+After=local-fs.target
+Before=kinetics-gateway.service cloudflared.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+TimeoutStartSec=30

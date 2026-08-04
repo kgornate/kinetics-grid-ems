@@ -1,0 +1,156 @@
+===== ANALYSIS TIME =====
+2026-08-05T00:07:45.102400+05:30
+
+===== DATABASE FILES =====
+/opt/kinetics-gateway/backend/data/kinetics_gateway.db: 173211648 bytes (165.19 MiB)
+/opt/kinetics-gateway/backend/data/kinetics_gateway.db-wal: 8981632 bytes (8.57 MiB)
+/opt/kinetics-gateway/backend/data/kinetics_gateway.db-shm: 32768 bytes (0.03 MiB)
+
+===== SQLITE ALLOCATION =====
+Page size: 4096
+Page count: 42323
+Freelist pages: 0
+Allocated database space: 165.32 MiB
+Internally free space: 0.00 MiB
+
+===== TABLE INVENTORY =====
+alarm_history: 782 rows
+alarms: 68 rows
+command_audit: 96 rows
+events: 113 rows
+telemetry: 22992 rows
+
+===== EXACT TABLE AND INDEX SPACE =====
+dbstat unavailable: no such table: dbstat
+
+===== TIMESTAMP COVERAGE =====
+alarm_history: rows=782, oldest=2026-07-28T16:25:01.862621+00:00, newest=2026-07-29T04:58:13.673997+00:00
+command_audit: rows=96, oldest=2026-07-28T18:18:50.880078+00:00, newest=2026-07-29T03:48:34.079947+00:00
+events: rows=113, oldest=2026-07-28T16:25:07.119569+00:00, newest=2026-07-29T03:48:34.518806+00:00
+telemetry: rows=22992, oldest=2026-07-28T16:25:05.825345+00:00, newest=2026-07-29T04:34:14.579191+00:00
+
+===== TELEMETRY BY ASSET =====
+Telemetry columns: id, timestamp, asset_id, payload_json, payload_blob, encoding, uncompressed_bytes, stored_bytes
+bms_bank: 1437 rows
+bms_rack_1: 1437 rows
+bms_rack_2: 1437 rows
+bms_rack_3: 1437 rows
+bms_rack_4: 1437 rows
+dehumidifier_1: 1437 rows
+dehumidifier_2: 1437 rows
+energy_meter: 1437 rows
+environment_other: 1437 rows
+hvac: 1437 rows
+liquid_cooling: 1437 rows
+pcs_1: 1437 rows
+pcs_2: 1437 rows
+pcs_3: 1437 rows
+pcs_4: 1437 rows
+safety_io: 1437 rows
+
+===== SD CARD FILESYSTEM =====
+Filesystem     Type  Size  Used Avail Use% Mounted on
+/dev/mmcblk1p1 ext4  114G   15G   94G  14% /mnt/ems-logs
+
+===== TOP-LEVEL SD USAGE =====
+8.0K	/mnt/ems-logs/backups/scheduler-install
+8.0K	/mnt/ems-logs/backups/scheduler-v302-install
+8.0K	/mnt/ems-logs/scheduler/bess-seven-day-backend-v3
+16K	/mnt/ems-logs/lost+found
+16K	/mnt/ems-logs/scheduler/bess-seven-day-v302
+28K	/mnt/ems-logs/scheduler
+64K	/mnt/ems-logs/backups/kinetics-phase1-4-r22-safe-stop-state
+84K	/mnt/ems-logs/backups/scheduler-v302-hot-takeover
+92K	/mnt/ems-logs/backups/bess-v302-r4-hotfix
+212K	/mnt/ems-logs/backups/scheduler-v302-lean-sequential
+59M	/mnt/ems-logs/backups/kinetics-phase1-4
+417M	/mnt/ems-logs/backups/frdm_kinetics_running_snapshot_20260804_231509
+469M	/mnt/ems-logs/backups/root-offload-20260731_234241
+1.1G	/mnt/ems-logs/backups
+3.2G	/mnt/ems-logs/kinetics-exports/kinetics_export_20260801T034013Z
+4.2G	/mnt/ems-logs/kinetics-exports/kinetics_export_20260801T202639Z
+5.8G	/mnt/ems-logs/kinetics-gateway
+7.3G	/mnt/ems-logs/kinetics-exports
+15G	/mnt/ems-logs
+
+===== GATEWAY LOG FILES =====
+6149177344 bytes	2026-08-05 00:06:43.1453117380	/mnt/ems-logs/kinetics-gateway/kinetics_gateway.db
+18939672 bytes	2026-08-05 00:07:41.8301118170	/mnt/ems-logs/kinetics-gateway/kinetics_gateway.db-wal
+10485686 bytes	2026-08-01 17:17:55.4085861490	/mnt/ems-logs/kinetics-gateway/kinetics_gateway.log.1
+3571990 bytes	2026-08-04 17:56:49.9314602260	/mnt/ems-logs/kinetics-gateway/kinetics_gateway.log
+32768 bytes	2026-08-05 00:07:15.1897485400	/mnt/ems-logs/kinetics-gateway/kinetics_gateway.db-shm
+14027 bytes	2026-08-03 23:23:28.3316569780	/mnt/ems-logs/kinetics-gateway/site-control-state.json
+
+===== SCHEDULER FILES =====
+566 bytes	2026-07-31 23:35:35.5775142280	/mnt/ems-logs/scheduler/bess-seven-day-backend-v3/state.json
+472 bytes	2026-08-04 17:56:49.9511116020	/mnt/ems-logs/scheduler/bess-seven-day-v302/state.json
+472 bytes	2026-08-04 16:46:28.7675094230	/mnt/ems-logs/scheduler/bess-seven-day-v302/state.json.rearm.20260804_165535
+472 bytes	2026-08-04 16:26:29.5241225300	/mnt/ems-logs/scheduler/bess-seven-day-v302/state.json.before-discharge-rearm.20260804_164032
+
+===== BACKUP STORAGE =====
+4.0K	/mnt/ems-logs/backups/scheduler-install/20260731_180327
+4.0K	/mnt/ems-logs/backups/scheduler-v302-install/20260801_103949
+8.0K	/mnt/ems-logs/backups/scheduler-install
+8.0K	/mnt/ems-logs/backups/scheduler-v302-install
+20K	/mnt/ems-logs/backups/frdm_kinetics_running_snapshot_20260804_231509/usr
+36K	/mnt/ems-logs/backups/frdm_kinetics_running_snapshot_20260804_231509/mnt
+56K	/mnt/ems-logs/backups/kinetics-phase1-4-r22-safe-stop-state/20260803_230609
+64K	/mnt/ems-logs/backups/kinetics-phase1-4-r22-safe-stop-state
+72K	/mnt/ems-logs/backups/frdm_kinetics_running_snapshot_20260804_231509/root
+76K	/mnt/ems-logs/backups/scheduler-v302-hot-takeover/20260803_180127
+84K	/mnt/ems-logs/backups/bess-v302-r4-hotfix/20260804_104547
+84K	/mnt/ems-logs/backups/scheduler-v302-hot-takeover
+92K	/mnt/ems-logs/backups/bess-v302-r4-hotfix
+92K	/mnt/ems-logs/backups/frdm_kinetics_running_snapshot_20260804_231509/metadata
+96K	/mnt/ems-logs/backups/frdm_kinetics_running_snapshot_20260804_231509/etc
+100K	/mnt/ems-logs/backups/scheduler-v302-lean-sequential/20260803_195714
+104K	/mnt/ems-logs/backups/scheduler-v302-lean-sequential/20260803_191325
+140K	/mnt/ems-logs/backups/frdm_kinetics_running_snapshot_20260804_231509/systemd
+212K	/mnt/ems-logs/backups/scheduler-v302-lean-sequential
+1.4M	/mnt/ems-logs/backups/frdm_kinetics_running_snapshot_20260804_231509/manifests
+4.2M	/mnt/ems-logs/backups/root-offload-20260731_234241/kinetics_before_memory_fix_20260728_154025
+4.2M	/mnt/ems-logs/backups/root-offload-20260731_234241/kinetics_stage2_review_20260728_154405
+9.2M	/mnt/ems-logs/backups/frdm_kinetics_running_snapshot_20260804_231509/logs
+59M	/mnt/ems-logs/backups/kinetics-phase1-4
+59M	/mnt/ems-logs/backups/kinetics-phase1-4/20260803_223942
+166M	/mnt/ems-logs/backups/frdm_kinetics_running_snapshot_20260804_231509/state
+170M	/mnt/ems-logs/backups/root-offload-20260731_234241/kinetics_gateway_latest_release
+178M	/mnt/ems-logs/backups/root-offload-20260731_234241/kinetics_gateway_v3_20260731T083308Z
+241M	/mnt/ems-logs/backups/frdm_kinetics_running_snapshot_20260804_231509/opt
+417M	/mnt/ems-logs/backups/frdm_kinetics_running_snapshot_20260804_231509
+469M	/mnt/ems-logs/backups/root-offload-20260731_234241
+1.1G	/mnt/ems-logs/backups
+
+===== SYSTEMD JOURNAL =====
+Archived and active journals take up 45M in the file system.
+
+===== JOURNAL DIRECTORY SIZE =====
+46M	/run/log/journal
+
+===== LARGE FILES ON SD CARD =====
+5864.31 MiB	2026-08-05 00:06:43.1453117380	/mnt/ems-logs/kinetics-gateway/kinetics_gateway.db
+4213.94 MiB	2026-08-03 11:03:10.6502873700	/mnt/ems-logs/kinetics-exports/kinetics_export_20260801T202639Z/kinetics_gateway_snapshot.db
+2556.39 MiB	2026-08-01 10:00:12.1558704650	/mnt/ems-logs/kinetics-exports/kinetics_export_20260801T034013Z/kinetics_gateway_snapshot.db
+212.55 MiB	2026-08-01 10:18:32.5271512330	/mnt/ems-logs/kinetics-exports/kinetics_export_20260801T034013Z/csv/telemetry_rows.csv.gz
+209.42 MiB	2026-08-01 10:00:50.4604023970	/mnt/ems-logs/kinetics-exports/kinetics_export_20260801T034013Z/csv/command_audit.csv
+209.41 MiB	2026-08-01 10:01:25.3808873350	/mnt/ems-logs/kinetics-exports/kinetics_export_20260801T034013Z/csv/events.csv
+165.32 MiB	2026-08-04 23:15:19.6647983750	/mnt/ems-logs/backups/frdm_kinetics_running_snapshot_20260804_231509/state/kinetics_gateway.db
+165.32 MiB	2026-08-04 23:15:19.6647983750	/mnt/ems-logs/backups/frdm_kinetics_running_snapshot_20260804_231509/opt/kinetics-gateway/backend/data/kinetics_gateway.db
+165.19 MiB	2026-07-29 10:03:13.2486817580	/mnt/ems-logs/backups/root-offload-20260731_234241/kinetics_gateway_v3_20260731T083308Z/opt/kinetics-gateway/backend/data/kinetics_gateway.db
+165.19 MiB	2026-07-29 10:03:13.0000000000	/mnt/ems-logs/backups/root-offload-20260731_234241/kinetics_gateway_latest_release/opt/kinetics-gateway/backend/data/kinetics_gateway.db
+133.29 MiB	2026-08-04 23:16:25.8377806580	/mnt/ems-logs/backups/frdm_kinetics_running_snapshot_20260804_231509.tar.gz
+58.40 MiB	2026-08-03 22:40:06.5968495630	/mnt/ems-logs/backups/kinetics-phase1-4/20260803_223942/backend.tar.gz
+56.95 MiB	2026-07-29 10:43:59.2399689530	/mnt/ems-logs/backups/root-offload-20260731_234241/kinetics_gateway_latest_release.tar.gz
+56.93 MiB	2026-07-29 10:09:43.2811272810	/mnt/ems-logs/backups/root-offload-20260731_234241/kinetics_gateway_latest_running.tar.gz
+18.06 MiB	2026-08-05 00:07:41.8301118170	/mnt/ems-logs/kinetics-gateway/kinetics_gateway.db-wal
+15.41 MiB	2026-07-25 23:53:07.0000000000	/mnt/ems-logs/backups/frdm_kinetics_running_snapshot_20260804_231509/opt/kinetics-gateway/venv/lib/python3.13/site-packages/uvloop/loop.cpython-313-aarch64-linux-gnu.so
+10.00 MiB	2026-08-01 17:17:55.4085861490	/mnt/ems-logs/kinetics-gateway/kinetics_gateway.log.1
+8.57 MiB	2026-07-29 10:28:13.6746472390	/mnt/ems-logs/backups/root-offload-20260731_234241/kinetics_gateway_v3_20260731T083308Z/opt/kinetics-gateway/backend/data/kinetics_gateway.db-wal
+8.13 MiB	2026-08-04 23:15:35.4210322960	/mnt/ems-logs/backups/frdm_kinetics_running_snapshot_20260804_231509/logs/kinetics-gateway.log
+4.02 MiB	2026-07-25 23:53:09.0000000000	/mnt/ems-logs/backups/frdm_kinetics_running_snapshot_20260804_231509/opt/kinetics-gateway/venv/lib/python3.13/site-packages/pydantic_core/_pydantic_core.cpython-313-aarch64-linux-gnu.so
+3.41 MiB	2026-08-04 17:56:49.9314602260	/mnt/ems-logs/kinetics-gateway/kinetics_gateway.log
+2.54 MiB	2026-07-25 23:53:07.0000000000	/mnt/ems-logs/backups/frdm_kinetics_running_snapshot_20260804_231509/opt/kinetics-gateway/venv/lib/python3.13/site-packages/yaml/_yaml.cpython-313-aarch64-linux-gnu.so
+1.32 MiB	2026-08-03 11:47:37.8869275080	/mnt/ems-logs/kinetics-exports/kinetics_gateway_journal.log
+1.25 MiB	2026-08-01 10:00:17.0679386790	/mnt/ems-logs/kinetics-exports/kinetics_export_20260801T034013Z/csv/alarm_history.csv
+1.18 MiB	2026-07-25 23:53:08.0000000000	/mnt/ems-logs/backups/frdm_kinetics_running_snapshot_20260804_231509/opt/kinetics-gateway/venv/lib/python3.13/site-packages/httptools/parser/parser.cpython-313-aarch64-linux-gnu.so
+1.06 MiB	2026-07-25 23:53:12.0000000000	/mnt/ems-logs/backups/frdm_kinetics_running_snapshot_20260804_231509/opt/kinetics-gateway/venv/lib/python3.13/site-packages/watchfiles/_rust_notify.cpython-313-aarch64-linux-gnu.so

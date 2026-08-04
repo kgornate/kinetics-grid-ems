@@ -1,0 +1,10 @@
+  UNIT                                 LOAD   ACTIVE SUB    DESCRIPTION
+● systemd-networkd-wait-online.service loaded failed failed Wait for Network to be Configured
+● weston.service                       loaded failed failed Weston, a Wayland compositor, as a system service
+● weston.socket                        loaded failed failed Weston socket
+
+Legend: LOAD   → Reflects whether the unit definition was properly loaded.
+        ACTIVE → The high-level unit activation state, i.e. generalization of SUB.
+        SUB    → The low-level unit activation state, values depend on unit type.
+
+3 loaded units listed.

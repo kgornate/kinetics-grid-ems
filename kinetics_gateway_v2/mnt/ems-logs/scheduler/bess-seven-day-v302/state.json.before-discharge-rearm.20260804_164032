@@ -1,0 +1,20 @@
+{
+  "active_pairs": [],
+  "build": "v302-lean-sequential-20260804-r4-compact-status-hotfix",
+  "completed_sessions": [
+    "2026-08-04:charge",
+    "2026-08-04:discharge"
+  ],
+  "current_date": "2026-08-05",
+  "current_session": "charge",
+  "last_update": "2026-08-04T16:26:29.523554+05:30",
+  "phase": "waiting_charge_preparation",
+  "prepared_pairs": [],
+  "schedule_dates": [
+    "2026-08-04",
+    "2026-08-05",
+    "2026-08-06",
+    "2026-08-07"
+  ],
+  "version": 5
+}

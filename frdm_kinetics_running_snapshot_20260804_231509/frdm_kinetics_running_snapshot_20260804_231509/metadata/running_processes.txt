@@ -1,0 +1,161 @@
+    PID    PPID                  STARTED     ELAPSED %CPU %MEM   RSS CMD
+      1       0 Mon Aug  3 10:25:17 2026  1-12:50:11  0.0  0.4  8600 /sbin/init
+      2       0 Mon Aug  3 10:25:17 2026  1-12:50:11  0.0  0.0     0 [kthreadd]
+      3       2 Mon Aug  3 10:25:17 2026  1-12:50:11  0.0  0.0     0 [pool_workqueue_release]
+      4       2 Mon Aug  3 10:25:17 2026  1-12:50:11  0.0  0.0     0 [kworker/R-rcu_gp]
+      5       2 Mon Aug  3 10:25:17 2026  1-12:50:11  0.0  0.0     0 [kworker/R-sync_wq]
+      6       2 Mon Aug  3 10:25:17 2026  1-12:50:11  0.0  0.0     0 [kworker/R-kvfree_rcu_reclaim]
+      7       2 Mon Aug  3 10:25:17 2026  1-12:50:11  0.0  0.0     0 [kworker/R-slub_flushwq]
+      8       2 Mon Aug  3 10:25:17 2026  1-12:50:11  0.0  0.0     0 [kworker/R-netns]
+     13       2 Mon Aug  3 10:25:17 2026  1-12:50:11  0.0  0.0     0 [kworker/R-mm_percpu_wq]
+     14       2 Mon Aug  3 10:25:17 2026  1-12:50:11  0.0  0.0     0 [ksoftirqd/0]
+     15       2 Mon Aug  3 10:25:17 2026  1-12:50:11  0.0  0.0     0 [rcu_preempt]
+     16       2 Mon Aug  3 10:25:17 2026  1-12:50:11  0.0  0.0     0 [rcu_exp_par_gp_kthread_worker/0]
+     17       2 Mon Aug  3 10:25:17 2026  1-12:50:11  0.0  0.0     0 [rcu_exp_gp_kthread_worker]
+     18       2 Mon Aug  3 10:25:17 2026  1-12:50:11  0.0  0.0     0 [migration/0]
+     19       2 Mon Aug  3 10:25:17 2026  1-12:50:11  0.0  0.0     0 [cpuhp/0]
+     20       2 Mon Aug  3 10:25:17 2026  1-12:50:11  0.0  0.0     0 [cpuhp/1]
+     21       2 Mon Aug  3 10:25:17 2026  1-12:50:11  0.0  0.0     0 [migration/1]
+     22       2 Mon Aug  3 10:25:17 2026  1-12:50:11  0.0  0.0     0 [ksoftirqd/1]
+     25       2 Mon Aug  3 10:25:17 2026  1-12:50:11  0.0  0.0     0 [kdevtmpfs]
+     26       2 Mon Aug  3 10:25:17 2026  1-12:50:11  0.0  0.0     0 [kworker/R-inet_frag_wq]
+     27       2 Mon Aug  3 10:25:17 2026  1-12:50:11  0.0  0.0     0 [rcu_tasks_kthread]
+     28       2 Mon Aug  3 10:25:17 2026  1-12:50:11  0.0  0.0     0 [rcu_tasks_trace_kthread]
+     29       2 Mon Aug  3 10:25:17 2026  1-12:50:11  0.0  0.0     0 [kauditd]
+     30       2 Mon Aug  3 10:25:17 2026  1-12:50:11  0.0  0.0     0 [oom_reaper]
+     31       2 Mon Aug  3 10:25:17 2026  1-12:50:11  0.0  0.0     0 [kworker/R-writeback]
+     32       2 Mon Aug  3 10:25:17 2026  1-12:50:11  0.0  0.0     0 [kcompactd0]
+     33       2 Mon Aug  3 10:25:17 2026  1-12:50:11  0.0  0.0     0 [ksmd]
+     34       2 Mon Aug  3 10:25:17 2026  1-12:50:11  0.0  0.0     0 [khugepaged]
+     35       2 Mon Aug  3 10:25:17 2026  1-12:50:11  0.0  0.0     0 [kworker/R-kblockd]
+     36       2 Mon Aug  3 10:25:17 2026  1-12:50:11  0.0  0.0     0 [kworker/R-blkcg_punt_bio]
+     37       2 Mon Aug  3 10:25:17 2026  1-12:50:11  0.0  0.0     0 [kworker/R-kintegrityd]
+     39       2 Mon Aug  3 10:25:17 2026  1-12:50:11  0.0  0.0     0 [kworker/R-tpm_dev_wq]
+     41       2 Mon Aug  3 10:25:17 2026  1-12:50:11  0.0  0.0     0 [kworker/R-ata_sff]
+     42       2 Mon Aug  3 10:25:17 2026  1-12:50:11  0.0  0.0     0 [kworker/R-edac-poller]
+     43       2 Mon Aug  3 10:25:17 2026  1-12:50:11  0.0  0.0     0 [kworker/R-devfreq_wq]
+     44       2 Mon Aug  3 10:25:17 2026  1-12:50:11  0.0  0.0     0 [watchdogd]
+     46       2 Mon Aug  3 10:25:17 2026  1-12:50:11  0.0  0.0     0 [kworker/R-quota_events_unbound]
+     48       2 Mon Aug  3 10:25:17 2026  1-12:50:11  0.0  0.0     0 [kworker/R-rpciod]
+     49       2 Mon Aug  3 10:25:17 2026  1-12:50:11  0.0  0.0     0 [kworker/R-xprtiod]
+     50       2 Mon Aug  3 10:25:17 2026  1-12:50:11  0.0  0.0     0 [kworker/R-cfg80211]
+     51       2 Mon Aug  3 10:25:17 2026  1-12:50:10  0.2  0.0     0 [kswapd0]
+     52       2 Mon Aug  3 10:25:17 2026  1-12:50:10  0.0  0.0     0 [kworker/R-nfsiod]
+     53       2 Mon Aug  3 10:25:17 2026  1-12:50:10  0.0  0.0     0 [kworker/R-kpcitest]
+     62       2 Mon Aug  3 10:25:17 2026  1-12:50:10  0.0  0.0     0 [kworker/R-nvme-wq]
+     63       2 Mon Aug  3 10:25:17 2026  1-12:50:10  0.0  0.0     0 [kworker/R-nvme-reset-wq]
+     64       2 Mon Aug  3 10:25:17 2026  1-12:50:10  0.0  0.0     0 [kworker/R-nvme-delete-wq]
+     65       2 Mon Aug  3 10:25:18 2026  1-12:50:10  0.0  0.0     0 [kworker/R-vfio-irqfd-cleanup]
+     66       2 Mon Aug  3 10:25:18 2026  1-12:50:10  0.0  0.0     0 [kworker/R-uas]
+     68       2 Mon Aug  3 10:25:18 2026  1-12:50:10  0.0  0.0     0 [kworker/R-sdhci]
+     69       2 Mon Aug  3 10:25:18 2026  1-12:50:10  0.0  0.0     0 [irq/24-mmc0]
+     70       2 Mon Aug  3 10:25:18 2026  1-12:50:10  0.0  0.0     0 [hwrng]
+     71       2 Mon Aug  3 10:25:18 2026  1-12:50:10  0.0  0.0     0 [kworker/R-mmc_complete]
+     72       2 Mon Aug  3 10:25:18 2026  1-12:50:10  0.0  0.0     0 [kworker/R-tls-strp]
+     73       2 Mon Aug  3 10:25:18 2026  1-12:50:10  0.0  0.0     0 [kworker/R-mld]
+     74       2 Mon Aug  3 10:25:18 2026  1-12:50:10  0.0  0.0     0 [kworker/R-ipv6_addrconf]
+     75       2 Mon Aug  3 10:25:18 2026  1-12:50:10  0.0  0.0     0 [kworker/R-dsa_ordered]
+     76       2 Mon Aug  3 10:25:18 2026  1-12:50:10  0.0  0.0     0 [krfcommd]
+     77       2 Mon Aug  3 10:25:18 2026  1-12:50:10  0.0  0.0     0 [kworker/R-kstrp]
+     78       2 Mon Aug  3 10:25:18 2026  1-12:50:10  0.0  0.0     0 [pxp_dispatch]
+     86       2 Mon Aug  3 10:25:18 2026  1-12:50:09  0.0  0.0     0 [kworker/R-ci_otg]
+     87       2 Mon Aug  3 10:25:18 2026  1-12:50:09  0.0  0.0     0 [irq/111-1-0022]
+     88       2 Mon Aug  3 10:25:18 2026  1-12:50:09  0.0  0.0     0 [2-0050]
+     89       2 Mon Aug  3 10:25:18 2026  1-12:50:09  0.0  0.0     0 [irq/111-2-0050]
+     91       2 Mon Aug  3 10:25:18 2026  1-12:50:09  0.0  0.0     0 [kworker/R-remoteproc-cm33]
+     97       2 Mon Aug  3 10:25:19 2026  1-12:50:09  0.0  0.0     0 [kworker/R-stmmac_wq]
+     99       2 Mon Aug  3 10:25:19 2026  1-12:50:09  0.0  0.0     0 [card0-crtc0]
+    101       2 Mon Aug  3 10:25:19 2026  1-12:50:09  0.0  0.0     0 [card0-crtc1]
+    102       2 Mon Aug  3 10:25:19 2026  1-12:50:09  0.0  0.0     0 [card0-crtc2]
+    103       2 Mon Aug  3 10:25:19 2026  1-12:50:09  0.0  0.0     0 [kworker/R-sdhci]
+    104       2 Mon Aug  3 10:25:19 2026  1-12:50:09  0.0  0.0     0 [irq/115-mmc1]
+    106       2 Mon Aug  3 10:25:19 2026  1-12:50:09  0.0  0.0     0 [card0-crtc3]
+    107       2 Mon Aug  3 10:25:19 2026  1-12:50:09  0.0  0.0     0 [kworker/R-sdhci]
+    108       2 Mon Aug  3 10:25:19 2026  1-12:50:09  0.0  0.0     0 [irq/116-mmc2]
+    109       2 Mon Aug  3 10:25:19 2026  1-12:50:09  0.0  0.0     0 [irq/117-42860000.mmc cd]
+    111       2 Mon Aug  3 10:25:19 2026  1-12:50:09  0.0  0.0     0 [kworker/R-mmc_complete]
+    112       2 Mon Aug  3 10:25:20 2026  1-12:50:08  0.0  0.0     0 [spi2]
+    116       2 Mon Aug  3 10:25:20 2026  1-12:50:08  0.0  0.0     0 [jbd2/mmcblk0p2-8]
+    117       2 Mon Aug  3 10:25:20 2026  1-12:50:08  0.0  0.0     0 [kworker/R-ext4-rsv-conversion]
+    146       1 Mon Aug  3 10:25:22 2026  1-12:50:06  0.0  0.4  9676 /usr/lib/systemd/systemd-journald
+    160       2 Mon Aug  3 10:25:22 2026  1-12:50:06  0.0  0.0     0 [kworker/R-MOAL_HANG_WORK_QUEUE]
+    162       2 Mon Aug  3 10:25:22 2026  1-12:50:06  0.0  0.0     0 [kworker/R-MOAL_WORK_QUEUE]
+    163       2 Mon Aug  3 10:25:22 2026  1-12:50:06  0.0  0.0     0 [kworker/R-MOAL_EVT_WORK_QUEUE]
+    164       2 Mon Aug  3 10:25:22 2026  1-12:50:06  0.0  0.0     0 [kworker/R-MOAL_RX_WORK_QUEUE]
+    165       2 Mon Aug  3 10:25:22 2026  1-12:50:06  0.0  0.0     0 [kworker/R-MOAL_TX_WORK_QUEUE]
+    166       2 Mon Aug  3 10:25:22 2026  1-12:50:06  0.0  0.0     0 [woal_reassoc_service]
+    191       1 Mon Aug  3 10:25:22 2026  1-12:50:05  0.0  0.3  7652 /usr/lib/systemd/systemd-udevd
+    217       2 Mon Aug  3 10:25:23 2026  1-12:50:05  0.0  0.0     0 [kworker/R-CSAmlan-2090683423]
+    218       2 Mon Aug  3 10:25:23 2026  1-12:50:05  0.0  0.0     0 [kworker/R-MCLIST_WORK_QUEUE]
+    220       2 Mon Aug  3 10:25:23 2026  1-12:50:05  0.0  0.0     0 [kworker/R-CSAuap-2090683424]
+    221       2 Mon Aug  3 10:25:23 2026  1-12:50:05  0.0  0.0     0 [kworker/R-MCLIST_WORK_QUEUE]
+    233       2 Mon Aug  3 10:25:23 2026  1-12:50:05  0.0  0.0     0 [kworker/R-CSAwfd-2090683424]
+    234       2 Mon Aug  3 10:25:23 2026  1-12:50:05  0.0  0.0     0 [kworker/R-MCLIST_WORK_QUEUE]
+    236       2 Mon Aug  3 10:25:23 2026  1-12:50:05  0.0  0.0     0 [irq/121-wifi_oob_wakeup]
+    255       1 Mon Aug  3 10:25:23 2026  1-12:50:05  0.0  0.0   440 /usr/sbin/rpcbind -w -f
+    315       1 Mon Aug  3 10:25:24 2026  1-12:50:04  0.0  0.0  1592 /usr/lib/systemd/systemd-resolved
+    319       1 Mon Aug  3 10:25:24 2026  1-12:50:04  0.0  0.0  1792 /usr/lib/systemd/systemd-userdbd
+    444       1 Mon Aug  3 10:25:25 2026  1-12:50:03  0.0  0.1  3772 /usr/sbin/ModemManager
+    445       1 Mon Aug  3 10:25:25 2026  1-12:50:03  0.0  0.0   820 /usr/sbin/atd -f
+    449       1 Mon Aug  3 10:25:25 2026  1-12:50:03  0.0  0.0  1200 avahi-daemon: running [imx93-11x11-lpddr4x-frdm.local]
+    451       1 Mon Aug  3 10:25:25 2026  1-12:50:03  0.0  0.0  1072 /usr/sbin/crond -n
+    452       1 Mon Aug  3 10:25:25 2026  1-12:50:03  0.0  0.1  2404 /usr/bin/dbus-daemon --system --address=systemd: --nofork --nopidfile --systemd-activation --syslog-only
+    454       1 Mon Aug  3 10:25:25 2026  1-12:50:03  0.0  0.0   748 /usr/bin/firmwared -d /lib/firmware
+    458       1 Mon Aug  3 10:25:25 2026  1-12:50:03  0.0  0.0  1612 /usr/sbin/ofonod -n
+    461       1 Mon Aug  3 10:25:25 2026  1-12:50:03  0.5  0.0  1040 /usr/libexec/parsec/parsec --config /etc/parsec/config.toml
+    462       1 Mon Aug  3 10:25:25 2026  1-12:50:03  0.0  0.0   120 seatd -g seat
+    465       1 Mon Aug  3 10:25:25 2026  1-12:50:03  0.0  0.0  1036 /usr/sbin/syslogd -F
+    467       1 Mon Aug  3 10:25:25 2026  1-12:50:03  0.0  0.1  3432 /usr/lib/systemd/systemd-logind
+    485     449 Mon Aug  3 10:25:25 2026  1-12:50:02  0.0  0.0   312 avahi-daemon: chroot helper
+    489       1 Mon Aug  3 10:25:25 2026  1-12:50:02  0.0  0.1  2564 /usr/lib/systemd/systemd-networkd
+    506       1 Mon Aug  3 10:25:26 2026  1-12:50:02  0.0  0.0  1404 /bin/sh /usr/local/sbin/kinetics-network-guard.sh
+    542       1 Mon Aug  3 10:25:27 2026  1-12:50:01  0.1  1.0 20360 /usr/bin/containerd
+    550       2 Mon Aug  3 10:25:27 2026  1-12:50:01  0.0  0.0     0 [jbd2/mmcblk1p1-8]
+    551       2 Mon Aug  3 10:25:27 2026  1-12:50:01  0.0  0.0     0 [kworker/R-ext4-rsv-conversion]
+    555       1 Mon Aug  3 10:25:27 2026  1-12:50:01  0.0  0.0   140 /sbin/agetty -o -- \u --noreset --noclear - linux
+    556       1 Mon Aug  3 10:25:27 2026  1-12:50:01  0.0  0.0   140 /sbin/agetty -o -- \u --noreset --noclear --keep-baud 115200,57600,38400,9600 - vt220
+    592       1 Mon Aug  3 10:25:28 2026  1-12:50:00  0.0  0.0   124 /usr/sbin/tee-supplicant
+    856       1 Mon Aug  3 10:26:00 2026  1-12:49:28  0.0  0.0  1984 wpa_supplicant -B -Dnl80211 -i mlan0 -c /run/ems-wpa-mlan0.conf
+    942       1 Mon Aug  3 10:26:18 2026  1-12:49:10  1.3  2.2 44392 /bin/cloudflared --no-autoupdate --config /etc/cloudflared/config.yml tunnel run
+   2368       1 Mon Aug  3 10:36:43 2026  1-12:38:44  0.0  0.1  2612 /usr/sbin/ntpd -u ntp:ntp -n -g
+ 168103       1 Tue Aug  4 16:50:55 2026    06:24:33 42.8  5.9 117956 /opt/kinetics-gateway/venv/bin/python3 /opt/kinetics-gateway/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
+ 168667       1 Tue Aug  4 16:55:35 2026    06:19:53  0.0  1.0 21040 /usr/bin/python3 /root/bess_seven_day_v302_compatible_scheduler.py
+ 174186       2 Tue Aug  4 17:58:23 2026    05:17:04  0.0  0.0     0 [kworker/1:1H-kblockd]
+ 180854       2 Tue Aug  4 19:16:39 2026    03:58:49  0.0  0.0     0 [kworker/1:0-events]
+ 195991       2 Tue Aug  4 22:15:05 2026    01:00:23  0.0  0.0     0 [kworker/0:1-events]
+ 196360       1 Tue Aug  4 22:19:24 2026       56:04  0.0  0.2  4048 sshd-session: root [priv]
+ 196361  196360 Tue Aug  4 22:19:24 2026       56:04  0.0  0.0     0 [sshd] <defunct>
+ 196367       1 Tue Aug  4 22:19:26 2026       56:02  0.0  0.3  7116 /usr/lib/systemd/systemd --user
+ 196370  196367 Tue Aug  4 22:19:26 2026       56:02  0.0  0.1  2516 (sd-pam)
+ 196377  196367 Tue Aug  4 22:19:27 2026       56:01  0.0  0.1  2984 /usr/bin/dbus-daemon --session --address=systemd: --nofork --nopidfile --systemd-activation --syslog-only
+ 196378  196367 Tue Aug  4 22:19:27 2026       56:01  0.0  0.2  4620 /usr/bin/pipewire
+ 196379  196360 Tue Aug  4 22:19:27 2026       56:01  0.0  0.2  4048 sshd-session: root@pts/0
+ 196380  196367 Tue Aug  4 22:19:27 2026       56:01  0.0  0.4  8100 /usr/bin/wireplumber
+ 196381  196367 Tue Aug  4 22:19:27 2026       56:01  0.0  0.1  2320 /usr/bin/pipewire -c filter-chain.conf
+ 196382  196367 Tue Aug  4 22:19:27 2026       56:01  0.0  0.2  4356 /usr/bin/pipewire-pulse
+ 196397  196379 Tue Aug  4 22:19:27 2026       56:01  0.0  0.1  3892 -sh
+ 196900       1 Tue Aug  4 22:25:07 2026       50:21  0.0  0.2  4168 sshd-session: root [priv]
+ 196901  196900 Tue Aug  4 22:25:07 2026       50:21  0.0  0.0     0 [sshd] <defunct>
+ 196913  196900 Tue Aug  4 22:25:09 2026       50:19  0.0  0.2  4132 sshd-session: root@pts/1
+ 196914  196913 Tue Aug  4 22:25:10 2026       50:18  0.0  0.2  4032 -sh
+ 197660       2 Tue Aug  4 22:32:33 2026       42:55  0.0  0.0     0 [kworker/0:1H-mmc_complete]
+ 198359       2 Tue Aug  4 22:40:40 2026       34:47  0.0  0.0     0 [kworker/u8:3-events_unbound]
+ 198861       2 Tue Aug  4 22:46:31 2026       28:57  0.0  0.0     0 [kworker/u8:0-ext4-rsv-conversion]
+ 199588       2 Tue Aug  4 22:54:33 2026       20:55  0.0  0.0     0 [kworker/u9:0-MOAL_TX_WORK_QUEUE]
+ 200316       2 Tue Aug  4 23:02:41 2026       12:47  0.0  0.0     0 [kworker/0:2H-kblockd]
+ 200387       2 Tue Aug  4 23:03:23 2026       12:05  0.0  0.0     0 [kworker/1:1-mm_percpu_wq]
+ 200416       2 Tue Aug  4 23:03:45 2026       11:43  0.0  0.0     0 [kworker/u8:2-events_unbound]
+ 200655       2 Tue Aug  4 23:06:36 2026       08:51  0.0  0.0     0 [kworker/0:0-mm_percpu_wq]
+ 200820       2 Tue Aug  4 23:08:28 2026       07:00  0.0  0.0     0 [kworker/u9:2-MOAL_RX_WORK_QUEUE]
+ 200849       2 Tue Aug  4 23:08:50 2026       06:37  0.0  0.0     0 [kworker/1:0H]
+ 201123       2 Tue Aug  4 23:12:04 2026       03:24  0.0  0.0     0 [kworker/u8:1-events_unbound]
+ 201124       2 Tue Aug  4 23:12:08 2026       03:19  0.0  0.0     0 [kworker/0:2-events]
+ 201153     319 Tue Aug  4 23:12:27 2026       03:00  0.0  0.1  3512 systemd-userwork: waiting...
+ 201210     319 Tue Aug  4 23:13:08 2026       02:19  0.0  0.2  4108 systemd-userwork: waiting...
+ 201232     319 Tue Aug  4 23:13:21 2026       02:07  0.0  0.1  3516 systemd-userwork: waiting...
+ 201261       2 Tue Aug  4 23:13:39 2026       01:48  0.0  0.0     0 [kworker/u9:1-MOAL_TX_WORK_QUEUE]
+ 201395       2 Tue Aug  4 23:15:08 2026       00:20  0.0  0.0     0 [kworker/1:2H]
+ 201396       2 Tue Aug  4 23:15:08 2026       00:19  0.1  0.0     0 [kworker/0:0H-mmc_complete]
+ 201405       2 Tue Aug  4 23:15:14 2026       00:14  0.0  0.0     0 [kworker/u8:4-events_power_efficient]
+ 201465     506 Tue Aug  4 23:15:25 2026       00:03  0.0  0.0  1140 sleep 5
+ 201503  196914 Tue Aug  4 23:15:28 2026       00:00 66.6  0.1  3132 ps -eo pid,ppid,lstart,etime,%cpu,%mem,rss,cmd

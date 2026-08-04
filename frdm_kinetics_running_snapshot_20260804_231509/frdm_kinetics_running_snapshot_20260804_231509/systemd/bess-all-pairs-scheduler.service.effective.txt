@@ -1,0 +1,18 @@
+# /etc/systemd/system/bess-all-pairs-scheduler.service
+[Unit]
+Description=BESS Four-Pair SOC Cutoff and Scheduled Discharge Supervisor
+After=network-online.target kinetics-gateway.service
+Requires=kinetics-gateway.service
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/kinetics-gateway/backend
+EnvironmentFile=/etc/bess-all-pairs-scheduler.env
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/usr/bin/python3 /root/bess_all_pairs_scheduler.py
+Restart=no
+KillSignal=SIGTERM
+TimeoutStopSec=900
+
+[Install]
+WantedBy=multi-user.target

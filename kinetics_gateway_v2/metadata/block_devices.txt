@@ -1,0 +1,8 @@
+NAME           SIZE TYPE FSTYPE MOUNTPOINTS               MODEL
+mmcblk0       29.1G disk                                  
+|-mmcblk0p1    256M part vfat   /run/media/boot-mmcblk0p1 
+`-mmcblk0p2    8.5G part ext4   /                         
+mmcblk0boot0     4M disk                                  
+mmcblk0boot1     4M disk                                  
+mmcblk1      116.1G disk                                  
+`-mmcblk1p1  116.1G part ext4   /mnt/ems-logs             

@@ -1,0 +1,15 @@
+Filesystem     Type      Size  Used Avail Use% Mounted on
+/dev/root      ext4      8.2G  6.5G  1.3G  84% /
+devtmpfs       devtmpfs  777M     0  777M   0% /dev
+tmpfs          tmpfs     970M     0  970M   0% /dev/shm
+tmpfs          tmpfs     388M   47M  342M  12% /run
+tmpfs          tmpfs     970M  250M  721M  26% /tmp
+tmpfs          tmpfs     1.0M     0  1.0M   0% /run/credentials/systemd-journald.service
+tmpfs          tmpfs     970M   13M  958M   2% /var/volatile
+tmpfs          tmpfs     1.0M     0  1.0M   0% /run/credentials/systemd-resolved.service
+tmpfs          tmpfs     1.0M     0  1.0M   0% /run/credentials/systemd-networkd.service
+/dev/mmcblk0p1 vfat      256M   36M  221M  14% /run/media/boot-mmcblk0p1
+/dev/mmcblk1p1 ext4      114G   14G   94G  13% /mnt/ems-logs
+tmpfs          tmpfs     1.0M     0  1.0M   0% /run/credentials/getty@tty1.service
+tmpfs          tmpfs     1.0M     0  1.0M   0% /run/credentials/serial-getty@ttyLP0.service
+tmpfs          tmpfs     194M  8.0K  194M   1% /run/user/0
