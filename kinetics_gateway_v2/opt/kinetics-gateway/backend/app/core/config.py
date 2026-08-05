@@ -357,6 +357,12 @@ class GatewayConfig(BaseModel):
     api_host: str = "0.0.0.0"
     api_port: int = 8000
     telemetry_interval_seconds: float = 1.0
+    websocket_max_clients: int = 8
+    websocket_send_timeout_seconds: float = 2.0
+    websocket_allow_full_mode: bool = False
+    http_max_concurrent_requests: int = 12
+    http_reserved_priority_requests: int = 4
+    http_admission_timeout_seconds: float = 0.10
     bms_catalog_file: str = "generated_protocols/bms_catalog.json"
     pcs_catalog_file: str = "generated_protocols/pcs_catalog.json"
     bms: BmsConfig = Field(default_factory=BmsConfig)
@@ -369,6 +375,19 @@ class GatewayConfig(BaseModel):
 
     @model_validator(mode="after")
     def validate_write_mode(self) -> "GatewayConfig":
+        if self.websocket_max_clients < 1:
+            raise ValueError("websocket_max_clients must be at least 1")
+        if self.websocket_send_timeout_seconds <= 0:
+            raise ValueError("websocket_send_timeout_seconds must be positive")
+        if self.http_max_concurrent_requests < 2:
+            raise ValueError("http_max_concurrent_requests must be at least 2")
+        if not 1 <= self.http_reserved_priority_requests < self.http_max_concurrent_requests:
+            raise ValueError(
+                "http_reserved_priority_requests must be between 1 and "
+                "http_max_concurrent_requests - 1"
+            )
+        if self.http_admission_timeout_seconds <= 0:
+            raise ValueError("http_admission_timeout_seconds must be positive")
         if self.mode == "read_only":
             self.bms.write_enabled = False
             self.pcs.write_enabled = False

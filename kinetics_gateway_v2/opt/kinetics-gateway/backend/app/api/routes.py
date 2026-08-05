@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect, status
@@ -10,6 +11,12 @@ from pydantic import BaseModel
 from app.security.auth import AuthService, User, build_user_dependencies
 from app.services.bms_pcs_control import ControlStatusBusyError
 from app.services.gateway_service import GatewayService
+from app.services.runtime_metrics import RuntimeMetrics
+
+
+async def _bounded_websocket_send(websocket: WebSocket, payload: Any, timeout: float) -> None:
+    """Bound per-client send work so a lagging peer cannot retain snapshots forever."""
+    await asyncio.wait_for(websocket.send_json(payload), timeout=timeout)
 
 
 class LoginRequest(BaseModel):
@@ -52,8 +59,36 @@ class SequenceStopRequest(BaseModel):
     open_bms: bool = False
 
 
-def build_router(service: GatewayService, auth: AuthService) -> APIRouter:
+def build_router(
+    service: GatewayService,
+    auth: AuthService,
+    runtime_metrics: RuntimeMetrics | None = None,
+) -> APIRouter:
     router = APIRouter()
+    websocket_slots = asyncio.BoundedSemaphore(service.config.websocket_max_clients)
+
+    async def acquire_websocket_slot(websocket: WebSocket) -> bool:
+        if websocket_slots.locked():
+            if runtime_metrics is not None:
+                runtime_metrics.websocket_rejected()
+            await websocket.close(code=1013, reason="WebSocket client limit reached")
+            return False
+        await websocket_slots.acquire()
+        return True
+
+    async def send_bounded(websocket: WebSocket, payload: Any) -> None:
+        try:
+            await _bounded_websocket_send(
+                websocket,
+                payload,
+                service.config.websocket_send_timeout_seconds,
+            )
+        except asyncio.TimeoutError:
+            if runtime_metrics is not None:
+                runtime_metrics.websocket_send_timeout()
+            with contextlib.suppress(Exception):
+                await websocket.close(code=1013, reason="WebSocket client too slow")
+            raise WebSocketDisconnect(code=1013)
     current_user, require_internal = build_user_dependencies(auth)
 
     @router.post("/api/auth/login")
@@ -101,7 +136,13 @@ def build_router(service: GatewayService, auth: AuthService) -> APIRouter:
 
     @router.get("/api/diagnostics/polling")
     def diagnostics_polling(user: User = Depends(current_user)) -> dict[str, Any]:
-        return {"polling": service.health().get("polling", {})}
+        return service.polling_diagnostics()
+
+    @router.get("/api/diagnostics/runtime")
+    def diagnostics_runtime(user: User = Depends(require_internal)) -> dict[str, Any]:
+        if runtime_metrics is None:
+            raise HTTPException(status_code=503, detail="Runtime metrics are unavailable")
+        return runtime_metrics.snapshot()
 
     @router.get("/api/diagnostics/control-refresh")
     def diagnostics_control_refresh(
@@ -149,6 +190,10 @@ def build_router(service: GatewayService, auth: AuthService) -> APIRouter:
     def bms_racks(user: User = Depends(current_user)) -> dict[str, Any]:
         racks = service.snapshot()["racks"]
         return {"racks": racks, "count": len(racks)}
+
+    @router.get("/api/bms/racks/summary")
+    def bms_racks_summary(user: User = Depends(current_user)) -> dict[str, Any]:
+        return service.rack_summaries()
 
     @router.get("/api/bms/racks/{rack_id}")
     def bms_rack(rack_id: int, include_all: bool = Query(False), user: User = Depends(current_user)) -> dict[str, Any]:
@@ -687,7 +732,7 @@ def build_router(service: GatewayService, auth: AuthService) -> APIRouter:
 
     @router.get("/api/storage/status")
     def storage_status(user: User = Depends(current_user)) -> dict[str, Any]:
-        return service.store.status()
+        return service.storage_status()
 
     @router.post("/api/storage/retention/run")
     def run_retention(user: User = Depends(require_internal)) -> dict[str, Any]:
@@ -729,22 +774,39 @@ def build_router(service: GatewayService, auth: AuthService) -> APIRouter:
         except HTTPException:
             await websocket.close(code=4401)
             return
+        if mode == "full" and not service.config.websocket_allow_full_mode:
+            if runtime_metrics is not None:
+                runtime_metrics.websocket_rejected()
+            await websocket.close(code=4403, reason="Full telemetry mode disabled")
+            return
+        if not await acquire_websocket_slot(websocket):
+            return
         await websocket.accept()
+        if runtime_metrics is not None:
+            runtime_metrics.websocket_connected()
+        send_failure = False
         try:
             if mode == "full":
                 while True:
-                    await websocket.send_json(service.snapshot())
+                    await send_bounded(websocket, service.snapshot())
                     await asyncio.sleep(service.config.telemetry_interval_seconds)
             last_sequence = int(service.snapshot().get("sequence") or 0)
-            await websocket.send_json(service.compact_snapshot())
+            await send_bounded(websocket, service.compact_snapshot())
             while True:
                 updates = service.updates_since(last_sequence)
                 for update in updates:
-                    await websocket.send_json(update)
+                    await send_bounded(websocket, update)
                     last_sequence = max(last_sequence, int(update.get("sequence") or last_sequence))
                 await asyncio.sleep(0.2)
         except WebSocketDisconnect:
             return
+        except Exception:
+            send_failure = True
+            raise
+        finally:
+            if runtime_metrics is not None:
+                runtime_metrics.websocket_disconnected(send_failure=send_failure)
+            websocket_slots.release()
 
     @router.websocket("/ws/alarms")
     async def alarm_socket(websocket: WebSocket, token: str = Query(...)) -> None:
@@ -753,13 +815,25 @@ def build_router(service: GatewayService, auth: AuthService) -> APIRouter:
         except HTTPException:
             await websocket.close(code=4401)
             return
+        if not await acquire_websocket_slot(websocket):
+            return
         await websocket.accept()
+        if runtime_metrics is not None:
+            runtime_metrics.websocket_connected()
+        send_failure = False
         try:
             while True:
                 alarms = service.store.list_alarms(active_only=True, limit=1000)
-                await websocket.send_json({"alarms": alarms, "count": len(alarms)})
+                await send_bounded(websocket, {"alarms": alarms, "count": len(alarms)})
                 await asyncio.sleep(max(1.0, service.config.telemetry_interval_seconds))
         except WebSocketDisconnect:
             return
+        except Exception:
+            send_failure = True
+            raise
+        finally:
+            if runtime_metrics is not None:
+                runtime_metrics.websocket_disconnected(send_failure=send_failure)
+            websocket_slots.release()
 
     return router

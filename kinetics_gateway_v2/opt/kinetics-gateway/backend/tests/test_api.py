@@ -3,6 +3,7 @@ import os
 os.environ.setdefault("KINETICS_CONFIG", "configs/kinetics_mock.json")
 
 from fastapi.testclient import TestClient
+from starlette.websockets import WebSocketDisconnect
 from app.main import app
 
 
@@ -59,3 +60,37 @@ def test_background_scheduler_advances_fast_group():
         time.sleep(1.2)
         after = client.get("/api/health").json()["polling"]["fast"]["count"]
         assert after > before
+
+
+def test_runtime_diagnostics_requires_internal_role_and_reports_requests():
+    with TestClient(app) as client:
+        customer = login(client, "customer", "Customer@123")
+        assert client.get(
+            "/api/diagnostics/runtime",
+            headers={"Authorization": f"Bearer {customer}"},
+        ).status_code == 403
+
+        internal = login(client)
+        response = client.get(
+            "/api/diagnostics/runtime",
+            headers={"Authorization": f"Bearer {internal}"},
+        )
+        assert response.status_code == 200
+        body = response.json()
+        assert body["process"]["rss_bytes"] is not None
+        assert body["http"]["in_flight"] >= 1
+        assert "task_count" in body["event_loop"]
+
+
+def test_websocket_defaults_to_delta_and_rejects_full_mode():
+    with TestClient(app) as client:
+        token = login(client)
+        with client.websocket_connect(f"/ws/telemetry?token={token}") as websocket:
+            initial = websocket.receive_json()
+            assert "sequence" in initial
+
+        try:
+            with client.websocket_connect(f"/ws/telemetry?token={token}&mode=full"):
+                raise AssertionError("full WebSocket mode must be disabled by default")
+        except WebSocketDisconnect as exc:
+            assert exc.code == 4403

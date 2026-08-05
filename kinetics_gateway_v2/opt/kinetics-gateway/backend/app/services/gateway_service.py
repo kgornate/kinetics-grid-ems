@@ -19,6 +19,7 @@ from app.services.alarm_engine import AlarmEngine
 from app.services.bms_pcs_control import BmsPcsControlService
 from app.protocols.planner import build_read_blocks
 from app.storage.sqlite_store import SQLiteStore
+from app.services.runtime_metrics import RuntimeMetrics
 
 LOGGER = logging.getLogger(__name__)
 POLL_CLASSES = ("fast", "normal", "slow", "bulk")
@@ -31,9 +32,17 @@ def now_iso() -> str:
 class GatewayService:
     """Owns the complete cached plant state and independently polls each data-rate class."""
 
-    def __init__(self, config: GatewayConfig, store: SQLiteStore) -> None:
+    def __init__(
+        self,
+        config: GatewayConfig,
+        store: SQLiteStore,
+        runtime_metrics: RuntimeMetrics | None = None,
+        *,
+        eager_initialization: bool = True,
+    ) -> None:
         self.config = config
         self.store = store
+        self.runtime_metrics = runtime_metrics
         self.bms_catalog = ProtocolCatalog.load(resolve_path(config.bms_catalog_file))
         pcs_catalog = ProtocolCatalog.load(resolve_path(config.pcs_catalog_file))
         self.pcs_catalog = apply_pcs_overrides(pcs_catalog, resolve_path(config.pcs.overrides_file))
@@ -82,10 +91,48 @@ class GatewayService:
             "total_uncompressed_bytes": 0,
             "total_stored_bytes": 0,
         }
-        self._initializing = True
-        self.refresh_all()
         self._initializing = False
-        self._store_snapshot_if_due(self._snapshot, force=True)
+        self._initialized = False
+        self._initialization_started_at: str | None = None
+        self._initialization_completed_at: str | None = None
+        self._initialization_error: str | None = None
+        self._data_rate_cache: dict[str, Any] | None = None
+        self._data_rate_generated_at: str | None = None
+        if eager_initialization:
+            self.initialize()
+
+    def initialize(self) -> None:
+        """Warm the telemetry cache outside the ASGI startup/event-loop thread."""
+        with self._lock:
+            if self._initialized or self._initializing:
+                return
+            self._initializing = True
+            self._initialization_started_at = now_iso()
+            self._initialization_error = None
+        try:
+            self.refresh_all()
+            self._store_snapshot_if_due(self.snapshot(), force=True)
+            self.refresh_data_rate_analysis()
+            with self._lock:
+                self._initialized = True
+                self._initialization_completed_at = now_iso()
+        except Exception as error:
+            with self._lock:
+                self._initialization_error = str(error)
+            raise
+        finally:
+            with self._lock:
+                self._initializing = False
+
+    def initialization_status(self) -> dict[str, Any]:
+        with self._lock:
+            return {
+                "ready": self._initialized,
+                "initializing": self._initializing,
+                "started_at": self._initialization_started_at,
+                "completed_at": self._initialization_completed_at,
+                "error": self._initialization_error,
+            }
 
     def _empty_snapshot(self) -> dict[str, Any]:
         racks = [
@@ -201,7 +248,10 @@ class GatewayService:
             for asset in updates:
                 self._merge_asset(asset, poll_class)
             event = self._finalize_poll(poll_class, updates, started_at, duration_ms, error_text)
-            return deepcopy(event)
+            historian_samples = self._prepare_historian_samples_if_due_locked(self._snapshot)
+            result = deepcopy(event)
+        self._store_prepared_historian_samples(historian_samples)
+        return result
 
     def poll_pcs(self) -> dict[str, Any]:
         """Poll all configured PCS slaves sequentially on the shared transport."""
@@ -256,9 +306,11 @@ class GatewayService:
         with self._lock:
             for update in updates:
                 self._merge_asset(update, "pcs")
-            return deepcopy(
-                self._finalize_poll("pcs", updates, started_at, duration_ms, error_text)
-            )
+            event = self._finalize_poll("pcs", updates, started_at, duration_ms, error_text)
+            historian_samples = self._prepare_historian_samples_if_due_locked(self._snapshot)
+            result = deepcopy(event)
+        self._store_prepared_historian_samples(historian_samples)
+        return result
 
     def _hardware_bms_class(self, poll_class: str) -> list[dict[str, Any]]:
         updates: list[dict[str, Any]] = []
@@ -456,8 +508,6 @@ class GatewayService:
         stats["average_event_bytes"] = round(stats["total_event_bytes"] / stats["count"], 2)
         self._snapshot["polling"] = deepcopy(self._poll_stats)
         self._updates.append(event)
-        if not self._initializing:
-            self._store_snapshot_if_due(self._snapshot)
         return event
 
     def control_pair_snapshot(self, rack_id: int, pcs_asset_id: str) -> dict[str, Any]:
@@ -568,6 +618,36 @@ class GatewayService:
             rack = next(r for r in self._snapshot["racks"] if int(r["rack_id"]) == rack_id)
             return deepcopy(rack)
 
+    def rack_summaries(self) -> dict[str, Any]:
+        """Return bounded rack metadata without copying full telemetry maps."""
+        with self._lock:
+            racks = [
+                {
+                    "asset_id": rack.get("asset_id"),
+                    "rack_id": rack.get("rack_id"),
+                    "online": rack.get("online"),
+                    "timestamp": rack.get("timestamp"),
+                    "telemetry_point_count": len(rack.get("telemetry", {})),
+                    "poll_status": deepcopy(rack.get("poll_status", {})),
+                }
+                for rack in self._snapshot.get("racks", [])
+            ]
+            return {
+                "gateway_id": self.config.gateway_id,
+                "sequence": self._sequence,
+                "timestamp": self._snapshot.get("timestamp"),
+                "racks": racks,
+                "count": len(racks),
+            }
+
+    def polling_diagnostics(self) -> dict[str, Any]:
+        with self._lock:
+            return {"polling": deepcopy(self._poll_stats)}
+
+    def storage_status(self) -> dict[str, Any]:
+        with self._lock:
+            return deepcopy(self._storage_status_cache)
+
     def _all_assets(self, snapshot: dict[str, Any]) -> list[dict[str, Any]]:
         pcs_assets = list(snapshot.get("pcs_devices", {}).values())
         if not pcs_assets and isinstance(snapshot.get("pcs"), dict):
@@ -640,15 +720,28 @@ class GatewayService:
             "telemetry": telemetry,
         }
 
-    def _store_snapshot_if_due(self, snapshot: dict[str, Any], *, force: bool = False) -> None:
+    def _prepare_historian_samples_if_due_locked(
+        self,
+        snapshot: dict[str, Any],
+        *,
+        force: bool = False,
+    ) -> list[tuple[str, dict[str, Any], Any]] | None:
+        """Claim a due historian interval and copy its bounded write payload.
+
+        The caller must hold ``self._lock``. Only snapshot selection and copying
+        happen here; JSON encoding, compression and SQLite I/O happen after the
+        cache lock is released.
+        """
+        if self._initializing and not force:
+            return None
         now = time.monotonic()
         interval = self.store.sample_interval_seconds
         if not force and now - self._last_store_at < interval:
-            return
+            return None
         self._last_store_at = now
 
         timestamp = snapshot.get("timestamp")
-        samples = [
+        return [
             (
                 str(asset.get("asset_id", "unknown")),
                 self._history_asset(asset),
@@ -656,22 +749,50 @@ class GatewayService:
             )
             for asset in self._all_assets(snapshot)
         ]
-        sizes = self.store.store_telemetry_batch(samples)
+
+    def _store_prepared_historian_samples(
+        self,
+        samples: list[tuple[str, dict[str, Any], Any]] | None,
+    ) -> None:
+        """Persist an already-copied historian batch without the cache lock."""
+        if not samples:
+            return
+        store_started = time.perf_counter()
+        store_failed = False
+        try:
+            sizes = self.store.store_telemetry_batch(samples)
+        except Exception:
+            store_failed = True
+            raise
+        finally:
+            if self.runtime_metrics is not None:
+                self.runtime_metrics.background_finished(
+                    "historian-write",
+                    (time.perf_counter() - store_started) * 1000,
+                    error=store_failed,
+                )
         raw_total = sizes["uncompressed_bytes"]
         stored_total = sizes["stored_bytes"]
 
-        stats = self._storage_sample_stats
-        stats["samples"] += 1
-        stats["last_uncompressed_bytes"] = raw_total
-        stats["last_stored_bytes"] = stored_total
-        stats["total_uncompressed_bytes"] += raw_total
-        stats["total_stored_bytes"] += stored_total
-        stats["average_uncompressed_bytes"] = round(
-            stats["total_uncompressed_bytes"] / stats["samples"], 2
-        )
-        stats["average_stored_bytes"] = round(
-            stats["total_stored_bytes"] / stats["samples"], 2
-        )
+        with self._lock:
+            stats = self._storage_sample_stats
+            stats["samples"] += 1
+            stats["last_uncompressed_bytes"] = raw_total
+            stats["last_stored_bytes"] = stored_total
+            stats["total_uncompressed_bytes"] += raw_total
+            stats["total_stored_bytes"] += stored_total
+            stats["average_uncompressed_bytes"] = round(
+                stats["total_uncompressed_bytes"] / stats["samples"], 2
+            )
+            stats["average_stored_bytes"] = round(
+                stats["total_stored_bytes"] / stats["samples"], 2
+            )
+
+    def _store_snapshot_if_due(self, snapshot: dict[str, Any], *, force: bool = False) -> None:
+        """Compatibility wrapper used by initialization and direct callers."""
+        with self._lock:
+            samples = self._prepare_historian_samples_if_due_locked(snapshot, force=force)
+        self._store_prepared_historian_samples(samples)
 
     def set_mock_scenario(self, scenario: str) -> dict[str, Any]:
         with self._lock:
@@ -857,7 +978,7 @@ class GatewayService:
             ),
         }
 
-    def data_rate_analysis(self) -> dict[str, Any]:
+    def _build_data_rate_analysis(self) -> dict[str, Any]:
         intervals = {
             "fast": self.config.bms.poll_fast_seconds,
             "normal": self.config.bms.poll_normal_seconds,
@@ -925,27 +1046,46 @@ class GatewayService:
             },
         }
 
+    def refresh_data_rate_analysis(self) -> dict[str, Any]:
+        analysis = self._build_data_rate_analysis()
+        generated_at = now_iso()
+        analysis["generated_at"] = generated_at
+        with self._lock:
+            self._data_rate_cache = deepcopy(analysis)
+            self._data_rate_generated_at = generated_at
+        return analysis
+
+    def data_rate_analysis(self) -> dict[str, Any]:
+        with self._lock:
+            if self._data_rate_cache is not None:
+                return deepcopy(self._data_rate_cache)
+        # Compatibility fallback for direct service users. In production the
+        # asynchronous initializer populates this before the first poll cycle.
+        return self.refresh_data_rate_analysis()
+
     def health(self) -> dict[str, Any]:
-        snapshot = self.snapshot()
-        assets = self.assets()
-        enabled_assets = [asset for asset in assets if asset.get("enabled", True)]
-        online_count = sum(1 for asset in enabled_assets if asset.get("online"))
-        return {
+        with self._lock:
+            assets = self._all_assets(self._snapshot)
+            enabled_assets = [asset for asset in assets if not asset.get("disabled", False)]
+            online_count = sum(1 for asset in enabled_assets if asset.get("online"))
+            result = {
             "status": "ok" if online_count == len(enabled_assets) else "degraded",
             "gateway_id": self.config.gateway_id,
             "mode": self.config.mode,
-            "sequence": snapshot.get("sequence"),
-            "timestamp": snapshot.get("timestamp"),
+            "sequence": self._sequence,
+            "timestamp": self._snapshot.get("timestamp"),
             "assets_online": online_count,
             "assets_total": len(enabled_assets),
             "assets_configured": len(assets),
             "last_poll_error": self._last_poll_error,
             "polling": deepcopy(self._poll_stats),
             "network": self.config.network.model_dump(),
-            "storage": self.store.status(),
+            "storage": deepcopy(self._storage_status_cache),
+            "startup": self.initialization_status(),
             "control_sequence": {
                 "enabled": self.config.control_sequence.enabled,
                 "full_automatic_sequence_allowed": self.config.control_sequence.allow_full_automatic_sequence,
                 "pairs": [pair.model_dump() for pair in self.config.control_sequence.pairs],
             },
-        }
+            }
+            return result

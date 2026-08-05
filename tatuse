@@ -1,0 +1,218 @@
+frdm_kinetics_running_snapshot_20260804_231509/frdm_kinetics_running_snapshot_20260804_231509/metadata/block_devices.txt:2: trailing whitespace.
+[32m+[m[32mmmcblk0       29.1G disk[m[41m                                  [m
+frdm_kinetics_running_snapshot_20260804_231509/frdm_kinetics_running_snapshot_20260804_231509/metadata/block_devices.txt:3: trailing whitespace.
+[32m+[m[32m|-mmcblk0p1    256M part vfat   /run/media/boot-mmcblk0p1[m[41m [m
+frdm_kinetics_running_snapshot_20260804_231509/frdm_kinetics_running_snapshot_20260804_231509/metadata/block_devices.txt:4: trailing whitespace.
+[32m+[m[32m`-mmcblk0p2    8.5G part ext4   /[m[41m                         [m
+frdm_kinetics_running_snapshot_20260804_231509/frdm_kinetics_running_snapshot_20260804_231509/metadata/block_devices.txt:5: trailing whitespace.
+[32m+[m[32mmmcblk0boot0     4M disk[m[41m                                  [m
+frdm_kinetics_running_snapshot_20260804_231509/frdm_kinetics_running_snapshot_20260804_231509/metadata/block_devices.txt:6: trailing whitespace.
+[32m+[m[32mmmcblk0boot1     4M disk[m[41m                                  [m
+frdm_kinetics_running_snapshot_20260804_231509/frdm_kinetics_running_snapshot_20260804_231509/metadata/block_devices.txt:7: trailing whitespace.
+[32m+[m[32mmmcblk1      116.1G disk[m[41m                                  [m
+frdm_kinetics_running_snapshot_20260804_231509/frdm_kinetics_running_snapshot_20260804_231509/metadata/block_devices.txt:8: trailing whitespace.
+[32m+[m[32m`-mmcblk1p1  116.1G part ext4   /mnt/ems-logs[m[41m             [m
+frdm_kinetics_running_snapshot_20260804_231509/frdm_kinetics_running_snapshot_20260804_231509/metadata/gateway_command.txt:1: trailing whitespace.
+[32m+[m[32m/opt/kinetics-gateway/venv/bin/python3 /opt/kinetics-gateway/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000[m[41m [m
+frdm_kinetics_running_snapshot_20260804_231509/frdm_kinetics_running_snapshot_20260804_231509/metadata/ip_addresses.txt:1: trailing whitespace.
+[32m+[m[32mlo               UNKNOWN        127.0.0.1/8 ::1/128[m[41m [m
+frdm_kinetics_running_snapshot_20260804_231509/frdm_kinetics_running_snapshot_20260804_231509/metadata/ip_addresses.txt:2: trailing whitespace.
+[32m+[m[32meth0             DOWN           192.168.10.2/24[m[41m [m
+frdm_kinetics_running_snapshot_20260804_231509/frdm_kinetics_running_snapshot_20260804_231509/metadata/ip_addresses.txt:3: trailing whitespace.
+[32m+[m[32meth1             UP             192.168.111.2/24 fe80::92a9:f7ff:fe80:4016/64[m[41m [m
+frdm_kinetics_running_snapshot_20260804_231509/frdm_kinetics_running_snapshot_20260804_231509/metadata/ip_addresses.txt:4: trailing whitespace.
+[32m+[m[32mmlan0            UP             192.168.1.100/24 fe80::82a1:97ff:fe50:376d/64[m[41m [m
+frdm_kinetics_running_snapshot_20260804_231509/frdm_kinetics_running_snapshot_20260804_231509/metadata/ip_addresses.txt:5: trailing whitespace.
+[32m+[m[32muap0             DOWN[m[41m           [m
+frdm_kinetics_running_snapshot_20260804_231509/frdm_kinetics_running_snapshot_20260804_231509/metadata/ip_addresses.txt:6: trailing whitespace.
+[32m+[m[32mwfd0             DOWN[m[41m           [m
+frdm_kinetics_running_snapshot_20260804_231509/frdm_kinetics_running_snapshot_20260804_231509/metadata/ip_addresses.txt:7: trailing whitespace.
+[32m+[m[32mcan0             DOWN[m[41m           [m
+frdm_kinetics_running_snapshot_20260804_231509/frdm_kinetics_running_snapshot_20260804_231509/metadata/ip_routes.txt:1: trailing whitespace.
+[32m+[m[32mdefault via 192.168.1.1 dev mlan0 metric 10[m[41m [m
+frdm_kinetics_running_snapshot_20260804_231509/frdm_kinetics_running_snapshot_20260804_231509/metadata/ip_routes.txt:2: trailing whitespace.
+[32m+[m[32m192.168.1.0/24 dev mlan0 proto kernel scope link src 192.168.1.100[m[41m [m
+frdm_kinetics_running_snapshot_20260804_231509/frdm_kinetics_running_snapshot_20260804_231509/metadata/ip_routes.txt:3: trailing whitespace.
+[32m+[m[32m192.168.10.0/24 dev eth0 proto kernel scope link src 192.168.10.2 linkdown[m[41m [m
+frdm_kinetics_running_snapshot_20260804_231509/frdm_kinetics_running_snapshot_20260804_231509/metadata/ip_routes.txt:4: trailing whitespace.
+[32m+[m[32m192.168.111.0/24 dev eth1 proto kernel scope link src 192.168.111.2[m[41m [m
+frdm_kinetics_running_snapshot_20260804_231509/frdm_kinetics_running_snapshot_20260804_231509/metadata/scheduler_command.txt:1: trailing whitespace.
+[32m+[m[32m/usr/bin/python3 /root/bess_seven_day_v302_compatible_scheduler.py[m[41m [m
+kinetics_gateway_latest_release/kinetics_gateway_latest_release/opt/kinetics-gateway/backend/protocol_sources/pcs_hmi/cfg_sys.json:23: trailing whitespace.
+[32m+[m[41m			  [m
+kinetics_gateway_latest_release/kinetics_gateway_latest_release/opt/kinetics-gateway/backend/protocol_sources/pcs_hmi/cfg_sys.json:24: space before tab in indent.
+[32m+[m			[41m  [m	[32m["0x1200", "±‰¡˜‘À––◊¥Ã¨", "1", "1", "1 Õ£ª˙|2 »Ì∆Ù|4 ◊‘ºÏ|8 ¥˝ª˙|16 ‘À––|32 Ω⁄ƒ‹‘À––|64 µ˜∂»‘À––|128 Ωµ∂Ó‘À––|256 ¿ÎÕ¯‘À––|512 ≤¢Õ¯‘À––|1024 π ’œÕ£ª˙|48 ‘À––|80 ‘À––|144 ‘À––|272 ‘À––|576 VSG≤¢Õ¯‘À––|320 VSG¿ÎÕ¯‘À––", "0", "15", "11", "22", "1", "-65535", "65535", "0", "1", ""],[m
+kinetics_gateway_latest_release/kinetics_gateway_latest_release/opt/kinetics-gateway/backend/protocol_sources/pcs_hmi/cfg_sys.json:28: trailing whitespace.
+[32m+[m[41m				[m
+kinetics_gateway_latest_release/kinetics_gateway_latest_release/opt/kinetics-gateway/backend/protocol_sources/pcs_hmi/cfg_sys.json:33: trailing whitespace.
+[32m+[m[41m				[m
+kinetics_gateway_latest_release/kinetics_gateway_latest_release/opt/kinetics-gateway/backend/protocol_sources/pcs_hmi/cfg_sys.json:43: trailing whitespace.
+[32m+[m[41m				[m
+kinetics_gateway_latest_release/kinetics_gateway_latest_release/opt/kinetics-gateway/backend/protocol_sources/pcs_hmi/cfg_sys.json:48: trailing whitespace.
+[32m+[m[41m				[m
+kinetics_gateway_latest_release/kinetics_gateway_latest_release/opt/kinetics-gateway/backend/protocol_sources/pcs_hmi/cfg_sys.json:49: trailing whitespace.
+[32m+[m[41m				[m
+kinetics_gateway_latest_release/kinetics_gateway_latest_release/opt/kinetics-gateway/backend/protocol_sources/pcs_hmi/cfg_sys.json:50: trailing whitespace.
+[32m+[m[41m				[m
+kinetics_gateway_latest_release/kinetics_gateway_latest_release/opt/kinetics-gateway/backend/protocol_sources/pcs_hmi/cfg_sys.json:57: trailing whitespace.
+[32m+[m				[32m["0x1101", "ƒ∏œﬂµÁ¡˜", "1", "0", "0", "0", "15", "11", "22", "0.1", "-65535", "65535", "0", "1", "A"],[m[41m				[m
+kinetics_gateway_latest_release/kinetics_gateway_latest_release/opt/kinetics-gateway/backend/protocol_sources/pcs_hmi/cfg_sys.json:61: trailing whitespace.
+[32m+[m[41m				[m
+kinetics_gateway_latest_release/kinetics_gateway_latest_release/opt/kinetics-gateway/backend/protocol_sources/pcs_hmi/cfg_sys.json:62: trailing whitespace.
+[32m+[m				[32m["0x1110", "IGBTAŒ¬∂»", "1", "0", "0", "0", "15", "11", "22", "0.1", "-65535", "65535", "0", "1", "°Ê"],[m[41m				[m
+kinetics_gateway_latest_release/kinetics_gateway_latest_release/opt/kinetics-gateway/backend/protocol_sources/pcs_hmi/cfg_sys.json:63: trailing whitespace.
+[32m+[m				[32m["0x1111", "IGBTBŒ¬∂»", "1", "0", "0", "0", "15", "11", "22", "0.1", "-65535", "65535", "0", "1", "°Ê"],[m[41m				[m
+kinetics_gateway_latest_release/kinetics_gateway_latest_release/opt/kinetics-gateway/backend/protocol_sources/pcs_hmi/cfg_sys.json:71: trailing whitespace.
+[32m+[m[41m								[m
+kinetics_gateway_latest_release/kinetics_gateway_latest_release/opt/kinetics-gateway/backend/protocol_sources/pcs_hmi/cfg_sys.json:76: trailing whitespace.
+[32m+[m[41m				[m
+kinetics_gateway_latest_release/kinetics_gateway_latest_release/opt/kinetics-gateway/backend/protocol_sources/pcs_hmi/cfg_sys.json:86: trailing whitespace.
+[32m+[m[41m				[m
+kinetics_gateway_latest_release/kinetics_gateway_latest_release/opt/kinetics-gateway/backend/protocol_sources/pcs_hmi/cfg_sys.json:87: trailing whitespace.
+[32m+[m[41m				[m
+kinetics_gateway_latest_release/kinetics_gateway_latest_release/opt/kinetics-gateway/backend/protocol_sources/pcs_hmi/cfg_sys.json:88: trailing whitespace.
+[32m+[m[41m                [m
+kinetics_gateway_latest_release/kinetics_gateway_latest_release/opt/kinetics-gateway/backend/protocol_sources/pcs_hmi/cfg_sys.json:89: trailing whitespace.
+[32m+[m[41m				[m
+kinetics_gateway_latest_release/kinetics_gateway_latest_release/opt/kinetics-gateway/backend/protocol_sources/pcs_hmi/cfg_sys.json:94: trailing whitespace.
+[32m+[m[41m				[m
+kinetics_gateway_latest_release/kinetics_gateway_latest_release/opt/kinetics-gateway/backend/protocol_sources/pcs_hmi/cfg_sys.json:99: trailing whitespace.
+[32m+[m[41m				[m
+kinetics_gateway_latest_release/kinetics_gateway_latest_release/opt/kinetics-gateway/backend/protocol_sources/pcs_hmi/cfg_sys.json:103: trailing whitespace.
+[32m+[m[32m                ["0x160B", "ƒ∏œﬂ«∑—π±£ª§„–÷µ", "3", "1", "0", "0", "15", "11", "22", "0.1", "-65535", "65535", "0", "1", "V"],[m[41m	[m
+kinetics_gateway_latest_release/kinetics_gateway_latest_release/opt/kinetics-gateway/backend/protocol_sources/pcs_hmi/cfg_sys.json:105: trailing whitespace.
+[32m+[m[41m              [m
+kinetics_gateway_latest_release/kinetics_gateway_latest_release/opt/kinetics-gateway/backend/protocol_sources/pcs_hmi/cfg_sys.json:106: trailing whitespace.
+[32m+[m[41m		[m
+kinetics_gateway_v2/metadata/block_devices.txt:2: trailing whitespace.
+[32m+[m[32mmmcblk0       29.1G disk[m[41m                                  [m
+kinetics_gateway_v2/metadata/block_devices.txt:3: trailing whitespace.
+[32m+[m[32m|-mmcblk0p1    256M part vfat   /run/media/boot-mmcblk0p1[m[41m [m
+kinetics_gateway_v2/metadata/block_devices.txt:4: trailing whitespace.
+[32m+[m[32m`-mmcblk0p2    8.5G part ext4   /[m[41m                         [m
+kinetics_gateway_v2/metadata/block_devices.txt:5: trailing whitespace.
+[32m+[m[32mmmcblk0boot0     4M disk[m[41m                                  [m
+kinetics_gateway_v2/metadata/block_devices.txt:6: trailing whitespace.
+[32m+[m[32mmmcblk0boot1     4M disk[m[41m                                  [m
+kinetics_gateway_v2/metadata/block_devices.txt:7: trailing whitespace.
+[32m+[m[32mmmcblk1      116.1G disk[m[41m                                  [m
+kinetics_gateway_v2/metadata/block_devices.txt:8: trailing whitespace.
+[32m+[m[32m`-mmcblk1p1  116.1G part ext4   /mnt/ems-logs[m[41m             [m
+kinetics_gateway_v2/metadata/gateway_command.txt:1: trailing whitespace.
+[32m+[m[32m/opt/kinetics-gateway/venv/bin/python3 /opt/kinetics-gateway/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000[m[41m [m
+kinetics_gateway_v2/metadata/ip_addresses.txt:1: trailing whitespace.
+[32m+[m[32mlo               UNKNOWN        127.0.0.1/8 ::1/128[m[41m [m
+kinetics_gateway_v2/metadata/ip_addresses.txt:2: trailing whitespace.
+[32m+[m[32meth0             DOWN           192.168.10.2/24[m[41m [m
+kinetics_gateway_v2/metadata/ip_addresses.txt:3: trailing whitespace.
+[32m+[m[32meth1             UP             192.168.111.2/24 fe80::92a9:f7ff:fe80:4016/64[m[41m [m
+kinetics_gateway_v2/metadata/ip_addresses.txt:4: trailing whitespace.
+[32m+[m[32mmlan0            UP             192.168.1.100/24 fe80::82a1:97ff:fe50:376d/64[m[41m [m
+kinetics_gateway_v2/metadata/ip_addresses.txt:5: trailing whitespace.
+[32m+[m[32muap0             DOWN[m[41m           [m
+kinetics_gateway_v2/metadata/ip_addresses.txt:6: trailing whitespace.
+[32m+[m[32mwfd0             DOWN[m[41m           [m
+kinetics_gateway_v2/metadata/ip_addresses.txt:7: trailing whitespace.
+[32m+[m[32mcan0             DOWN[m[41m           [m
+kinetics_gateway_v2/metadata/ip_routes.txt:1: trailing whitespace.
+[32m+[m[32mdefault via 192.168.1.1 dev mlan0 metric 10[m[41m [m
+kinetics_gateway_v2/metadata/ip_routes.txt:2: trailing whitespace.
+[32m+[m[32m192.168.1.0/24 dev mlan0 proto kernel scope link src 192.168.1.100[m[41m [m
+kinetics_gateway_v2/metadata/ip_routes.txt:3: trailing whitespace.
+[32m+[m[32m192.168.10.0/24 dev eth0 proto kernel scope link src 192.168.10.2 linkdown[m[41m [m
+kinetics_gateway_v2/metadata/ip_routes.txt:4: trailing whitespace.
+[32m+[m[32m192.168.111.0/24 dev eth1 proto kernel scope link src 192.168.111.2[m[41m [m
+kinetics_gateway_v2/metadata/scheduler_command.txt:1: trailing whitespace.
+[32m+[m[32m/usr/bin/python3 /root/bess_seven_day_v302_compatible_scheduler.py[m[41m [m
+kinetics_gateway_v2/opt/kinetics-gateway/backend/protocol_sources/pcs_hmi/cfg_sys.json:23: trailing whitespace.
+[32m+[m[41m			  [m
+kinetics_gateway_v2/opt/kinetics-gateway/backend/protocol_sources/pcs_hmi/cfg_sys.json:24: space before tab in indent.
+[32m+[m			[41m  [m	[32m["0x1200", "±‰¡˜‘À––◊¥Ã¨", "1", "1", "1 Õ£ª˙|2 »Ì∆Ù|4 ◊‘ºÏ|8 ¥˝ª˙|16 ‘À––|32 Ω⁄ƒ‹‘À––|64 µ˜∂»‘À––|128 Ωµ∂Ó‘À––|256 ¿ÎÕ¯‘À––|512 ≤¢Õ¯‘À––|1024 π ’œÕ£ª˙|48 ‘À––|80 ‘À––|144 ‘À––|272 ‘À––|576 VSG≤¢Õ¯‘À––|320 VSG¿ÎÕ¯‘À––", "0", "15", "11", "22", "1", "-65535", "65535", "0", "1", ""],[m
+kinetics_gateway_v2/opt/kinetics-gateway/backend/protocol_sources/pcs_hmi/cfg_sys.json:28: trailing whitespace.
+[32m+[m[41m				[m
+kinetics_gateway_v2/opt/kinetics-gateway/backend/protocol_sources/pcs_hmi/cfg_sys.json:33: trailing whitespace.
+[32m+[m[41m				[m
+kinetics_gateway_v2/opt/kinetics-gateway/backend/protocol_sources/pcs_hmi/cfg_sys.json:43: trailing whitespace.
+[32m+[m[41m				[m
+kinetics_gateway_v2/opt/kinetics-gateway/backend/protocol_sources/pcs_hmi/cfg_sys.json:48: trailing whitespace.
+[32m+[m[41m				[m
+kinetics_gateway_v2/opt/kinetics-gateway/backend/protocol_sources/pcs_hmi/cfg_sys.json:49: trailing whitespace.
+[32m+[m[41m				[m
+kinetics_gateway_v2/opt/kinetics-gateway/backend/protocol_sources/pcs_hmi/cfg_sys.json:50: trailing whitespace.
+[32m+[m[41m				[m
+kinetics_gateway_v2/opt/kinetics-gateway/backend/protocol_sources/pcs_hmi/cfg_sys.json:57: trailing whitespace.
+[32m+[m				[32m["0x1101", "ƒ∏œﬂµÁ¡˜", "1", "0", "0", "0", "15", "11", "22", "0.1", "-65535", "65535", "0", "1", "A"],[m[41m				[m
+kinetics_gateway_v2/opt/kinetics-gateway/backend/protocol_sources/pcs_hmi/cfg_sys.json:61: trailing whitespace.
+[32m+[m[41m				[m
+kinetics_gateway_v2/opt/kinetics-gateway/backend/protocol_sources/pcs_hmi/cfg_sys.json:62: trailing whitespace.
+[32m+[m				[32m["0x1110", "IGBTAŒ¬∂»", "1", "0", "0", "0", "15", "11", "22", "0.1", "-65535", "65535", "0", "1", "°Ê"],[m[41m				[m
+kinetics_gateway_v2/opt/kinetics-gateway/backend/protocol_sources/pcs_hmi/cfg_sys.json:63: trailing whitespace.
+[32m+[m				[32m["0x1111", "IGBTBŒ¬∂»", "1", "0", "0", "0", "15", "11", "22", "0.1", "-65535", "65535", "0", "1", "°Ê"],[m[41m				[m
+kinetics_gateway_v2/opt/kinetics-gateway/backend/protocol_sources/pcs_hmi/cfg_sys.json:71: trailing whitespace.
+[32m+[m[41m								[m
+kinetics_gateway_v2/opt/kinetics-gateway/backend/protocol_sources/pcs_hmi/cfg_sys.json:76: trailing whitespace.
+[32m+[m[41m				[m
+kinetics_gateway_v2/opt/kinetics-gateway/backend/protocol_sources/pcs_hmi/cfg_sys.json:86: trailing whitespace.
+[32m+[m[41m				[m
+kinetics_gateway_v2/opt/kinetics-gateway/backend/protocol_sources/pcs_hmi/cfg_sys.json:87: trailing whitespace.
+[32m+[m[41m				[m
+kinetics_gateway_v2/opt/kinetics-gateway/backend/protocol_sources/pcs_hmi/cfg_sys.json:88: trailing whitespace.
+[32m+[m[41m                [m
+kinetics_gateway_v2/opt/kinetics-gateway/backend/protocol_sources/pcs_hmi/cfg_sys.json:89: trailing whitespace.
+[32m+[m[41m				[m
+kinetics_gateway_v2/opt/kinetics-gateway/backend/protocol_sources/pcs_hmi/cfg_sys.json:94: trailing whitespace.
+[32m+[m[41m				[m
+kinetics_gateway_v2/opt/kinetics-gateway/backend/protocol_sources/pcs_hmi/cfg_sys.json:99: trailing whitespace.
+[32m+[m[41m				[m
+kinetics_gateway_v2/opt/kinetics-gateway/backend/protocol_sources/pcs_hmi/cfg_sys.json:103: trailing whitespace.
+[32m+[m[32m                ["0x160B", "ƒ∏œﬂ«∑—π±£ª§„–÷µ", "3", "1", "0", "0", "15", "11", "22", "0.1", "-65535", "65535", "0", "1", "V"],[m[41m	[m
+kinetics_gateway_v2/opt/kinetics-gateway/backend/protocol_sources/pcs_hmi/cfg_sys.json:105: trailing whitespace.
+[32m+[m[41m              [m
+kinetics_gateway_v2/opt/kinetics-gateway/backend/protocol_sources/pcs_hmi/cfg_sys.json:106: trailing whitespace.
+[32m+[m[41m		[m
+kinetics_stage2_review_20260728_154405/kinetics_stage2_review_20260728_154405/backend/protocol_sources/pcs_hmi/cfg_sys.json:23: trailing whitespace.
+[32m+[m[41m			  [m
+kinetics_stage2_review_20260728_154405/kinetics_stage2_review_20260728_154405/backend/protocol_sources/pcs_hmi/cfg_sys.json:24: space before tab in indent.
+[32m+[m			[41m  [m	[32m["0x1200", "±‰¡˜‘À––◊¥Ã¨", "1", "1", "1 Õ£ª˙|2 »Ì∆Ù|4 ◊‘ºÏ|8 ¥˝ª˙|16 ‘À––|32 Ω⁄ƒ‹‘À––|64 µ˜∂»‘À––|128 Ωµ∂Ó‘À––|256 ¿ÎÕ¯‘À––|512 ≤¢Õ¯‘À––|1024 π ’œÕ£ª˙|48 ‘À––|80 ‘À––|144 ‘À––|272 ‘À––|576 VSG≤¢Õ¯‘À––|320 VSG¿ÎÕ¯‘À––", "0", "15", "11", "22", "1", "-65535", "65535", "0", "1", ""],[m
+kinetics_stage2_review_20260728_154405/kinetics_stage2_review_20260728_154405/backend/protocol_sources/pcs_hmi/cfg_sys.json:28: trailing whitespace.
+[32m+[m[41m				[m
+kinetics_stage2_review_20260728_154405/kinetics_stage2_review_20260728_154405/backend/protocol_sources/pcs_hmi/cfg_sys.json:33: trailing whitespace.
+[32m+[m[41m				[m
+kinetics_stage2_review_20260728_154405/kinetics_stage2_review_20260728_154405/backend/protocol_sources/pcs_hmi/cfg_sys.json:43: trailing whitespace.
+[32m+[m[41m				[m
+kinetics_stage2_review_20260728_154405/kinetics_stage2_review_20260728_154405/backend/protocol_sources/pcs_hmi/cfg_sys.json:48: trailing whitespace.
+[32m+[m[41m				[m
+kinetics_stage2_review_20260728_154405/kinetics_stage2_review_20260728_154405/backend/protocol_sources/pcs_hmi/cfg_sys.json:49: trailing whitespace.
+[32m+[m[41m				[m
+kinetics_stage2_review_20260728_154405/kinetics_stage2_review_20260728_154405/backend/protocol_sources/pcs_hmi/cfg_sys.json:50: trailing whitespace.
+[32m+[m[41m				[m
+kinetics_stage2_review_20260728_154405/kinetics_stage2_review_20260728_154405/backend/protocol_sources/pcs_hmi/cfg_sys.json:57: trailing whitespace.
+[32m+[m				[32m["0x1101", "ƒ∏œﬂµÁ¡˜", "1", "0", "0", "0", "15", "11", "22", "0.1", "-65535", "65535", "0", "1", "A"],[m[41m				[m
+kinetics_stage2_review_20260728_154405/kinetics_stage2_review_20260728_154405/backend/protocol_sources/pcs_hmi/cfg_sys.json:61: trailing whitespace.
+[32m+[m[41m				[m
+kinetics_stage2_review_20260728_154405/kinetics_stage2_review_20260728_154405/backend/protocol_sources/pcs_hmi/cfg_sys.json:62: trailing whitespace.
+[32m+[m				[32m["0x1110", "IGBTAŒ¬∂»", "1", "0", "0", "0", "15", "11", "22", "0.1", "-65535", "65535", "0", "1", "°Ê"],[m[41m				[m
+kinetics_stage2_review_20260728_154405/kinetics_stage2_review_20260728_154405/backend/protocol_sources/pcs_hmi/cfg_sys.json:63: trailing whitespace.
+[32m+[m				[32m["0x1111", "IGBTBŒ¬∂»", "1", "0", "0", "0", "15", "11", "22", "0.1", "-65535", "65535", "0", "1", "°Ê"],[m[41m				[m
+kinetics_stage2_review_20260728_154405/kinetics_stage2_review_20260728_154405/backend/protocol_sources/pcs_hmi/cfg_sys.json:71: trailing whitespace.
+[32m+[m[41m								[m
+kinetics_stage2_review_20260728_154405/kinetics_stage2_review_20260728_154405/backend/protocol_sources/pcs_hmi/cfg_sys.json:76: trailing whitespace.
+[32m+[m[41m				[m
+kinetics_stage2_review_20260728_154405/kinetics_stage2_review_20260728_154405/backend/protocol_sources/pcs_hmi/cfg_sys.json:86: trailing whitespace.
+[32m+[m[41m				[m
+kinetics_stage2_review_20260728_154405/kinetics_stage2_review_20260728_154405/backend/protocol_sources/pcs_hmi/cfg_sys.json:87: trailing whitespace.
+[32m+[m[41m				[m
+kinetics_stage2_review_20260728_154405/kinetics_stage2_review_20260728_154405/backend/protocol_sources/pcs_hmi/cfg_sys.json:88: trailing whitespace.
+[32m+[m[41m                [m
+kinetics_stage2_review_20260728_154405/kinetics_stage2_review_20260728_154405/backend/protocol_sources/pcs_hmi/cfg_sys.json:89: trailing whitespace.
+[32m+[m[41m				[m
+kinetics_stage2_review_20260728_154405/kinetics_stage2_review_20260728_154405/backend/protocol_sources/pcs_hmi/cfg_sys.json:94: trailing whitespace.
+[32m+[m[41m				[m
+kinetics_stage2_review_20260728_154405/kinetics_stage2_review_20260728_154405/backend/protocol_sources/pcs_hmi/cfg_sys.json:99: trailing whitespace.
+[32m+[m[41m				[m
+kinetics_stage2_review_20260728_154405/kinetics_stage2_review_20260728_154405/backend/protocol_sources/pcs_hmi/cfg_sys.json:103: trailing whitespace.
+[32m+[m[32m                ["0x160B", "ƒ∏œﬂ«∑—π±£ª§„–÷µ", "3", "1", "0", "0", "15", "11", "22", "0.1", "-65535", "65535", "0", "1", "V"],[m[41m	[m
+kinetics_stage2_review_20260728_154405/kinetics_stage2_review_20260728_154405/backend/protocol_sources/pcs_hmi/cfg_sys.json:105: trailing whitespace.
+[32m+[m[41m              [m
+kinetics_stage2_review_20260728_154405/kinetics_stage2_review_20260728_154405/backend/protocol_sources/pcs_hmi/cfg_sys.json:106: trailing whitespace.
+[32m+[m[41m		[m
