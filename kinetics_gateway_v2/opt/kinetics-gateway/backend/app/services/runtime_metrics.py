@@ -53,6 +53,15 @@ class RuntimeMetrics:
         self._asyncio_tasks = 0
         self._asyncio_tasks_peak = 0
         self._recent_slow_requests: deque[dict[str, Any]] = deque(maxlen=20)
+        self._startup_stages: dict[str, dict[str, Any]] = {}
+
+    def startup_stage(self, name: str, elapsed_ms: float, **details: Any) -> None:
+        with self._lock:
+            self._startup_stages[name] = {
+                "completed_at": _now_iso(),
+                "elapsed_ms": round(max(0.0, elapsed_ms), 3),
+                **details,
+            }
 
     def request_started(self) -> None:
         with self._lock:
@@ -341,5 +350,6 @@ class RuntimeMetrics:
                     "task_count": self._asyncio_tasks,
                     "peak_task_count": self._asyncio_tasks_peak,
                 },
+                "startup_stages": deepcopy(self._startup_stages),
             }
         return result

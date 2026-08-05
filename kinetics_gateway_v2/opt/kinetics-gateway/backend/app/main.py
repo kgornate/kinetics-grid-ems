@@ -95,7 +95,13 @@ async def polling_supervisor() -> None:
     """Warm hardware caches without delaying API startup, then start pollers."""
     children: list[asyncio.Task] = []
     try:
+        initialization_started = time.monotonic()
         await asyncio.to_thread(service.initialize)
+        runtime_metrics.startup_stage(
+            "hardware_cache_initialization",
+            (time.monotonic() - initialization_started) * 1000,
+            ready=service.initialization_status().get("ready", False),
+        )
         if config.bms.enabled:
             children.extend(
                 asyncio.create_task(

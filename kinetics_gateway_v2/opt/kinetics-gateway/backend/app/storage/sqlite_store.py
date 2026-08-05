@@ -64,6 +64,35 @@ class SQLiteStore:
         self._telemetry_size: dict[str, float | int] = {}
         self._initialize()
         self._load_status_counters()
+        self.release_database_cache_hint()
+
+    def release_database_cache_hint(self) -> dict[str, bool]:
+        """Ask Linux to reclaim scan-created DB cache when memory is needed.
+
+        Startup status accounting reads the large telemetry table.  Those pages
+        may be charged to the service cgroup even though they are not Python
+        heap.  POSIX_FADV_DONTNEED is advisory and does not remove SQLite data.
+        SQLite remains the owner of consistency and may reread pages normally.
+        """
+        result: dict[str, bool] = {}
+        advice = getattr(os, "POSIX_FADV_DONTNEED", None)
+        posix_fadvise = getattr(os, "posix_fadvise", None)
+        for suffix in ("", "-wal"):
+            path = Path(f"{self.database_path}{suffix}")
+            key = "database" if not suffix else "wal"
+            result[key] = False
+            if advice is None or posix_fadvise is None or not path.is_file():
+                continue
+            try:
+                descriptor = os.open(path, os.O_RDONLY)
+                try:
+                    posix_fadvise(descriptor, 0, 0, advice)
+                finally:
+                    os.close(descriptor)
+                result[key] = True
+            except OSError:
+                pass
+        return result
 
     @property
     def using_preferred_storage(self) -> bool:
