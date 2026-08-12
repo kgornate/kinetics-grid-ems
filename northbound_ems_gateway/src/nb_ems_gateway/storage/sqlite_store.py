@@ -1,5 +1,5 @@
 from __future__ import annotations
-import csv, io, json, os, shutil, sqlite3, time
+import csv, io, json, os, shutil, sqlite3, threading, time
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Any
@@ -12,12 +12,19 @@ class SQLiteStore:
         self.skipped_write_count=0
         self.last_skip_reason: str | None=None
         self.last_snapshot_write_ts=0.0
+        self._lock=threading.RLock()
         h=self.health()
         if not h['can_write'] and config.fail_if_mount_missing:
             raise RuntimeError('Storage is not writable: ' + '; '.join(h['reasons']))
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.conn=sqlite3.connect(self.path, check_same_thread=False)
+        self.conn=sqlite3.connect(self.path, timeout=30.0, check_same_thread=False)
         self.conn.row_factory=sqlite3.Row
+        self.conn.execute('PRAGMA busy_timeout=30000')
+        try:
+            self.conn.execute('PRAGMA journal_mode=WAL')
+            self.conn.execute('PRAGMA synchronous=NORMAL')
+        except Exception:
+            pass
         self._init_schema()
         if config.cleanup_on_startup:
             self.cleanup(retention_days=config.retention_days, vacuum=False)
@@ -33,8 +40,40 @@ class SQLiteStore:
         CREATE TABLE IF NOT EXISTS gateway_events (id INTEGER PRIMARY KEY AUTOINCREMENT,timestamp_utc TEXT NOT NULL,severity TEXT NOT NULL,event_type TEXT NOT NULL,source TEXT,asset_id TEXT,message TEXT NOT NULL,payload_json TEXT);
         CREATE INDEX IF NOT EXISTS idx_events_ts ON gateway_events(timestamp_utc);
         CREATE INDEX IF NOT EXISTS idx_events_filters ON gateway_events(severity,event_type,source,asset_id,timestamp_utc);
+        CREATE TABLE IF NOT EXISTS fast_bess_samples (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp_utc TEXT NOT NULL,
+            timestamp_epoch_ms INTEGER NOT NULL,
+            source_id TEXT NOT NULL,
+            bess_id TEXT NOT NULL,
+            pcs_asset_id TEXT,
+            bms_asset_id TEXT,
+            pcs_values_json TEXT,
+            bms_values_json TEXT,
+            selected_signal_count INTEGER DEFAULT 0,
+            good_signal_count INTEGER DEFAULT 0,
+            bad_signal_count INTEGER DEFAULT 0,
+            max_data_age_ms INTEGER,
+            quality TEXT,
+            payload_json TEXT,
+            schema_version INTEGER DEFAULT 1,
+            profile_name TEXT,
+            write_mode TEXT DEFAULT 'compact_json'
+        );
+        CREATE INDEX IF NOT EXISTS idx_fast_bess_samples_time ON fast_bess_samples(timestamp_epoch_ms);
+        CREATE INDEX IF NOT EXISTS idx_fast_bess_samples_source_time ON fast_bess_samples(source_id,timestamp_epoch_ms);
         ''')
+        self._ensure_column('fast_bess_samples', 'schema_version', 'INTEGER DEFAULT 1')
+        self._ensure_column('fast_bess_samples', 'profile_name', 'TEXT')
+        self._ensure_column('fast_bess_samples', 'write_mode', "TEXT DEFAULT 'compact_json'")
         self.conn.commit()
+
+    def _table_columns(self, table: str) -> set[str]:
+        return {row[1] for row in self.conn.execute(f'PRAGMA table_info({table})').fetchall()}
+
+    def _ensure_column(self, table: str, column: str, declaration: str) -> None:
+        if column not in self._table_columns(table):
+            self.conn.execute(f'ALTER TABLE {table} ADD COLUMN {column} {declaration}')
 
     def db_size_bytes(self) -> int:
         total=0
@@ -56,18 +95,19 @@ class SQLiteStore:
                 reasons.append(f'disk usage check failed: {exc}')
         db_mb=self.db_size_bytes()//(1024*1024)
         if db_mb > self.config.max_db_size_mb: reasons.append(f'database above max size: {db_mb} MB > {self.config.max_db_size_mb} MB')
-        return {'enabled':True,'type':'sqlite','path':str(self.path),'required_mount_path':mount_path,'mount_ok':mount_ok,'can_write':len(reasons)==0,'reasons':reasons,'free_space_mb':free_mb,'total_space_mb':total_mb,'used_percent':used_pct,'db_size_mb':db_mb,'min_free_space_mb':self.config.min_free_space_mb,'max_db_size_mb':self.config.max_db_size_mb,'store_mode':self.config.store_mode,'snapshot_interval_sec':self.config.snapshot_interval_sec,'retention_days':self.config.retention_days,'skipped_write_count':self.skipped_write_count,'last_skip_reason':self.last_skip_reason}
+        return {'enabled':True,'type':'sqlite','path':str(self.path),'required_mount_path':mount_path,'mount_ok':mount_ok,'can_write':len(reasons)==0,'reasons':reasons,'free_space_mb':free_mb,'total_space_mb':total_mb,'used_percent':used_pct,'db_size_mb':db_mb,'min_free_space_mb':self.config.min_free_space_mb,'max_db_size_mb':self.config.max_db_size_mb,'telemetry_history_enabled':self.config.telemetry_history_enabled,'store_mode':self.config.store_mode,'snapshot_interval_sec':self.config.snapshot_interval_sec,'retention_days':self.config.retention_days,'skipped_write_count':self.skipped_write_count,'last_skip_reason':self.last_skip_reason}
 
     def status(self) -> dict[str,Any]:
         h=self.health(); tables={}; table_errors={}
         if hasattr(self,'conn'):
-            for t in ['telemetry_snapshots','telemetry_points','gateway_events']:
-                try:
-                    row=self.conn.execute(f'SELECT COUNT(*) FROM {t}').fetchone()
-                    tables[t]=int(row[0]) if row and row[0] is not None else 0
-                except Exception as exc:
-                    tables[t]=None
-                    table_errors[t]=str(exc)
+            with self._lock:
+                for t in ['telemetry_snapshots','telemetry_points','gateway_events','fast_bess_samples']:
+                    try:
+                        row=self.conn.execute(f'SELECT COUNT(*) FROM {t}').fetchone()
+                        tables[t]=int(row[0]) if row and row[0] is not None else 0
+                    except Exception as exc:
+                        tables[t]=None
+                        table_errors[t]=str(exc)
         h['tables']=tables
         if table_errors:
             h['table_errors']=table_errors
@@ -121,11 +161,87 @@ class SQLiteStore:
             self.conn.rollback()
             raise
 
+    def insert_fast_bess_sample(self, sample: dict[str,Any]) -> int | None:
+        with self._lock:
+            if not self._can_write():
+                return None
+            ts = sample.get('timestamp_utc') or datetime.now(timezone.utc).isoformat()
+            epoch_ms = int(sample.get('timestamp_epoch_ms') or int(time.time() * 1000))
+            write_mode = sample.get('write_mode') or 'compact_json'
+            schema_version = int(sample.get('schema_version') or (2 if write_mode == 'value_only' else 1))
+
+            # V2 compact mode intentionally does not repeat payload_json, units,
+            # display names, categories or per-signal update timestamps every second.
+            payload_json = None if write_mode == 'value_only' else json.dumps(sample, separators=(',',':'))
+
+            cur = self.conn.execute(
+                '''INSERT INTO fast_bess_samples(
+                    timestamp_utc,timestamp_epoch_ms,source_id,bess_id,pcs_asset_id,bms_asset_id,
+                    pcs_values_json,bms_values_json,selected_signal_count,good_signal_count,
+                    bad_signal_count,max_data_age_ms,quality,payload_json,
+                    schema_version,profile_name,write_mode
+                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',
+                (
+                    ts,
+                    epoch_ms,
+                    sample.get('source_id'),
+                    sample.get('bess_id'),
+                    sample.get('pcs_asset_id'),
+                    sample.get('bms_asset_id'),
+                    json.dumps(sample.get('pcs_values') or {}, separators=(',',':')),
+                    json.dumps(sample.get('bms_values') or {}, separators=(',',':')),
+                    int(sample.get('selected_signal_count') or 0),
+                    int(sample.get('good_signal_count') or 0),
+                    int(sample.get('bad_signal_count') or 0),
+                    sample.get('max_data_age_ms'),
+                    sample.get('quality'),
+                    payload_json,
+                    schema_version,
+                    sample.get('profile_name'),
+                    write_mode,
+                ),
+            )
+            self.conn.commit()
+            return int(cur.lastrowid)
+
+    def cleanup_fast_bess_samples(self, retention_days: int) -> dict[str,Any]:
+        with self._lock:
+            if not self._can_write():
+                return {'ok':False,'reason':self.last_skip_reason}
+            cutoff_dt = datetime.now(timezone.utc) - timedelta(days=retention_days)
+            cutoff_ms = int(cutoff_dt.timestamp() * 1000)
+            cur = self.conn.execute('DELETE FROM fast_bess_samples WHERE timestamp_epoch_ms < ?', (cutoff_ms,))
+            self.conn.commit()
+            return {'ok':True,'retention_days':retention_days,'cutoff_epoch_ms':cutoff_ms,'deleted':int(cur.rowcount)}
+
+    def query_fast_bess_samples(self, source_id: str|None=None, limit: int=100, from_epoch_ms: int|None=None, to_epoch_ms: int|None=None, order: str='desc') -> dict[str,Any]:
+        with self._lock:
+            where=[]; args=[]
+            if source_id:
+                where.append('source_id=?'); args.append(source_id)
+            if from_epoch_ms is not None:
+                where.append('timestamp_epoch_ms>=?'); args.append(int(from_epoch_ms))
+            if to_epoch_ms is not None:
+                where.append('timestamp_epoch_ms<=?'); args.append(int(to_epoch_ms))
+            clause=' WHERE '+' AND '.join(where) if where else ''
+            direction='ASC' if str(order).lower()=='asc' else 'DESC'
+            rows=self.conn.execute(f'SELECT * FROM fast_bess_samples{clause} ORDER BY timestamp_epoch_ms {direction} LIMIT ?', args+[min(int(limit),5000)]).fetchall()
+            return {'items':[self._fast_bess_sample(r) for r in rows]}
+
+    def latest_fast_bess_samples(self) -> dict[str,Any]:
+        with self._lock:
+            rows=self.conn.execute('''SELECT f.* FROM fast_bess_samples f
+                JOIN (SELECT source_id, MAX(timestamp_epoch_ms) AS max_ts FROM fast_bess_samples GROUP BY source_id) m
+                ON f.source_id=m.source_id AND f.timestamp_epoch_ms=m.max_ts
+                ORDER BY f.source_id''').fetchall()
+            return {'items':[self._fast_bess_sample(r) for r in rows]}
+
     def insert_event(self,severity:str,event_type:str,message:str,payload:dict[str,Any]|None=None,*,source:str|None=None,asset_id:str|None=None) -> int | None:
-        if not self._can_write(): return None
-        ts=datetime.now(timezone.utc).isoformat()
-        cur=self.conn.execute('INSERT INTO gateway_events(timestamp_utc,severity,event_type,source,asset_id,message,payload_json) VALUES (?,?,?,?,?,?,?)',(ts,severity.lower(),event_type,source,asset_id,message,json.dumps(payload or {},separators=(',',':'))))
-        self.conn.commit(); return int(cur.lastrowid)
+        with self._lock:
+            if not self._can_write(): return None
+            ts=datetime.now(timezone.utc).isoformat()
+            cur=self.conn.execute('INSERT INTO gateway_events(timestamp_utc,severity,event_type,source,asset_id,message,payload_json) VALUES (?,?,?,?,?,?,?)',(ts,severity.lower(),event_type,source,asset_id,message,json.dumps(payload or {},separators=(',',':'))))
+            self.conn.commit(); return int(cur.lastrowid)
 
     def cleanup(self, retention_days: int | None=None, vacuum: bool | None=None) -> dict[str,Any]:
         if not self._can_write(): return {'ok':False,'reason':self.last_skip_reason}
@@ -186,8 +302,41 @@ class SQLiteStore:
         rows=self.conn.execute('SELECT * FROM telemetry_points WHERE asset_id=? AND signal_name=? ORDER BY timestamp_utc DESC LIMIT ?',(asset_id,signal_name,limit)).fetchall()
         return [{'timestamp_utc':r['timestamp_utc'],'asset_id':r['asset_id'],'signal_name':r['signal_name'],'value':r['value'],'unit':r['unit'],'quality':r['quality'],'category':r['category']} for r in rows]
 
+    def _fast_bess_sample(self,row:sqlite3.Row)->dict[str,Any]:
+        def load(col: str) -> Any:
+            try:
+                return json.loads(row[col] or '{}')
+            except Exception:
+                return {'raw': row[col]}
+
+        columns = set(row.keys())
+        def get_optional(name: str, default: Any=None) -> Any:
+            return row[name] if name in columns else default
+
+        return {
+            'id': row['id'],
+            'timestamp_utc': row['timestamp_utc'],
+            'timestamp_epoch_ms': row['timestamp_epoch_ms'],
+            'source_id': row['source_id'],
+            'bess_id': row['bess_id'],
+            'pcs_asset_id': row['pcs_asset_id'],
+            'bms_asset_id': row['bms_asset_id'],
+            'schema_version': get_optional('schema_version', 1),
+            'profile_name': get_optional('profile_name'),
+            'write_mode': get_optional('write_mode', 'compact_json'),
+            'pcs_values': load('pcs_values_json'),
+            'bms_values': load('bms_values_json'),
+            'selected_signal_count': row['selected_signal_count'],
+            'good_signal_count': row['good_signal_count'],
+            'bad_signal_count': row['bad_signal_count'],
+            'max_data_age_ms': row['max_data_age_ms'],
+            'quality': row['quality'],
+        }
+
     def _event(self,row:sqlite3.Row)->dict[str,Any]:
         try: payload=json.loads(row['payload_json'] or '{}')
         except Exception: payload={'raw':row['payload_json']}
         return {'id':row['id'],'timestamp_utc':row['timestamp_utc'],'severity':row['severity'],'event_type':row['event_type'],'source':row['source'],'asset_id':row['asset_id'],'message':row['message'],'payload':payload}
-    def close(self)->None: self.conn.close()
+    def close(self)->None:
+        with self._lock:
+            self.conn.close()

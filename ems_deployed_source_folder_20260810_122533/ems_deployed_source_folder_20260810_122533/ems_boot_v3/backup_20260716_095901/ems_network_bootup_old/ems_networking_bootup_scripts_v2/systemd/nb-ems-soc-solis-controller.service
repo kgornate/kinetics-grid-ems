@@ -1,0 +1,20 @@
+[Unit]
+Description=Northbound EMS SOC + Solis RTU State Machine Controller
+Requires=ems-network-setup.service
+After=ems-network-setup.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/kinetics-grid-ems/northbound_ems_gateway
+Environment=PYTHONPATH=/root/kinetics-grid-ems/northbound_ems_gateway/src
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/usr/bin/python3 /root/kinetics-grid-ems/northbound_ems_gateway/tools/soc_only_controller.py --config configs/soc_solis_field_rtu.json --live --force
+Restart=always
+RestartSec=5
+StandardOutput=journal+console
+StandardError=journal+console
+
+[Install]
+WantedBy=multi-user.target

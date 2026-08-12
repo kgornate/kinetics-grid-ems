@@ -44,18 +44,19 @@
     "port": 7000
   },
   "storage": {
-    "enabled": false,
+    "enabled": true,
     "type": "sqlite",
     "path": "/mnt/ems-logs/northbound_ems_gateway/nb_ems_gateway.db",
     "required_mount_path": "/mnt/ems-logs",
     "fail_if_mount_missing": true,
     "min_free_space_mb": 512,
-    "max_db_size_mb": 2048,
-    "retention_days": 7,
+    "max_db_size_mb": 80000,
+    "retention_days": 90,
     "store_mode": "key_signals",
-    "snapshot_interval_sec": 30,
+    "snapshot_interval_sec": 60,
     "cleanup_on_startup": true,
-    "vacuum_after_cleanup": false
+    "vacuum_after_cleanup": false,
+    "telemetry_history_enabled": false
   },
   "server_upload": {
     "enabled": false,
@@ -74,11 +75,11 @@
   },
   "logging": {
     "enabled": true,
-    "min_severity": "debug",
-    "store_access_logs": true,
-    "store_poll_events": true,
-    "store_server_upload_events": true,
-    "store_telemetry_quality_events": true,
+    "min_severity": "info",
+    "store_access_logs": false,
+    "store_poll_events": false,
+    "store_server_upload_events": false,
+    "store_telemetry_quality_events": false,
     "max_query_limit": 1000,
     "default_query_limit": 200,
     "retention_days": 30,
@@ -162,5 +163,32 @@
     "soc_signal_name": "soc",
     "solar_generation_available": null,
     "standby_when_both_low_and_solar_available": true
+  },
+  "fast_bess_logger": {
+    "enabled": true,
+    "interval_sec": 1.0,
+    "retention_days": 90,
+    "profile_name": "pcs_bms_critical_lean_90d",
+    "profile_path": "data/historian_profiles/fast_bess_profiles.json",
+    "sources": [
+      "external_ems_1",
+      "external_ems_2"
+    ],
+    "write_mode": "value_only",
+    "max_data_age_sec": 10.0,
+    "cleanup_interval_sec": 3600.0,
+    "log_start_stop_events": true,
+    "source_asset_map": {
+      "external_ems_1": {
+        "bess_id": "bess_1",
+        "pcs_asset_id": "external_ems_1_pcs",
+        "bms_asset_id": "external_ems_1_bms"
+      },
+      "external_ems_2": {
+        "bess_id": "bess_2",
+        "pcs_asset_id": "external_ems_2_pcs",
+        "bms_asset_id": "external_ems_2_bms"
+      }
+    }
   }
 }

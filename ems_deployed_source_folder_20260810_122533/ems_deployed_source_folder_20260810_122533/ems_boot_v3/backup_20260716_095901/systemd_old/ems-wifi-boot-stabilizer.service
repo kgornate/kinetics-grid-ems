@@ -1,0 +1,8 @@
+[Unit]
+Description=EMS Wi-Fi boot stabilizer and Cloudflare recovery
+After=ems-network-setup.service
+
+[Service]
+Type=oneshot
+ExecStart=/root/kinetics-grid-ems/ems_network_bootup/ems_wifi_boot_stabilizer.sh
+TimeoutStartSec=300

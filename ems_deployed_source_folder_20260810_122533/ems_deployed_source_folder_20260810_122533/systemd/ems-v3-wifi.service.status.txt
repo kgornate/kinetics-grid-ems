@@ -1,0 +1,12 @@
+● ems-v3-wifi.service - EMS Boot V3 Wi-Fi setup
+     Loaded: loaded (/etc/systemd/system/ems-v3-wifi.service; enabled; preset: disabled)
+     Active: active (exited) since Tue 2026-07-28 04:04:56 UTC; 1 week 6 days ago
+    Process: 491 ExecStart=/root/kinetics-grid-ems/ems_boot_v3/scripts/imx93_wifi_v3.sh (code=exited, status=0/SUCCESS)
+   Main PID: 491 (code=exited, status=0/SUCCESS)
+      Tasks: 1 (limit: 1789)
+     Memory: 11.5M (peak: 14.0M)
+        CPU: 13.326s
+     CGroup: /system.slice/ems-v3-wifi.service
+             └─623 wpa_supplicant -B -Dnl80211,wext -i mlan0 -c /tmp/ems_v3_wpa.conf -f /tmp/ems_v3_wpa.log
+
+Notice: journal has been rotated since unit was started, output may be incomplete.

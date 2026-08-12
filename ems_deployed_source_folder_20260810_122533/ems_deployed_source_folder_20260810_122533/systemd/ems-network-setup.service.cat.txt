@@ -1,0 +1,21 @@
+# /etc/systemd/system/ems-network-setup.service
+[Unit]
+Description=Configure EMS Gateway Network eth0 eth1 Wi-Fi for NorthBound Cloudflare Mode
+After=connman.service network.target
+Wants=network.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root/kinetics-grid-ems/ems_network_bootup
+ExecStartPre=/bin/sleep 20
+ExecStart=/root/kinetics-grid-ems/ems_network_bootup/ems_network_all_setup.sh
+RemainAfterExit=yes
+StandardOutput=journal+console
+StandardError=journal+console
+
+[Install]
+WantedBy=multi-user.target
+
+# /etc/systemd/system/ems-network-setup.service.d/99-force-wifi-default.conf
+[Service]
+ExecStartPost=/bin/sh -c 'pkill -f "udhcpc.*eth0" 2>/dev/null || true; ip route del default via 192.168.100.1 dev eth0 metric 10 2>/dev/null || true; ip route del default via 192.168.100.1 dev eth0 metric 100 2>/dev/null || true; ip route del default dev eth0 2>/dev/null || true; ip addr flush dev eth0 2>/dev/null || true; ip link set eth0 down 2>/dev/null || true; ip route replace default via 192.168.1.1 dev mlan0 metric 10'

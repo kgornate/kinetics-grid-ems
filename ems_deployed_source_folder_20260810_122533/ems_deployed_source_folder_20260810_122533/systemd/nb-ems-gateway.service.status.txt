@@ -1,0 +1,5 @@
+○ nb-ems-gateway.service - NorthBound EMS Gateway Application
+     Loaded: loaded (/etc/systemd/system/nb-ems-gateway.service; disabled; preset: disabled)
+    Drop-In: /etc/systemd/system/nb-ems-gateway.service.d
+             └─10-v3-order.conf
+     Active: inactive (dead)

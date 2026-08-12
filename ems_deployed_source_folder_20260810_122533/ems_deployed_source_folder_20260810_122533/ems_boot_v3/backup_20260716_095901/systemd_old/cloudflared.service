@@ -1,0 +1,17 @@
+[Unit]
+Description=cloudflared
+After=network-online.target ems-network-setup.service
+Wants=network-online.target ems-network-setup.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/cloudflared --no-autoupdate --config /etc/cloudflared/config.yml tunnel run
+Restart=always
+RestartSec=5
+TimeoutStartSec=30
+KillMode=process
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

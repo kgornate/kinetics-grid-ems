@@ -1,0 +1,799 @@
+diff -ruN /mnt/data/ems_extract/ems_deployed_source_folder_20260810_122533/northbound_ems_gateway/configs/development.json /mnt/data/fast_bess_work/northbound_ems_gateway/configs/development.json
+--- /mnt/data/ems_extract/ems_deployed_source_folder_20260810_122533/northbound_ems_gateway/configs/development.json	2026-07-19 21:12:28.000000000 +0000
++++ /mnt/data/fast_bess_work/northbound_ems_gateway/configs/development.json	2026-08-10 12:35:53.875138988 +0000
+@@ -44,18 +44,19 @@
+     "port": 7000
+   },
+   "storage": {
+-    "enabled": false,
++    "enabled": true,
+     "type": "sqlite",
+     "path": "/mnt/ems-logs/northbound_ems_gateway/nb_ems_gateway.db",
+     "required_mount_path": "/mnt/ems-logs",
+     "fail_if_mount_missing": true,
+     "min_free_space_mb": 512,
+-    "max_db_size_mb": 2048,
++    "max_db_size_mb": 25000,
+     "retention_days": 7,
+     "store_mode": "key_signals",
+-    "snapshot_interval_sec": 30,
++    "snapshot_interval_sec": 60,
+     "cleanup_on_startup": true,
+-    "vacuum_after_cleanup": true
++    "vacuum_after_cleanup": true,
++    "telemetry_history_enabled": false
+   },
+   "server_upload": {
+     "enabled": false,
+@@ -74,11 +75,11 @@
+   },
+   "logging": {
+     "enabled": true,
+-    "min_severity": "debug",
+-    "store_access_logs": true,
+-    "store_poll_events": true,
+-    "store_server_upload_events": true,
+-    "store_telemetry_quality_events": true,
++    "min_severity": "info",
++    "store_access_logs": false,
++    "store_poll_events": false,
++    "store_server_upload_events": false,
++    "store_telemetry_quality_events": false,
+     "max_query_limit": 1000,
+     "default_query_limit": 200,
+     "retention_days": 30,
+@@ -162,5 +163,32 @@
+     "soc_signal_name": "soc",
+     "solar_generation_available": null,
+     "standby_when_both_low_and_solar_available": true
++  },
++  "fast_bess_logger": {
++    "enabled": true,
++    "interval_sec": 1.0,
++    "retention_days": 7,
++    "profile_name": "pcs_bms_critical",
++    "profile_path": "data/historian_profiles/fast_bess_profiles.json",
++    "sources": [
++      "external_ems_1",
++      "external_ems_2"
++    ],
++    "write_mode": "compact_json",
++    "max_data_age_sec": 10.0,
++    "cleanup_interval_sec": 3600.0,
++    "log_start_stop_events": true,
++    "source_asset_map": {
++      "external_ems_1": {
++        "bess_id": "bess_1",
++        "pcs_asset_id": "external_ems_1_pcs",
++        "bms_asset_id": "external_ems_1_bms"
++      },
++      "external_ems_2": {
++        "bess_id": "bess_2",
++        "pcs_asset_id": "external_ems_2_pcs",
++        "bms_asset_id": "external_ems_2_bms"
++      }
++    }
+   }
+ }
+\ No newline at end of file
+diff -ruN /mnt/data/ems_extract/ems_deployed_source_folder_20260810_122533/northbound_ems_gateway/data/historian_profiles/fast_bess_profiles.json /mnt/data/fast_bess_work/northbound_ems_gateway/data/historian_profiles/fast_bess_profiles.json
+--- /mnt/data/ems_extract/ems_deployed_source_folder_20260810_122533/northbound_ems_gateway/data/historian_profiles/fast_bess_profiles.json	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/fast_bess_work/northbound_ems_gateway/data/historian_profiles/fast_bess_profiles.json	2026-08-10 12:35:40.063097484 +0000
+@@ -0,0 +1,86 @@
++{
++  "profiles": {
++    "pcs_bms_critical": {
++      "description": "1-second compact BESS logger profile. PCS+BMS only for both BESS/EMS: voltage, current, frequency, status and important fault/alarm signals.",
++      "assets": {
++        "pcs_1": [
++          "phase_a_voltage",
++          "phase_b_voltage",
++          "phase_c_voltage",
++          "phase_a_current",
++          "phase_b_current",
++          "phase_c_current",
++          "dc_voltage",
++          "dc_current",
++          "grid_frequency",
++          "charge_power",
++          "discharge_power",
++          "charge_discharge_power",
++          "total_active_power",
++          "soc",
++          "fault_status",
++          "total_fault_status",
++          "total_fault_status_2",
++          "total_alarm_status",
++          "on_grid_status",
++          "off_grid_status",
++          "standby_status",
++          "running_status_2",
++          "pcs_online_status",
++          "bms_online_status",
++          "battery_system_status",
++          "sw_fault_ac_over_voltage",
++          "sw_fault_ac_under_voltage",
++          "sw_fault_ac_over_frequency",
++          "sw_fault_ac_under_frequency",
++          "sw_fault_ac_over_current",
++          "hw_fault_ac_over_current",
++          "sw_fault_dc_charge_over_current",
++          "sw_fault_dc_discharge_over_current"
++        ],
++        "bms_1": [
++          "k_total_voltage",
++          "cluster_total_voltage_collected",
++          "cluster_total_current",
++          "can_hall_sampling_current",
++          "display_soc",
++          "cluster_internal_soc",
++          "soh",
++          "cell_max_voltage",
++          "cell_min_voltage",
++          "cell_average_voltage",
++          "max_min_cell_voltage_diff",
++          "battery_max_temperature",
++          "battery_min_temperature",
++          "average_temperature",
++          "insulation_resistance",
++          "pre_charge_total_voltage",
++          "max_acceptable_charge_current",
++          "max_acceptable_discharge_current",
++          "system_status",
++          "charge_discharge_status",
++          "pre_charge_contactor_status",
++          "negative_contactor_status",
++          "contactor_fault",
++          "fuse_fault",
++          "insulation_fault",
++          "insulation_monitoring_fault",
++          "battery_temperature_sensor_fault",
++          "voltage_sampling_fault",
++          "current_sampling_fault_functional_safety_fault",
++          "charge_over_current",
++          "discharge_over_current_level_1",
++          "bmu_communication_fault",
++          "bau_communication_fault",
++          "pcs_communication_fault",
++          "cell_over_voltage_level_1",
++          "cell_under_voltage_level_1",
++          "battery_pack_over_voltage_alarm_voltage_value",
++          "battery_pack_under_voltage_alarm_voltage_value",
++          "battery_charge_over_current_alarm_current_value",
++          "battery_discharge_over_current_alarm_current_value"
++        ]
++      }
++    }
++  }
++}
+Binary files /mnt/data/ems_extract/ems_deployed_source_folder_20260810_122533/northbound_ems_gateway/src/nb_ems_gateway/__pycache__/__init__.cpython-313.pyc and /mnt/data/fast_bess_work/northbound_ems_gateway/src/nb_ems_gateway/__pycache__/__init__.cpython-313.pyc differ
+Binary files /mnt/data/ems_extract/ems_deployed_source_folder_20260810_122533/northbound_ems_gateway/src/nb_ems_gateway/__pycache__/main.cpython-313.pyc and /mnt/data/fast_bess_work/northbound_ems_gateway/src/nb_ems_gateway/__pycache__/main.cpython-313.pyc differ
+Binary files /mnt/data/ems_extract/ems_deployed_source_folder_20260810_122533/northbound_ems_gateway/src/nb_ems_gateway/alarms/__pycache__/__init__.cpython-313.pyc and /mnt/data/fast_bess_work/northbound_ems_gateway/src/nb_ems_gateway/alarms/__pycache__/__init__.cpython-313.pyc differ
+Binary files /mnt/data/ems_extract/ems_deployed_source_folder_20260810_122533/northbound_ems_gateway/src/nb_ems_gateway/alarms/__pycache__/alarm_engine.cpython-313.pyc and /mnt/data/fast_bess_work/northbound_ems_gateway/src/nb_ems_gateway/alarms/__pycache__/alarm_engine.cpython-313.pyc differ
+Binary files /mnt/data/ems_extract/ems_deployed_source_folder_20260810_122533/northbound_ems_gateway/src/nb_ems_gateway/api/__pycache__/__init__.cpython-313.pyc and /mnt/data/fast_bess_work/northbound_ems_gateway/src/nb_ems_gateway/api/__pycache__/__init__.cpython-313.pyc differ
+Binary files /mnt/data/ems_extract/ems_deployed_source_folder_20260810_122533/northbound_ems_gateway/src/nb_ems_gateway/api/__pycache__/routes_assets.cpython-313.pyc and /mnt/data/fast_bess_work/northbound_ems_gateway/src/nb_ems_gateway/api/__pycache__/routes_assets.cpython-313.pyc differ
+Binary files /mnt/data/ems_extract/ems_deployed_source_folder_20260810_122533/northbound_ems_gateway/src/nb_ems_gateway/api/__pycache__/routes_auth.cpython-313.pyc and /mnt/data/fast_bess_work/northbound_ems_gateway/src/nb_ems_gateway/api/__pycache__/routes_auth.cpython-313.pyc differ
+Binary files /mnt/data/ems_extract/ems_deployed_source_folder_20260810_122533/northbound_ems_gateway/src/nb_ems_gateway/api/__pycache__/routes_commands.cpython-313.pyc and /mnt/data/fast_bess_work/northbound_ems_gateway/src/nb_ems_gateway/api/__pycache__/routes_commands.cpython-313.pyc differ
+Binary files /mnt/data/ems_extract/ems_deployed_source_folder_20260810_122533/northbound_ems_gateway/src/nb_ems_gateway/api/__pycache__/routes_config.cpython-313.pyc and /mnt/data/fast_bess_work/northbound_ems_gateway/src/nb_ems_gateway/api/__pycache__/routes_config.cpython-313.pyc differ
+Binary files /mnt/data/ems_extract/ems_deployed_source_folder_20260810_122533/northbound_ems_gateway/src/nb_ems_gateway/api/__pycache__/routes_control.cpython-313.pyc and /mnt/data/fast_bess_work/northbound_ems_gateway/src/nb_ems_gateway/api/__pycache__/routes_control.cpython-313.pyc differ
+Binary files /mnt/data/ems_extract/ems_deployed_source_folder_20260810_122533/northbound_ems_gateway/src/nb_ems_gateway/api/__pycache__/routes_fast_bess.cpython-313.pyc and /mnt/data/fast_bess_work/northbound_ems_gateway/src/nb_ems_gateway/api/__pycache__/routes_fast_bess.cpython-313.pyc differ
+Binary files /mnt/data/ems_extract/ems_deployed_source_folder_20260810_122533/northbound_ems_gateway/src/nb_ems_gateway/api/__pycache__/routes_health.cpython-313.pyc and /mnt/data/fast_bess_work/northbound_ems_gateway/src/nb_ems_gateway/api/__pycache__/routes_health.cpython-313.pyc differ
+Binary files /mnt/data/ems_extract/ems_deployed_source_folder_20260810_122533/northbound_ems_gateway/src/nb_ems_gateway/api/__pycache__/routes_logs.cpython-313.pyc and /mnt/data/fast_bess_work/northbound_ems_gateway/src/nb_ems_gateway/api/__pycache__/routes_logs.cpython-313.pyc differ
+Binary files /mnt/data/ems_extract/ems_deployed_source_folder_20260810_122533/northbound_ems_gateway/src/nb_ems_gateway/api/__pycache__/routes_registers.cpython-313.pyc and /mnt/data/fast_bess_work/northbound_ems_gateway/src/nb_ems_gateway/api/__pycache__/routes_registers.cpython-313.pyc differ
+Binary files /mnt/data/ems_extract/ems_deployed_source_folder_20260810_122533/northbound_ems_gateway/src/nb_ems_gateway/api/__pycache__/routes_server_upload.cpython-313.pyc and /mnt/data/fast_bess_work/northbound_ems_gateway/src/nb_ems_gateway/api/__pycache__/routes_server_upload.cpython-313.pyc differ
+Binary files /mnt/data/ems_extract/ems_deployed_source_folder_20260810_122533/northbound_ems_gateway/src/nb_ems_gateway/api/__pycache__/routes_soc_protection.cpython-313.pyc and /mnt/data/fast_bess_work/northbound_ems_gateway/src/nb_ems_gateway/api/__pycache__/routes_soc_protection.cpython-313.pyc differ
+Binary files /mnt/data/ems_extract/ems_deployed_source_folder_20260810_122533/northbound_ems_gateway/src/nb_ems_gateway/api/__pycache__/routes_sources.cpython-313.pyc and /mnt/data/fast_bess_work/northbound_ems_gateway/src/nb_ems_gateway/api/__pycache__/routes_sources.cpython-313.pyc differ
+Binary files /mnt/data/ems_extract/ems_deployed_source_folder_20260810_122533/northbound_ems_gateway/src/nb_ems_gateway/api/__pycache__/routes_storage.cpython-313.pyc and /mnt/data/fast_bess_work/northbound_ems_gateway/src/nb_ems_gateway/api/__pycache__/routes_storage.cpython-313.pyc differ
+Binary files /mnt/data/ems_extract/ems_deployed_source_folder_20260810_122533/northbound_ems_gateway/src/nb_ems_gateway/api/__pycache__/routes_telemetry.cpython-313.pyc and /mnt/data/fast_bess_work/northbound_ems_gateway/src/nb_ems_gateway/api/__pycache__/routes_telemetry.cpython-313.pyc differ
+Binary files /mnt/data/ems_extract/ems_deployed_source_folder_20260810_122533/northbound_ems_gateway/src/nb_ems_gateway/api/__pycache__/routes_ws.cpython-313.pyc and /mnt/data/fast_bess_work/northbound_ems_gateway/src/nb_ems_gateway/api/__pycache__/routes_ws.cpython-313.pyc differ
+Binary files /mnt/data/ems_extract/ems_deployed_source_folder_20260810_122533/northbound_ems_gateway/src/nb_ems_gateway/api/__pycache__/server.cpython-313.pyc and /mnt/data/fast_bess_work/northbound_ems_gateway/src/nb_ems_gateway/api/__pycache__/server.cpython-313.pyc differ
+diff -ruN /mnt/data/ems_extract/ems_deployed_source_folder_20260810_122533/northbound_ems_gateway/src/nb_ems_gateway/api/routes_fast_bess.py /mnt/data/fast_bess_work/northbound_ems_gateway/src/nb_ems_gateway/api/routes_fast_bess.py
+--- /mnt/data/ems_extract/ems_deployed_source_folder_20260810_122533/northbound_ems_gateway/src/nb_ems_gateway/api/routes_fast_bess.py	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/fast_bess_work/northbound_ems_gateway/src/nb_ems_gateway/api/routes_fast_bess.py	2026-08-10 12:34:47.236496586 +0000
+@@ -0,0 +1,35 @@
++from fastapi import APIRouter, Request, HTTPException
++
++router = APIRouter()
++
++@router.get('/api/fast-bess/status')
++def fast_bess_status(request: Request) -> dict:
++    c = request.app.state.container
++    return c.fast_bess_logger_status()
++
++@router.get('/api/fast-bess/latest')
++def fast_bess_latest(request: Request) -> dict:
++    c = request.app.state.container
++    if not c.storage:
++        raise HTTPException(503, 'storage disabled')
++    return c.storage.latest_fast_bess_samples()
++
++@router.get('/api/fast-bess/history')
++def fast_bess_history(
++    request: Request,
++    source_id: str | None = None,
++    limit: int = 100,
++    from_epoch_ms: int | None = None,
++    to_epoch_ms: int | None = None,
++    order: str = 'desc',
++) -> dict:
++    c = request.app.state.container
++    if not c.storage:
++        raise HTTPException(503, 'storage disabled')
++    return c.storage.query_fast_bess_samples(
++        source_id=source_id,
++        limit=max(1, min(limit, 5000)),
++        from_epoch_ms=from_epoch_ms,
++        to_epoch_ms=to_epoch_ms,
++        order=order,
++    )
+diff -ruN /mnt/data/ems_extract/ems_deployed_source_folder_20260810_122533/northbound_ems_gateway/src/nb_ems_gateway/api/routes_health.py /mnt/data/fast_bess_work/northbound_ems_gateway/src/nb_ems_gateway/api/routes_health.py
+--- /mnt/data/ems_extract/ems_deployed_source_folder_20260810_122533/northbound_ems_gateway/src/nb_ems_gateway/api/routes_health.py	2026-07-19 18:38:18.000000000 +0000
++++ /mnt/data/fast_bess_work/northbound_ems_gateway/src/nb_ems_gateway/api/routes_health.py	2026-08-10 12:35:06.172825415 +0000
+@@ -10,6 +10,7 @@
+         storage_status={'enabled':c.config.storage.enabled,'status_error':str(exc),'tables':{}}
+     d['storage']=storage_status
+     d['server_upload']=c.server_upload_status()
++    d['fast_bess_logger']=c.fast_bess_logger_status()
+     if getattr(c, 'soc_protection_controller', None):
+         d['soc_protection']=c.soc_protection_controller.status.to_dict()
+     d['logging']={
+diff -ruN /mnt/data/ems_extract/ems_deployed_source_folder_20260810_122533/northbound_ems_gateway/src/nb_ems_gateway/api/server.py /mnt/data/fast_bess_work/northbound_ems_gateway/src/nb_ems_gateway/api/server.py
+--- /mnt/data/ems_extract/ems_deployed_source_folder_20260810_122533/northbound_ems_gateway/src/nb_ems_gateway/api/server.py	2026-07-19 18:38:41.000000000 +0000
++++ /mnt/data/fast_bess_work/northbound_ems_gateway/src/nb_ems_gateway/api/server.py	2026-08-10 12:34:48.216581095 +0000
+@@ -18,6 +18,7 @@
+ from .routes_commands import router as commands_router
+ from .routes_control import router as control_router
+ from .routes_soc_protection import router as soc_protection_router
++from .routes_fast_bess import router as fast_bess_router
+ from .routes_ws import router as ws_router
+ 
+ 
+@@ -68,6 +69,7 @@
+         commands_router,
+         control_router,
+         soc_protection_router,
++        fast_bess_router,
+     ]:
+         app.include_router(r, dependencies=protected_dependencies)
+     app.include_router(ws_router)
+Binary files /mnt/data/ems_extract/ems_deployed_source_folder_20260810_122533/northbound_ems_gateway/src/nb_ems_gateway/app/__pycache__/__init__.cpython-313.pyc and /mnt/data/fast_bess_work/northbound_ems_gateway/src/nb_ems_gateway/app/__pycache__/__init__.cpython-313.pyc differ
+Binary files /mnt/data/ems_extract/ems_deployed_source_folder_20260810_122533/northbound_ems_gateway/src/nb_ems_gateway/app/__pycache__/dependency_container.cpython-313.pyc and /mnt/data/fast_bess_work/northbound_ems_gateway/src/nb_ems_gateway/app/__pycache__/dependency_container.cpython-313.pyc differ
+diff -ruN /mnt/data/ems_extract/ems_deployed_source_folder_20260810_122533/northbound_ems_gateway/src/nb_ems_gateway/app/dependency_container.py /mnt/data/fast_bess_work/northbound_ems_gateway/src/nb_ems_gateway/app/dependency_container.py
+--- /mnt/data/ems_extract/ems_deployed_source_folder_20260810_122533/northbound_ems_gateway/src/nb_ems_gateway/app/dependency_container.py	2026-07-19 18:40:10.000000000 +0000
++++ /mnt/data/fast_bess_work/northbound_ems_gateway/src/nb_ems_gateway/app/dependency_container.py	2026-08-10 12:34:24.723334789 +0000
+@@ -25,6 +25,7 @@
+     control_service: Any | None = None
+     server_upload_service: Any | None = None
+     soc_protection_controller: Any | None = None
++    fast_bess_logger: Any | None = None
+ 
+     @classmethod
+     def create(cls, *, config: AppConfig, register_map: RegisterMap) -> 'DependencyContainer':
+@@ -70,6 +71,11 @@
+     def storage_status(self) -> dict[str, Any]:
+         return self.storage.status() if self.storage else {'enabled': False}
+ 
++    def fast_bess_logger_status(self) -> dict[str, Any]:
++        if not self.fast_bess_logger:
++            return {'enabled': self.config.fast_bess_logger.enabled, 'running': False}
++        return self.fast_bess_logger.status()
++
+     def server_upload_status(self) -> dict[str, Any]:
+         if not self.server_upload_service:
+             return {
+Binary files /mnt/data/ems_extract/ems_deployed_source_folder_20260810_122533/northbound_ems_gateway/src/nb_ems_gateway/assets/__pycache__/__init__.cpython-313.pyc and /mnt/data/fast_bess_work/northbound_ems_gateway/src/nb_ems_gateway/assets/__pycache__/__init__.cpython-313.pyc differ
+Binary files /mnt/data/ems_extract/ems_deployed_source_folder_20260810_122533/northbound_ems_gateway/src/nb_ems_gateway/assets/__pycache__/asset_manager.cpython-313.pyc and /mnt/data/fast_bess_work/northbound_ems_gateway/src/nb_ems_gateway/assets/__pycache__/asset_manager.cpython-313.pyc differ
+Binary files /mnt/data/ems_extract/ems_deployed_source_folder_20260810_122533/northbound_ems_gateway/src/nb_ems_gateway/auth/__pycache__/__init__.cpython-313.pyc and /mnt/data/fast_bess_work/northbound_ems_gateway/src/nb_ems_gateway/auth/__pycache__/__init__.cpython-313.pyc differ
+Binary files /mnt/data/ems_extract/ems_deployed_source_folder_20260810_122533/northbound_ems_gateway/src/nb_ems_gateway/auth/__pycache__/security.cpython-313.pyc and /mnt/data/fast_bess_work/northbound_ems_gateway/src/nb_ems_gateway/auth/__pycache__/security.cpython-313.pyc differ
+Binary files /mnt/data/ems_extract/ems_deployed_source_folder_20260810_122533/northbound_ems_gateway/src/nb_ems_gateway/config/__pycache__/__init__.cpython-313.pyc and /mnt/data/fast_bess_work/northbound_ems_gateway/src/nb_ems_gateway/config/__pycache__/__init__.cpython-313.pyc differ
+Binary files /mnt/data/ems_extract/ems_deployed_source_folder_20260810_122533/northbound_ems_gateway/src/nb_ems_gateway/config/__pycache__/loader.cpython-313.pyc and /mnt/data/fast_bess_work/northbound_ems_gateway/src/nb_ems_gateway/config/__pycache__/loader.cpython-313.pyc differ
+Binary files /mnt/data/ems_extract/ems_deployed_source_folder_20260810_122533/northbound_ems_gateway/src/nb_ems_gateway/config/__pycache__/models.cpython-313.pyc and /mnt/data/fast_bess_work/northbound_ems_gateway/src/nb_ems_gateway/config/__pycache__/models.cpython-313.pyc differ
+diff -ruN /mnt/data/ems_extract/ems_deployed_source_folder_20260810_122533/northbound_ems_gateway/src/nb_ems_gateway/config/models.py /mnt/data/fast_bess_work/northbound_ems_gateway/src/nb_ems_gateway/config/models.py
+--- /mnt/data/ems_extract/ems_deployed_source_folder_20260810_122533/northbound_ems_gateway/src/nb_ems_gateway/config/models.py	2026-07-19 18:41:01.000000000 +0000
++++ /mnt/data/fast_bess_work/northbound_ems_gateway/src/nb_ems_gateway/config/models.py	2026-08-10 12:33:00.581831770 +0000
+@@ -80,6 +80,9 @@
+ 
+ class StorageConfig(BaseModel):
+     enabled: bool = True
++    # Master SQLite switch. Keep this True when any DB-backed feature is used.
++    # Set telemetry_history_enabled=False when only fast critical logging is required.
++    telemetry_history_enabled: bool = True
+     type: str = "sqlite"
+     path: str = "/mnt/ems-logs/northbound_ems_gateway/nb_ems_gateway.db"
+     required_mount_path: str | None = "/mnt/ems-logs"
+@@ -92,6 +95,20 @@
+     cleanup_on_startup: bool = True
+     vacuum_after_cleanup: bool = False
+ 
++
++class FastBESSLoggerConfig(BaseModel):
++    enabled: bool = False
++    interval_sec: float = 1.0
++    retention_days: int = 7
++    profile_name: str = "pcs_bms_critical"
++    profile_path: str = "data/historian_profiles/fast_bess_profiles.json"
++    sources: list[str] = Field(default_factory=lambda: ["external_ems_1", "external_ems_2"])
++    write_mode: Literal["compact_json"] = "compact_json"
++    max_data_age_sec: float = 10.0
++    cleanup_interval_sec: float = 3600.0
++    log_start_stop_events: bool = True
++    source_asset_map: dict[str, dict[str, str]] = Field(default_factory=dict)
++
+ class ServerUploadConfig(BaseModel):
+     enabled: bool = False
+     transport: str = "https_rest"
+@@ -161,6 +178,7 @@
+     api: APIConfig = Field(default_factory=APIConfig)
+     logs_api: LogsAPIConfig = Field(default_factory=LogsAPIConfig)
+     storage: StorageConfig = Field(default_factory=StorageConfig)
++    fast_bess_logger: FastBESSLoggerConfig = Field(default_factory=FastBESSLoggerConfig)
+     server_upload: ServerUploadConfig = Field(default_factory=ServerUploadConfig)
+     logging: LoggingConfig = Field(default_factory=LoggingConfig)
+     auth: AuthConfig = Field(default_factory=AuthConfig)
+Binary files /mnt/data/ems_extract/ems_deployed_source_folder_20260810_122533/northbound_ems_gateway/src/nb_ems_gateway/control/__pycache__/__init__.cpython-313.pyc and /mnt/data/fast_bess_work/northbound_ems_gateway/src/nb_ems_gateway/control/__pycache__/__init__.cpython-313.pyc differ
+Binary files /mnt/data/ems_extract/ems_deployed_source_folder_20260810_122533/northbound_ems_gateway/src/nb_ems_gateway/control/__pycache__/control_service.cpython-313.pyc and /mnt/data/fast_bess_work/northbound_ems_gateway/src/nb_ems_gateway/control/__pycache__/control_service.cpython-313.pyc differ
+Binary files /mnt/data/ems_extract/ems_deployed_source_folder_20260810_122533/northbound_ems_gateway/src/nb_ems_gateway/control/__pycache__/models.cpython-313.pyc and /mnt/data/fast_bess_work/northbound_ems_gateway/src/nb_ems_gateway/control/__pycache__/models.cpython-313.pyc differ
+Binary files /mnt/data/ems_extract/ems_deployed_source_folder_20260810_122533/northbound_ems_gateway/src/nb_ems_gateway/control/__pycache__/soc_protection.cpython-313.pyc and /mnt/data/fast_bess_work/northbound_ems_gateway/src/nb_ems_gateway/control/__pycache__/soc_protection.cpython-313.pyc differ
+Binary files /mnt/data/ems_extract/ems_deployed_source_folder_20260810_122533/northbound_ems_gateway/src/nb_ems_gateway/decoding/__pycache__/__init__.cpython-313.pyc and /mnt/data/fast_bess_work/northbound_ems_gateway/src/nb_ems_gateway/decoding/__pycache__/__init__.cpython-313.pyc differ
+Binary files /mnt/data/ems_extract/ems_deployed_source_folder_20260810_122533/northbound_ems_gateway/src/nb_ems_gateway/decoding/__pycache__/float_codec.cpython-313.pyc and /mnt/data/fast_bess_work/northbound_ems_gateway/src/nb_ems_gateway/decoding/__pycache__/float_codec.cpython-313.pyc differ
+Binary files /mnt/data/ems_extract/ems_deployed_source_folder_20260810_122533/northbound_ems_gateway/src/nb_ems_gateway/dictionary/__pycache__/__init__.cpython-313.pyc and /mnt/data/fast_bess_work/northbound_ems_gateway/src/nb_ems_gateway/dictionary/__pycache__/__init__.cpython-313.pyc differ
+Binary files /mnt/data/ems_extract/ems_deployed_source_folder_20260810_122533/northbound_ems_gateway/src/nb_ems_gateway/dictionary/__pycache__/register_map.cpython-313.pyc and /mnt/data/fast_bess_work/northbound_ems_gateway/src/nb_ems_gateway/dictionary/__pycache__/register_map.cpython-313.pyc differ
+Binary files /mnt/data/ems_extract/ems_deployed_source_folder_20260810_122533/northbound_ems_gateway/src/nb_ems_gateway/health/__pycache__/__init__.cpython-313.pyc and /mnt/data/fast_bess_work/northbound_ems_gateway/src/nb_ems_gateway/health/__pycache__/__init__.cpython-313.pyc differ
+Binary files /mnt/data/ems_extract/ems_deployed_source_folder_20260810_122533/northbound_ems_gateway/src/nb_ems_gateway/health/__pycache__/health_engine.cpython-313.pyc and /mnt/data/fast_bess_work/northbound_ems_gateway/src/nb_ems_gateway/health/__pycache__/health_engine.cpython-313.pyc differ
+Binary files /mnt/data/ems_extract/ems_deployed_source_folder_20260810_122533/northbound_ems_gateway/src/nb_ems_gateway/logging/__pycache__/__init__.cpython-313.pyc and /mnt/data/fast_bess_work/northbound_ems_gateway/src/nb_ems_gateway/logging/__pycache__/__init__.cpython-313.pyc differ
+Binary files /mnt/data/ems_extract/ems_deployed_source_folder_20260810_122533/northbound_ems_gateway/src/nb_ems_gateway/logging/__pycache__/event_logger.cpython-313.pyc and /mnt/data/fast_bess_work/northbound_ems_gateway/src/nb_ems_gateway/logging/__pycache__/event_logger.cpython-313.pyc differ
+diff -ruN /mnt/data/ems_extract/ems_deployed_source_folder_20260810_122533/northbound_ems_gateway/src/nb_ems_gateway/main.py /mnt/data/fast_bess_work/northbound_ems_gateway/src/nb_ems_gateway/main.py
+--- /mnt/data/ems_extract/ems_deployed_source_folder_20260810_122533/northbound_ems_gateway/src/nb_ems_gateway/main.py	2026-07-19 18:42:56.000000000 +0000
++++ /mnt/data/fast_bess_work/northbound_ems_gateway/src/nb_ems_gateway/main.py	2026-08-10 12:34:36.583819824 +0000
+@@ -14,6 +14,7 @@
+ from nb_ems_gateway.polling.scheduler import PollingScheduler
+ from nb_ems_gateway.protocol.reader import build_readers
+ from nb_ems_gateway.server_upload.uploader import ServerUploadService
++from nb_ems_gateway.storage.fast_bess_logger import FastBESSLogger
+ 
+ logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(name)s - %(message)s')
+ 
+@@ -35,6 +36,7 @@
+     container.readers = readers
+     container.control_service = ControlService(container, readers)
+     container.soc_protection_controller = SOCProtectionController(container)
++    container.fast_bess_logger = FastBESSLogger(config.fast_bess_logger, container)
+     scheduler = PollingScheduler(container, readers)
+     uploader = ServerUploadService(config.server_upload, container)
+     container.server_upload_service = uploader
+@@ -54,6 +56,8 @@
+     print(f'  logs API: enabled={config.logs_api.enabled}, http://{config.logs_api.host}:{config.logs_api.port}')
+     print(f'  storage: {config.storage.path}')
+     print(f'  storage required mount: {config.storage.required_mount_path}')
++    print(f'  telemetry historian: enabled={config.storage.telemetry_history_enabled}, mode={config.storage.store_mode}, interval={config.storage.snapshot_interval_sec}s')
++    print(f'  fast BESS logger: enabled={config.fast_bess_logger.enabled}, interval={config.fast_bess_logger.interval_sec}s, profile={config.fast_bess_logger.profile_name}')
+     print(f'  server upload: enabled={config.server_upload.enabled}, interface={config.server_upload.network_interface}')
+     print(f'  auth: enabled={config.auth.enabled}, users={len(config.auth.users)}')
+     print(f'  commands: enabled={config.api.commands_enabled}')
+@@ -66,6 +70,8 @@
+             await scheduler.stop()
+             return
+         await uploader.start()
++        if container.fast_bess_logger:
++            await container.fast_bess_logger.start()
+         await container.soc_protection_controller.start()
+         app = create_app(container)
+         main_server = uvicorn.Server(uvicorn.Config(app, host=config.api.host, port=config.api.port, log_level='info'))
+@@ -79,6 +85,8 @@
+         await uploader.stop()
+         if container.soc_protection_controller:
+             await container.soc_protection_controller.stop()
++        if container.fast_bess_logger:
++            await container.fast_bess_logger.stop()
+         await scheduler.stop()
+         container.close()
+ 
+Binary files /mnt/data/ems_extract/ems_deployed_source_folder_20260810_122533/northbound_ems_gateway/src/nb_ems_gateway/polling/__pycache__/__init__.cpython-313.pyc and /mnt/data/fast_bess_work/northbound_ems_gateway/src/nb_ems_gateway/polling/__pycache__/__init__.cpython-313.pyc differ
+Binary files /mnt/data/ems_extract/ems_deployed_source_folder_20260810_122533/northbound_ems_gateway/src/nb_ems_gateway/polling/__pycache__/scheduler.cpython-313.pyc and /mnt/data/fast_bess_work/northbound_ems_gateway/src/nb_ems_gateway/polling/__pycache__/scheduler.cpython-313.pyc differ
+diff -ruN /mnt/data/ems_extract/ems_deployed_source_folder_20260810_122533/northbound_ems_gateway/src/nb_ems_gateway/polling/scheduler.py /mnt/data/fast_bess_work/northbound_ems_gateway/src/nb_ems_gateway/polling/scheduler.py
+--- /mnt/data/ems_extract/ems_deployed_source_folder_20260810_122533/northbound_ems_gateway/src/nb_ems_gateway/polling/scheduler.py	2026-07-19 18:42:59.000000000 +0000
++++ /mnt/data/fast_bess_work/northbound_ems_gateway/src/nb_ems_gateway/polling/scheduler.py	2026-08-10 12:34:13.846574081 +0000
+@@ -85,10 +85,10 @@
+             source_results[source.source_id] = {'good': s_good, 'bad': s_bad}
+         self.container.latest_poll_errors = errors[-50:]
+         self.cycle_count += 1
+-        if self.container.storage:
++        if self.container.storage and self.container.config.storage.telemetry_history_enabled:
+             assets_snapshot = self.container.asset_manager.snapshot()
+             self.container.storage.insert_cycle_snapshots(assets_snapshot)
+-        if self.cycle_count == 1 or bad:
++        if (self.cycle_count == 1 or bad) and self.container.config.logging.store_poll_events:
+             self.container.event_logger.log(
+                 'warning' if bad else 'info',
+                 'poll_cycle_completed',
+Binary files /mnt/data/ems_extract/ems_deployed_source_folder_20260810_122533/northbound_ems_gateway/src/nb_ems_gateway/protocol/__pycache__/__init__.cpython-313.pyc and /mnt/data/fast_bess_work/northbound_ems_gateway/src/nb_ems_gateway/protocol/__pycache__/__init__.cpython-313.pyc differ
+Binary files /mnt/data/ems_extract/ems_deployed_source_folder_20260810_122533/northbound_ems_gateway/src/nb_ems_gateway/protocol/__pycache__/reader.cpython-313.pyc and /mnt/data/fast_bess_work/northbound_ems_gateway/src/nb_ems_gateway/protocol/__pycache__/reader.cpython-313.pyc differ
+Binary files /mnt/data/ems_extract/ems_deployed_source_folder_20260810_122533/northbound_ems_gateway/src/nb_ems_gateway/server_upload/__pycache__/__init__.cpython-313.pyc and /mnt/data/fast_bess_work/northbound_ems_gateway/src/nb_ems_gateway/server_upload/__pycache__/__init__.cpython-313.pyc differ
+Binary files /mnt/data/ems_extract/ems_deployed_source_folder_20260810_122533/northbound_ems_gateway/src/nb_ems_gateway/server_upload/__pycache__/interface.cpython-313.pyc and /mnt/data/fast_bess_work/northbound_ems_gateway/src/nb_ems_gateway/server_upload/__pycache__/interface.cpython-313.pyc differ
+Binary files /mnt/data/ems_extract/ems_deployed_source_folder_20260810_122533/northbound_ems_gateway/src/nb_ems_gateway/server_upload/__pycache__/payload.cpython-313.pyc and /mnt/data/fast_bess_work/northbound_ems_gateway/src/nb_ems_gateway/server_upload/__pycache__/payload.cpython-313.pyc differ
+Binary files /mnt/data/ems_extract/ems_deployed_source_folder_20260810_122533/northbound_ems_gateway/src/nb_ems_gateway/server_upload/__pycache__/uploader.cpython-313.pyc and /mnt/data/fast_bess_work/northbound_ems_gateway/src/nb_ems_gateway/server_upload/__pycache__/uploader.cpython-313.pyc differ
+Binary files /mnt/data/ems_extract/ems_deployed_source_folder_20260810_122533/northbound_ems_gateway/src/nb_ems_gateway/sources/__pycache__/__init__.cpython-313.pyc and /mnt/data/fast_bess_work/northbound_ems_gateway/src/nb_ems_gateway/sources/__pycache__/__init__.cpython-313.pyc differ
+Binary files /mnt/data/ems_extract/ems_deployed_source_folder_20260810_122533/northbound_ems_gateway/src/nb_ems_gateway/sources/__pycache__/namespacing.cpython-313.pyc and /mnt/data/fast_bess_work/northbound_ems_gateway/src/nb_ems_gateway/sources/__pycache__/namespacing.cpython-313.pyc differ
+Binary files /mnt/data/ems_extract/ems_deployed_source_folder_20260810_122533/northbound_ems_gateway/src/nb_ems_gateway/storage/__pycache__/__init__.cpython-313.pyc and /mnt/data/fast_bess_work/northbound_ems_gateway/src/nb_ems_gateway/storage/__pycache__/__init__.cpython-313.pyc differ
+Binary files /mnt/data/ems_extract/ems_deployed_source_folder_20260810_122533/northbound_ems_gateway/src/nb_ems_gateway/storage/__pycache__/fast_bess_logger.cpython-313.pyc and /mnt/data/fast_bess_work/northbound_ems_gateway/src/nb_ems_gateway/storage/__pycache__/fast_bess_logger.cpython-313.pyc differ
+Binary files /mnt/data/ems_extract/ems_deployed_source_folder_20260810_122533/northbound_ems_gateway/src/nb_ems_gateway/storage/__pycache__/sqlite_store.cpython-313.pyc and /mnt/data/fast_bess_work/northbound_ems_gateway/src/nb_ems_gateway/storage/__pycache__/sqlite_store.cpython-313.pyc differ
+diff -ruN /mnt/data/ems_extract/ems_deployed_source_folder_20260810_122533/northbound_ems_gateway/src/nb_ems_gateway/storage/fast_bess_logger.py /mnt/data/fast_bess_work/northbound_ems_gateway/src/nb_ems_gateway/storage/fast_bess_logger.py
+--- /mnt/data/ems_extract/ems_deployed_source_folder_20260810_122533/northbound_ems_gateway/src/nb_ems_gateway/storage/fast_bess_logger.py	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/fast_bess_work/northbound_ems_gateway/src/nb_ems_gateway/storage/fast_bess_logger.py	2026-08-10 12:34:07.037345917 +0000
+@@ -0,0 +1,235 @@
++from __future__ import annotations
++
++import asyncio
++import json
++import time
++from datetime import datetime, timezone
++from pathlib import Path
++from typing import Any
++
++from nb_ems_gateway.config.models import FastBESSLoggerConfig
++
++
++def _parse_iso_ts(value: str | None) -> float | None:
++    if not value:
++        return None
++    try:
++        return datetime.fromisoformat(value.replace('Z', '+00:00')).timestamp()
++    except Exception:
++        return None
++
++
++class FastBESSLogger:
++    """One-second compact logger for critical BESS PCS/BMS values.
++
++    This logger samples the latest values already present in AssetManager. It does
++    not issue extra Modbus reads, so it does not disturb the gateway polling or
++    control path. It writes one compact SQLite row per BESS/source per interval.
++    """
++
++    def __init__(self, config: FastBESSLoggerConfig, container: Any) -> None:
++        self.config = config
++        self.container = container
++        self._task: asyncio.Task | None = None
++        self._running = False
++        self._profile: dict[str, list[str]] = {}
++        self._profile_error: str | None = None
++        self.sample_count = 0
++        self.write_count = 0
++        self.skipped_count = 0
++        self.last_error: str | None = None
++        self.last_sample_utc: str | None = None
++        self.last_cleanup_ts = 0.0
++        self.last_cleanup_result: dict[str, Any] | None = None
++
++    def load_profile(self) -> None:
++        path = Path(self.config.profile_path)
++        if not path.is_absolute():
++            path = Path.cwd() / path
++        try:
++            data = json.loads(path.read_text(encoding='utf-8'))
++            profiles = data.get('profiles') or {}
++            profile = profiles.get(self.config.profile_name)
++            if not isinstance(profile, dict):
++                raise KeyError(f'profile not found: {self.config.profile_name}')
++            assets = profile.get('assets', profile)
++            pcs = list(assets.get('pcs_1') or assets.get('pcs') or [])
++            bms = list(assets.get('bms_1') or assets.get('bms') or [])
++            if not pcs and not bms:
++                raise ValueError('profile does not contain pcs_1 or bms_1 signal lists')
++            self._profile = {'pcs_1': pcs, 'bms_1': bms}
++            self._profile_error = None
++        except Exception as exc:
++            self._profile = {'pcs_1': [], 'bms_1': []}
++            self._profile_error = str(exc)
++            raise
++
++    async def start(self) -> None:
++        if not self.config.enabled:
++            return
++        if not self.container.storage:
++            self.last_error = 'storage disabled; fast BESS logger cannot start'
++            return
++        self.load_profile()
++        self._running = True
++        self._task = asyncio.create_task(self._loop())
++        if self.config.log_start_stop_events:
++            self.container.event_logger.info(
++                'fast_bess_logger_started',
++                'Fast BESS PCS/BMS logger started',
++                self.status(),
++                source='fast_bess_logger',
++            )
++
++    async def stop(self) -> None:
++        self._running = False
++        if self._task:
++            self._task.cancel()
++            await asyncio.gather(self._task, return_exceptions=True)
++        if self.config.enabled and self.config.log_start_stop_events:
++            self.container.event_logger.info(
++                'fast_bess_logger_stopped',
++                'Fast BESS PCS/BMS logger stopped',
++                self.status(),
++                source='fast_bess_logger',
++            )
++
++    async def _loop(self) -> None:
++        while self._running:
++            start = time.time()
++            try:
++                self.sample_once()
++            except Exception as exc:
++                self.last_error = str(exc)
++                self.skipped_count += 1
++                self.container.event_logger.error(
++                    'fast_bess_logger_error',
++                    f'Fast BESS logger sample failed: {exc}',
++                    {'error': str(exc)},
++                    source='fast_bess_logger',
++                )
++            elapsed = time.time() - start
++            await asyncio.sleep(max(0.05, self.config.interval_sec - elapsed))
++
++    def _source_asset_ids(self, source_id: str) -> dict[str, str]:
++        mapped = self.config.source_asset_map.get(source_id) or {}
++        return {
++            'bess_id': mapped.get('bess_id') or source_id.replace('external_ems_', 'bess_'),
++            'pcs_asset_id': mapped.get('pcs_asset_id') or f'{source_id}_pcs',
++            'bms_asset_id': mapped.get('bms_asset_id') or f'{source_id}_bms',
++        }
++
++    def _extract_signals(self, asset_id: str, wanted: list[str], now_ts: float) -> tuple[dict[str, Any], int, int, int | None]:
++        asset = self.container.asset_manager.telemetry.get(asset_id, {})
++        signals = asset.get('signals', {})
++        out: dict[str, Any] = {}
++        good = 0
++        bad = 0
++        ages: list[int] = []
++        for signal_name in wanted:
++            sig = signals.get(signal_name)
++            if not sig:
++                out[signal_name] = {'quality': 'missing'}
++                bad += 1
++                continue
++            updated_ts = _parse_iso_ts(sig.get('updated_utc'))
++            age_ms = int(max(0.0, now_ts - updated_ts) * 1000) if updated_ts is not None else None
++            if age_ms is not None:
++                ages.append(age_ms)
++            quality = sig.get('quality', 'unknown')
++            if quality == 'good':
++                good += 1
++            else:
++                bad += 1
++            out[signal_name] = {
++                'value': sig.get('value'),
++                'unit': sig.get('unit'),
++                'quality': quality,
++                'category': sig.get('category'),
++                'display_name': sig.get('display_name'),
++                'updated_utc': sig.get('updated_utc'),
++                'age_ms': age_ms,
++            }
++        return out, good, bad, max(ages) if ages else None
++
++    def sample_once(self) -> dict[str, Any]:
++        if not self.container.storage:
++            self.skipped_count += 1
++            return {'ok': False, 'reason': 'storage_disabled'}
++        if not self._profile:
++            self.load_profile()
++        now = datetime.now(timezone.utc)
++        now_ts = now.timestamp()
++        epoch_ms = int(now_ts * 1000)
++        ts = now.isoformat()
++        written: list[dict[str, Any]] = []
++        for source_id in self.config.sources:
++            ids = self._source_asset_ids(source_id)
++            pcs_values, pcs_good, pcs_bad, pcs_age = self._extract_signals(ids['pcs_asset_id'], self._profile.get('pcs_1', []), now_ts)
++            bms_values, bms_good, bms_bad, bms_age = self._extract_signals(ids['bms_asset_id'], self._profile.get('bms_1', []), now_ts)
++            max_age_ms_values = [v for v in [pcs_age, bms_age] if v is not None]
++            max_age_ms = max(max_age_ms_values) if max_age_ms_values else None
++            selected = len(self._profile.get('pcs_1', [])) + len(self._profile.get('bms_1', []))
++            good = pcs_good + bms_good
++            bad = pcs_bad + bms_bad
++            if bad == 0:
++                quality = 'good'
++            elif good > 0:
++                quality = 'partial'
++            else:
++                quality = 'bad'
++            if max_age_ms is not None and max_age_ms > int(self.config.max_data_age_sec * 1000):
++                quality = 'stale' if good else 'bad'
++            sample = {
++                'timestamp_utc': ts,
++                'timestamp_epoch_ms': epoch_ms,
++                'source_id': source_id,
++                'bess_id': ids['bess_id'],
++                'pcs_asset_id': ids['pcs_asset_id'],
++                'bms_asset_id': ids['bms_asset_id'],
++                'profile_name': self.config.profile_name,
++                'pcs_values': pcs_values,
++                'bms_values': bms_values,
++                'selected_signal_count': selected,
++                'good_signal_count': good,
++                'bad_signal_count': bad,
++                'max_data_age_ms': max_age_ms,
++                'quality': quality,
++            }
++            row_id = self.container.storage.insert_fast_bess_sample(sample)
++            written.append({'source_id': source_id, 'row_id': row_id, 'quality': quality, 'good': good, 'bad': bad})
++            if row_id is not None:
++                self.write_count += 1
++        self.sample_count += 1
++        self.last_sample_utc = ts
++        self._cleanup_if_due()
++        return {'ok': True, 'timestamp_utc': ts, 'written': written}
++
++    def _cleanup_if_due(self) -> None:
++        if not self.container.storage:
++            return
++        now = time.time()
++        if now - self.last_cleanup_ts < self.config.cleanup_interval_sec:
++            return
++        self.last_cleanup_ts = now
++        self.last_cleanup_result = self.container.storage.cleanup_fast_bess_samples(self.config.retention_days)
++
++    def status(self) -> dict[str, Any]:
++        return {
++            'enabled': self.config.enabled,
++            'running': self._running,
++            'interval_sec': self.config.interval_sec,
++            'retention_days': self.config.retention_days,
++            'profile_name': self.config.profile_name,
++            'profile_path': self.config.profile_path,
++            'profile_error': self._profile_error,
++            'sources': self.config.sources,
++            'pcs_signal_count': len(self._profile.get('pcs_1', [])),
++            'bms_signal_count': len(self._profile.get('bms_1', [])),
++            'sample_count': self.sample_count,
++            'write_count': self.write_count,
++            'skipped_count': self.skipped_count,
++            'last_sample_utc': self.last_sample_utc,
++            'last_cleanup_result': self.last_cleanup_result,
++            'last_error': self.last_error,
++        }
+diff -ruN /mnt/data/ems_extract/ems_deployed_source_folder_20260810_122533/northbound_ems_gateway/src/nb_ems_gateway/storage/sqlite_store.py /mnt/data/fast_bess_work/northbound_ems_gateway/src/nb_ems_gateway/storage/sqlite_store.py
+--- /mnt/data/ems_extract/ems_deployed_source_folder_20260810_122533/northbound_ems_gateway/src/nb_ems_gateway/storage/sqlite_store.py	2026-07-19 18:44:16.000000000 +0000
++++ /mnt/data/fast_bess_work/northbound_ems_gateway/src/nb_ems_gateway/storage/sqlite_store.py	2026-08-10 12:33:28.848023840 +0000
+@@ -33,6 +33,25 @@
+         CREATE TABLE IF NOT EXISTS gateway_events (id INTEGER PRIMARY KEY AUTOINCREMENT,timestamp_utc TEXT NOT NULL,severity TEXT NOT NULL,event_type TEXT NOT NULL,source TEXT,asset_id TEXT,message TEXT NOT NULL,payload_json TEXT);
+         CREATE INDEX IF NOT EXISTS idx_events_ts ON gateway_events(timestamp_utc);
+         CREATE INDEX IF NOT EXISTS idx_events_filters ON gateway_events(severity,event_type,source,asset_id,timestamp_utc);
++        CREATE TABLE IF NOT EXISTS fast_bess_samples (
++            id INTEGER PRIMARY KEY AUTOINCREMENT,
++            timestamp_utc TEXT NOT NULL,
++            timestamp_epoch_ms INTEGER NOT NULL,
++            source_id TEXT NOT NULL,
++            bess_id TEXT NOT NULL,
++            pcs_asset_id TEXT,
++            bms_asset_id TEXT,
++            pcs_values_json TEXT,
++            bms_values_json TEXT,
++            selected_signal_count INTEGER DEFAULT 0,
++            good_signal_count INTEGER DEFAULT 0,
++            bad_signal_count INTEGER DEFAULT 0,
++            max_data_age_ms INTEGER,
++            quality TEXT,
++            payload_json TEXT
++        );
++        CREATE INDEX IF NOT EXISTS idx_fast_bess_samples_time ON fast_bess_samples(timestamp_epoch_ms);
++        CREATE INDEX IF NOT EXISTS idx_fast_bess_samples_source_time ON fast_bess_samples(source_id,timestamp_epoch_ms);
+         ''')
+         self.conn.commit()
+ 
+@@ -56,12 +75,12 @@
+                 reasons.append(f'disk usage check failed: {exc}')
+         db_mb=self.db_size_bytes()//(1024*1024)
+         if db_mb > self.config.max_db_size_mb: reasons.append(f'database above max size: {db_mb} MB > {self.config.max_db_size_mb} MB')
+-        return {'enabled':True,'type':'sqlite','path':str(self.path),'required_mount_path':mount_path,'mount_ok':mount_ok,'can_write':len(reasons)==0,'reasons':reasons,'free_space_mb':free_mb,'total_space_mb':total_mb,'used_percent':used_pct,'db_size_mb':db_mb,'min_free_space_mb':self.config.min_free_space_mb,'max_db_size_mb':self.config.max_db_size_mb,'store_mode':self.config.store_mode,'snapshot_interval_sec':self.config.snapshot_interval_sec,'retention_days':self.config.retention_days,'skipped_write_count':self.skipped_write_count,'last_skip_reason':self.last_skip_reason}
++        return {'enabled':True,'type':'sqlite','path':str(self.path),'required_mount_path':mount_path,'mount_ok':mount_ok,'can_write':len(reasons)==0,'reasons':reasons,'free_space_mb':free_mb,'total_space_mb':total_mb,'used_percent':used_pct,'db_size_mb':db_mb,'min_free_space_mb':self.config.min_free_space_mb,'max_db_size_mb':self.config.max_db_size_mb,'telemetry_history_enabled':self.config.telemetry_history_enabled,'store_mode':self.config.store_mode,'snapshot_interval_sec':self.config.snapshot_interval_sec,'retention_days':self.config.retention_days,'skipped_write_count':self.skipped_write_count,'last_skip_reason':self.last_skip_reason}
+ 
+     def status(self) -> dict[str,Any]:
+         h=self.health(); tables={}; table_errors={}
+         if hasattr(self,'conn'):
+-            for t in ['telemetry_snapshots','telemetry_points','gateway_events']:
++            for t in ['telemetry_snapshots','telemetry_points','gateway_events','fast_bess_samples']:
+                 try:
+                     row=self.conn.execute(f'SELECT COUNT(*) FROM {t}').fetchone()
+                     tables[t]=int(row[0]) if row and row[0] is not None else 0
+@@ -121,6 +140,66 @@
+             self.conn.rollback()
+             raise
+ 
++    def insert_fast_bess_sample(self, sample: dict[str,Any]) -> int | None:
++        if not self._can_write():
++            return None
++        ts = sample.get('timestamp_utc') or datetime.now(timezone.utc).isoformat()
++        epoch_ms = int(sample.get('timestamp_epoch_ms') or int(time.time() * 1000))
++        cur = self.conn.execute(
++            '''INSERT INTO fast_bess_samples(
++                timestamp_utc,timestamp_epoch_ms,source_id,bess_id,pcs_asset_id,bms_asset_id,
++                pcs_values_json,bms_values_json,selected_signal_count,good_signal_count,
++                bad_signal_count,max_data_age_ms,quality,payload_json
++            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',
++            (
++                ts,
++                epoch_ms,
++                sample.get('source_id'),
++                sample.get('bess_id'),
++                sample.get('pcs_asset_id'),
++                sample.get('bms_asset_id'),
++                json.dumps(sample.get('pcs_values') or {}, separators=(',',':')),
++                json.dumps(sample.get('bms_values') or {}, separators=(',',':')),
++                int(sample.get('selected_signal_count') or 0),
++                int(sample.get('good_signal_count') or 0),
++                int(sample.get('bad_signal_count') or 0),
++                sample.get('max_data_age_ms'),
++                sample.get('quality'),
++                json.dumps(sample, separators=(',',':')),
++            ),
++        )
++        self.conn.commit()
++        return int(cur.lastrowid)
++
++    def cleanup_fast_bess_samples(self, retention_days: int) -> dict[str,Any]:
++        if not self._can_write():
++            return {'ok':False,'reason':self.last_skip_reason}
++        cutoff_dt = datetime.now(timezone.utc) - timedelta(days=retention_days)
++        cutoff_ms = int(cutoff_dt.timestamp() * 1000)
++        cur = self.conn.execute('DELETE FROM fast_bess_samples WHERE timestamp_epoch_ms < ?', (cutoff_ms,))
++        self.conn.commit()
++        return {'ok':True,'retention_days':retention_days,'cutoff_epoch_ms':cutoff_ms,'deleted':int(cur.rowcount)}
++
++    def query_fast_bess_samples(self, source_id: str|None=None, limit: int=100, from_epoch_ms: int|None=None, to_epoch_ms: int|None=None, order: str='desc') -> dict[str,Any]:
++        where=[]; args=[]
++        if source_id:
++            where.append('source_id=?'); args.append(source_id)
++        if from_epoch_ms is not None:
++            where.append('timestamp_epoch_ms>=?'); args.append(int(from_epoch_ms))
++        if to_epoch_ms is not None:
++            where.append('timestamp_epoch_ms<=?'); args.append(int(to_epoch_ms))
++        clause=' WHERE '+' AND '.join(where) if where else ''
++        direction='ASC' if str(order).lower()=='asc' else 'DESC'
++        rows=self.conn.execute(f'SELECT * FROM fast_bess_samples{clause} ORDER BY timestamp_epoch_ms {direction} LIMIT ?', args+[min(int(limit),5000)]).fetchall()
++        return {'items':[self._fast_bess_sample(r) for r in rows]}
++
++    def latest_fast_bess_samples(self) -> dict[str,Any]:
++        rows=self.conn.execute('''SELECT f.* FROM fast_bess_samples f
++            JOIN (SELECT source_id, MAX(timestamp_epoch_ms) AS max_ts FROM fast_bess_samples GROUP BY source_id) m
++            ON f.source_id=m.source_id AND f.timestamp_epoch_ms=m.max_ts
++            ORDER BY f.source_id''').fetchall()
++        return {'items':[self._fast_bess_sample(r) for r in rows]}
++
+     def insert_event(self,severity:str,event_type:str,message:str,payload:dict[str,Any]|None=None,*,source:str|None=None,asset_id:str|None=None) -> int | None:
+         if not self._can_write(): return None
+         ts=datetime.now(timezone.utc).isoformat()
+@@ -186,6 +265,29 @@
+         rows=self.conn.execute('SELECT * FROM telemetry_points WHERE asset_id=? AND signal_name=? ORDER BY timestamp_utc DESC LIMIT ?',(asset_id,signal_name,limit)).fetchall()
+         return [{'timestamp_utc':r['timestamp_utc'],'asset_id':r['asset_id'],'signal_name':r['signal_name'],'value':r['value'],'unit':r['unit'],'quality':r['quality'],'category':r['category']} for r in rows]
+ 
++    def _fast_bess_sample(self,row:sqlite3.Row)->dict[str,Any]:
++        def load(col: str) -> Any:
++            try:
++                return json.loads(row[col] or '{}')
++            except Exception:
++                return {'raw': row[col]}
++        return {
++            'id': row['id'],
++            'timestamp_utc': row['timestamp_utc'],
++            'timestamp_epoch_ms': row['timestamp_epoch_ms'],
++            'source_id': row['source_id'],
++            'bess_id': row['bess_id'],
++            'pcs_asset_id': row['pcs_asset_id'],
++            'bms_asset_id': row['bms_asset_id'],
++            'pcs_values': load('pcs_values_json'),
++            'bms_values': load('bms_values_json'),
++            'selected_signal_count': row['selected_signal_count'],
++            'good_signal_count': row['good_signal_count'],
++            'bad_signal_count': row['bad_signal_count'],
++            'max_data_age_ms': row['max_data_age_ms'],
++            'quality': row['quality'],
++        }
++
+     def _event(self,row:sqlite3.Row)->dict[str,Any]:
+         try: payload=json.loads(row['payload_json'] or '{}')
+         except Exception: payload={'raw':row['payload_json']}

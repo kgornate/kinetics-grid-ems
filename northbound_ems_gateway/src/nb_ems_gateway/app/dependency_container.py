@@ -25,6 +25,7 @@ class DependencyContainer:
     control_service: Any | None = None
     server_upload_service: Any | None = None
     soc_protection_controller: Any | None = None
+    fast_bess_logger: Any | None = None
 
     @classmethod
     def create(cls, *, config: AppConfig, register_map: RegisterMap) -> 'DependencyContainer':
@@ -69,6 +70,11 @@ class DependencyContainer:
 
     def storage_status(self) -> dict[str, Any]:
         return self.storage.status() if self.storage else {'enabled': False}
+
+    def fast_bess_logger_status(self) -> dict[str, Any]:
+        if not self.fast_bess_logger:
+            return {'enabled': self.config.fast_bess_logger.enabled, 'running': False}
+        return self.fast_bess_logger.status()
 
     def server_upload_status(self) -> dict[str, Any]:
         if not self.server_upload_service:

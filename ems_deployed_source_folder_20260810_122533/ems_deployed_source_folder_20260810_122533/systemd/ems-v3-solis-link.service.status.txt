@@ -1,0 +1,8 @@
+● ems-v3-solis-link.service - EMS V3 Solis USB stable link setup
+     Loaded: loaded (/etc/systemd/system/ems-v3-solis-link.service; enabled; preset: disabled)
+     Active: active (exited) since Tue 2026-07-28 04:04:57 UTC; 1 week 6 days ago
+    Process: 775 ExecStart=/root/kinetics-grid-ems/ems_boot_v3/scripts/ems_v3_solis_link.sh (code=exited, status=0/SUCCESS)
+   Main PID: 775 (code=exited, status=0/SUCCESS)
+        CPU: 137ms
+
+Notice: journal has been rotated since unit was started, output may be incomplete.

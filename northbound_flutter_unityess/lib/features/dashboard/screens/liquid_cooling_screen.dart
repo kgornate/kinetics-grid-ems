@@ -21,6 +21,7 @@ import 'utility_meter_screen.dart';
 import 'ems_system_screen.dart';
 import 'strategy_command_screen.dart';
 import 'fire_screen.dart';
+import 'fast_bess_historian_screen.dart';
 import 'dehumidifier_screen.dart';
 
 class LiquidCoolingScreen extends StatefulWidget {
@@ -88,6 +89,9 @@ class _LiquidCoolingScreenState extends State<LiquidCoolingScreen> {
         break;
       case DashboardPage.bms:
         target = BmsScreen(session: widget.session);
+        break;
+      case DashboardPage.historian:
+        target = FastBessHistorianScreen(session: widget.session);
         break;
       case DashboardPage.chiller:
         return;
@@ -232,6 +236,7 @@ class _LiquidCoolingScreenState extends State<LiquidCoolingScreen> {
             onTopology: () => _go(DashboardPage.topology),
             onPcs: () => _go(DashboardPage.pcs),
             onBms: () => _go(DashboardPage.bms),
+            onHistorian: () => _go(DashboardPage.historian),
             onChiller: () {},
             onDehumidifier: () => _go(DashboardPage.dehumidifier),
             onFire: () => _go(DashboardPage.fire),

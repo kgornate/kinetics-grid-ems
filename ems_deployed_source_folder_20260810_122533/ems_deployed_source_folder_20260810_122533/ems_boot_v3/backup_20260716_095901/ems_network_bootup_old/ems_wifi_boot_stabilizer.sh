@@ -1,0 +1,75 @@
+#!/bin/sh
+
+LOG="/var/log/ems_wifi_boot_stabilizer.log"
+
+echo "======================================" >> "$LOG"
+echo "$(date) [stabilizer] started" >> "$LOG"
+
+iw dev mlan0 set power_save off 2>/dev/null || true
+
+pkill -f "udhcpc.*eth0" 2>/dev/null || true
+pkill -f "udhcpc.*eth1" 2>/dev/null || true
+pkill -f "dhclient.*eth0" 2>/dev/null || true
+pkill -f "dhclient.*eth1" 2>/dev/null || true
+
+ip route del default dev eth0 2>/dev/null || true
+ip route del default via 192.168.100.1 dev eth0 2>/dev/null || true
+ip addr flush dev eth0 2>/dev/null || true
+ip addr add 192.168.10.2/24 dev eth0 2>/dev/null || true
+ip link set eth0 down 2>/dev/null || true
+
+ip route del default dev eth1 2>/dev/null || true
+ip route del default via 192.168.100.1 dev eth1 2>/dev/null || true
+ip addr flush dev eth1 2>/dev/null || true
+ip addr add 192.168.100.2/24 dev eth1 2>/dev/null || true
+ip link set eth1 up 2>/dev/null || true
+ip route replace 192.168.100.151 dev eth1 src 192.168.100.2 2>/dev/null || true
+ip route replace 192.168.100.153 dev eth1 src 192.168.100.2 2>/dev/null || true
+
+if iw dev mlan0 link 2>/dev/null | grep -q "Connected to" && ping -I mlan0 -c 1 -W 3 8.8.8.8 >/dev/null 2>&1; then
+    echo "$(date) [stabilizer] Wi-Fi already OK" >> "$LOG"
+else
+    echo "$(date) [stabilizer] Wi-Fi not stable, rerunning setup" >> "$LOG"
+    for i in 1 2 3; do
+        echo "$(date) [stabilizer] Wi-Fi setup retry $i/3" >> "$LOG"
+        /root/kinetics-grid-ems/ems_network_bootup/imx93_wifi_setup.sh >> "$LOG" 2>&1
+        iw dev mlan0 set power_save off 2>/dev/null || true
+        if iw dev mlan0 link 2>/dev/null | grep -q "Connected to" && ping -I mlan0 -c 1 -W 3 8.8.8.8 >/dev/null 2>&1; then
+            echo "$(date) [stabilizer] Wi-Fi recovered on retry $i" >> "$LOG"
+            break
+        fi
+        sleep 15
+    done
+fi
+
+ip route del default dev eth0 2>/dev/null || true
+ip route del default dev eth1 2>/dev/null || true
+ip route del default via 192.168.100.1 dev eth0 2>/dev/null || true
+ip route del default via 192.168.100.1 dev eth1 2>/dev/null || true
+
+if ip -4 addr show mlan0 | grep -q "inet "; then
+    ip route replace default via 192.168.1.1 dev mlan0 metric 10 2>/dev/null || true
+fi
+
+ip route replace 192.168.100.151 dev eth1 src 192.168.100.2 2>/dev/null || true
+ip route replace 192.168.100.153 dev eth1 src 192.168.100.2 2>/dev/null || true
+
+cat > /etc/resolv.conf <<DNS
+nameserver 192.168.1.1
+nameserver 8.8.8.8
+nameserver 8.8.4.4
+DNS
+
+echo "$(date) [stabilizer] final status" >> "$LOG"
+iw dev mlan0 link >> "$LOG" 2>&1 || true
+ip -br addr >> "$LOG" 2>&1
+ip route >> "$LOG" 2>&1
+
+if iw dev mlan0 link 2>/dev/null | grep -q "Connected to" && ping -I mlan0 -c 1 -W 3 8.8.8.8 >/dev/null 2>&1; then
+    echo "$(date) [stabilizer] Internet OK, leaving cloudflared.service untouched" >> "$LOG"
+    systemctl restart nb-ems-soc-controller.service >> "$LOG" 2>&1 || true
+else
+    echo "$(date) [stabilizer] Internet still not OK" >> "$LOG"
+fi
+
+echo "$(date) [stabilizer] completed" >> "$LOG"

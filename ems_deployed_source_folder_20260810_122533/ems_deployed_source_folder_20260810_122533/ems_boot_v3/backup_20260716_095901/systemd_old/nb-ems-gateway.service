@@ -1,0 +1,19 @@
+[Unit]
+Description=NorthBound EMS Gateway Application
+Requires=ems-network-setup.service
+After=ems-network-setup.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+EnvironmentFile=-/etc/nb_ems_gateway.conf
+ExecStart=/root/kinetics-grid-ems/ems_network_bootup/nb_ems_gateway_start.sh
+WorkingDirectory=/root/kinetics-grid-ems/ems_network_bootup
+Restart=always
+RestartSec=5
+StandardOutput=journal+console
+StandardError=journal+console
+
+[Install]
+WantedBy=multi-user.target

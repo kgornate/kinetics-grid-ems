@@ -85,10 +85,10 @@ class PollingScheduler:
             source_results[source.source_id] = {'good': s_good, 'bad': s_bad}
         self.container.latest_poll_errors = errors[-50:]
         self.cycle_count += 1
-        if self.container.storage:
+        if self.container.storage and self.container.config.storage.telemetry_history_enabled:
             assets_snapshot = self.container.asset_manager.snapshot()
             self.container.storage.insert_cycle_snapshots(assets_snapshot)
-        if self.cycle_count == 1 or bad:
+        if (self.cycle_count == 1 or bad) and self.container.config.logging.store_poll_events:
             self.container.event_logger.log(
                 'warning' if bad else 'info',
                 'poll_cycle_completed',

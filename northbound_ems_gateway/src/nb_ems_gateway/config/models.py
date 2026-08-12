@@ -80,6 +80,9 @@ class LogsAPIConfig(BaseModel):
 
 class StorageConfig(BaseModel):
     enabled: bool = True
+    # Master SQLite switch. Keep this True when any DB-backed feature is used.
+    # Set telemetry_history_enabled=False when only fast critical logging is required.
+    telemetry_history_enabled: bool = True
     type: str = "sqlite"
     path: str = "/mnt/ems-logs/northbound_ems_gateway/nb_ems_gateway.db"
     required_mount_path: str | None = "/mnt/ems-logs"
@@ -91,6 +94,20 @@ class StorageConfig(BaseModel):
     snapshot_interval_sec: float = 30.0
     cleanup_on_startup: bool = True
     vacuum_after_cleanup: bool = False
+
+
+class FastBESSLoggerConfig(BaseModel):
+    enabled: bool = False
+    interval_sec: float = 1.0
+    retention_days: int = 90
+    profile_name: str = "pcs_bms_critical_lean_90d"
+    profile_path: str = "data/historian_profiles/fast_bess_profiles.json"
+    sources: list[str] = Field(default_factory=lambda: ["external_ems_1", "external_ems_2"])
+    write_mode: Literal["compact_json","value_only"] = "value_only"
+    max_data_age_sec: float = 10.0
+    cleanup_interval_sec: float = 3600.0
+    log_start_stop_events: bool = True
+    source_asset_map: dict[str, dict[str, str]] = Field(default_factory=dict)
 
 class ServerUploadConfig(BaseModel):
     enabled: bool = False
@@ -161,6 +178,7 @@ class AppConfig(BaseModel):
     api: APIConfig = Field(default_factory=APIConfig)
     logs_api: LogsAPIConfig = Field(default_factory=LogsAPIConfig)
     storage: StorageConfig = Field(default_factory=StorageConfig)
+    fast_bess_logger: FastBESSLoggerConfig = Field(default_factory=FastBESSLoggerConfig)
     server_upload: ServerUploadConfig = Field(default_factory=ServerUploadConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
     auth: AuthConfig = Field(default_factory=AuthConfig)

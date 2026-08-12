@@ -1,0 +1,12 @@
+[Unit]
+Description=Fix EMS routes: eth1 field-only, mlan0 internet
+After=ems-network-setup.service
+Wants=ems-network-setup.service
+
+[Service]
+Type=oneshot
+ExecStart=/root/kinetics-grid-ems/ems_network_bootup/fix_field_wifi_routes.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

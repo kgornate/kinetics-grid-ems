@@ -1,0 +1,467 @@
+diff -ruN '--exclude=__pycache__' '--exclude=*.pyc' /mnt/data/full_fast_src/northbound_ems_gateway/configs/development.json /mnt/data/fast_bess_v2_work/northbound_ems_gateway/configs/development.json
+--- /mnt/data/full_fast_src/northbound_ems_gateway/configs/development.json	2026-08-10 12:35:53.000000000 +0000
++++ /mnt/data/fast_bess_v2_work/northbound_ems_gateway/configs/development.json	2026-08-10 12:54:10.227188811 +0000
+@@ -50,12 +50,12 @@
+     "required_mount_path": "/mnt/ems-logs",
+     "fail_if_mount_missing": true,
+     "min_free_space_mb": 512,
+-    "max_db_size_mb": 25000,
+-    "retention_days": 7,
++    "max_db_size_mb": 80000,
++    "retention_days": 90,
+     "store_mode": "key_signals",
+     "snapshot_interval_sec": 60,
+     "cleanup_on_startup": true,
+-    "vacuum_after_cleanup": true,
++    "vacuum_after_cleanup": false,
+     "telemetry_history_enabled": false
+   },
+   "server_upload": {
+@@ -167,14 +167,14 @@
+   "fast_bess_logger": {
+     "enabled": true,
+     "interval_sec": 1.0,
+-    "retention_days": 7,
+-    "profile_name": "pcs_bms_critical",
++    "retention_days": 90,
++    "profile_name": "pcs_bms_critical_lean_90d",
+     "profile_path": "data/historian_profiles/fast_bess_profiles.json",
+     "sources": [
+       "external_ems_1",
+       "external_ems_2"
+     ],
+-    "write_mode": "compact_json",
++    "write_mode": "value_only",
+     "max_data_age_sec": 10.0,
+     "cleanup_interval_sec": 3600.0,
+     "log_start_stop_events": true,
+diff -ruN '--exclude=__pycache__' '--exclude=*.pyc' /mnt/data/full_fast_src/northbound_ems_gateway/data/historian_profiles/fast_bess_profiles.json /mnt/data/fast_bess_v2_work/northbound_ems_gateway/data/historian_profiles/fast_bess_profiles.json
+--- /mnt/data/full_fast_src/northbound_ems_gateway/data/historian_profiles/fast_bess_profiles.json	2026-08-10 12:35:40.000000000 +0000
++++ /mnt/data/fast_bess_v2_work/northbound_ems_gateway/data/historian_profiles/fast_bess_profiles.json	2026-08-10 12:52:07.461230422 +0000
+@@ -1,7 +1,7 @@
+ {
+   "profiles": {
+     "pcs_bms_critical": {
+-      "description": "1-second compact BESS logger profile. PCS+BMS only for both BESS/EMS: voltage, current, frequency, status and important fault/alarm signals.",
++      "description": "Original v1 1-second PCS+BMS profile. Kept for backward compatibility. Verbose profile, not recommended for 90-day local retention.",
+       "assets": {
+         "pcs_1": [
+           "phase_a_voltage",
+@@ -60,6 +60,78 @@
+           "system_status",
+           "charge_discharge_status",
+           "pre_charge_contactor_status",
++          "negative_contactor_status",
++          "contactor_fault",
++          "fuse_fault",
++          "insulation_fault",
++          "insulation_monitoring_fault",
++          "battery_temperature_sensor_fault",
++          "voltage_sampling_fault",
++          "current_sampling_fault_functional_safety_fault",
++          "charge_over_current",
++          "discharge_over_current_level_1",
++          "bmu_communication_fault",
++          "bau_communication_fault",
++          "pcs_communication_fault",
++          "cell_over_voltage_level_1",
++          "cell_under_voltage_level_1",
++          "battery_pack_over_voltage_alarm_voltage_value",
++          "battery_pack_under_voltage_alarm_voltage_value",
++          "battery_charge_over_current_alarm_current_value",
++          "battery_discharge_over_current_alarm_current_value"
++        ]
++      }
++    },
++    "pcs_bms_critical_lean_90d": {
++      "description": "V2 compact 1-second PCS+BMS profile for 90-day local retention. Stores only voltage, current, frequency, power/status and core fault indicators for both BESS.",
++      "assets": {
++        "pcs_1": [
++          "phase_a_voltage",
++          "phase_b_voltage",
++          "phase_c_voltage",
++          "phase_a_current",
++          "phase_b_current",
++          "phase_c_current",
++          "dc_voltage",
++          "dc_current",
++          "grid_frequency",
++          "charge_discharge_power",
++          "total_active_power",
++          "soc",
++          "fault_status",
++          "total_fault_status",
++          "total_alarm_status",
++          "on_grid_status",
++          "off_grid_status",
++          "running_status_2",
++          "pcs_online_status",
++          "bms_online_status",
++          "sw_fault_ac_over_voltage",
++          "sw_fault_ac_under_voltage",
++          "sw_fault_ac_over_frequency",
++          "sw_fault_ac_under_frequency",
++          "sw_fault_ac_over_current",
++          "hw_fault_ac_over_current",
++          "sw_fault_dc_charge_over_current",
++          "sw_fault_dc_discharge_over_current"
++        ],
++        "bms_1": [
++          "cluster_total_voltage_collected",
++          "cluster_total_current",
++          "can_hall_sampling_current",
++          "display_soc",
++          "soh",
++          "cell_max_voltage",
++          "cell_min_voltage",
++          "max_min_cell_voltage_diff",
++          "battery_max_temperature",
++          "battery_min_temperature",
++          "average_temperature",
++          "insulation_resistance",
++          "pre_charge_total_voltage",
++          "system_status",
++          "charge_discharge_status",
++          "pre_charge_contactor_status",
+           "negative_contactor_status",
+           "contactor_fault",
+           "fuse_fault",
+diff -ruN '--exclude=__pycache__' '--exclude=*.pyc' /mnt/data/full_fast_src/northbound_ems_gateway/src/nb_ems_gateway/api/routes_fast_bess.py /mnt/data/fast_bess_v2_work/northbound_ems_gateway/src/nb_ems_gateway/api/routes_fast_bess.py
+--- /mnt/data/full_fast_src/northbound_ems_gateway/src/nb_ems_gateway/api/routes_fast_bess.py	2026-08-10 12:34:47.000000000 +0000
++++ /mnt/data/fast_bess_v2_work/northbound_ems_gateway/src/nb_ems_gateway/api/routes_fast_bess.py	2026-08-10 12:54:00.285141369 +0000
+@@ -1,18 +1,42 @@
+-from fastapi import APIRouter, Request, HTTPException
++from fastapi import APIRouter, Request, HTTPException, Query
+ 
+ router = APIRouter()
+ 
++
++def _maybe_expand(container, result: dict, response_format: str) -> dict:
++    # V2 stores scalar compact values by default. The same compact data is best
++    # for Flutter charts/server pulls. Expanded mode is reserved for compatibility
++    # if a future client needs additional presentation metadata.
++    if response_format == 'expanded' and container.fast_bess_logger:
++        result = dict(result)
++        result['items'] = [container.fast_bess_logger.expand_item(dict(item)) for item in result.get('items', [])]
++    return result
++
++
+ @router.get('/api/fast-bess/status')
+ def fast_bess_status(request: Request) -> dict:
+     c = request.app.state.container
+     return c.fast_bess_logger_status()
+ 
++
++@router.get('/api/fast-bess/profile')
++def fast_bess_profile(request: Request) -> dict:
++    c = request.app.state.container
++    if not c.fast_bess_logger:
++        return {'enabled': False, 'profile': None}
++    return c.fast_bess_logger.profile_status()
++
++
+ @router.get('/api/fast-bess/latest')
+-def fast_bess_latest(request: Request) -> dict:
++def fast_bess_latest(
++    request: Request,
++    format: str = Query('compact', pattern='^(compact|expanded)$'),
++) -> dict:
+     c = request.app.state.container
+     if not c.storage:
+         raise HTTPException(503, 'storage disabled')
+-    return c.storage.latest_fast_bess_samples()
++    return _maybe_expand(c, c.storage.latest_fast_bess_samples(), format)
++
+ 
+ @router.get('/api/fast-bess/history')
+ def fast_bess_history(
+@@ -22,14 +46,16 @@
+     from_epoch_ms: int | None = None,
+     to_epoch_ms: int | None = None,
+     order: str = 'desc',
++    format: str = Query('compact', pattern='^(compact|expanded)$'),
+ ) -> dict:
+     c = request.app.state.container
+     if not c.storage:
+         raise HTTPException(503, 'storage disabled')
+-    return c.storage.query_fast_bess_samples(
++    result = c.storage.query_fast_bess_samples(
+         source_id=source_id,
+         limit=max(1, min(limit, 5000)),
+         from_epoch_ms=from_epoch_ms,
+         to_epoch_ms=to_epoch_ms,
+         order=order,
+     )
++    return _maybe_expand(c, result, format)
+diff -ruN '--exclude=__pycache__' '--exclude=*.pyc' /mnt/data/full_fast_src/northbound_ems_gateway/src/nb_ems_gateway/config/models.py /mnt/data/fast_bess_v2_work/northbound_ems_gateway/src/nb_ems_gateway/config/models.py
+--- /mnt/data/full_fast_src/northbound_ems_gateway/src/nb_ems_gateway/config/models.py	2026-08-10 12:33:00.000000000 +0000
++++ /mnt/data/fast_bess_v2_work/northbound_ems_gateway/src/nb_ems_gateway/config/models.py	2026-08-10 12:52:13.818403455 +0000
+@@ -99,11 +99,11 @@
+ class FastBESSLoggerConfig(BaseModel):
+     enabled: bool = False
+     interval_sec: float = 1.0
+-    retention_days: int = 7
+-    profile_name: str = "pcs_bms_critical"
++    retention_days: int = 90
++    profile_name: str = "pcs_bms_critical_lean_90d"
+     profile_path: str = "data/historian_profiles/fast_bess_profiles.json"
+     sources: list[str] = Field(default_factory=lambda: ["external_ems_1", "external_ems_2"])
+-    write_mode: Literal["compact_json"] = "compact_json"
++    write_mode: Literal["compact_json","value_only"] = "value_only"
+     max_data_age_sec: float = 10.0
+     cleanup_interval_sec: float = 3600.0
+     log_start_stop_events: bool = True
+diff -ruN '--exclude=__pycache__' '--exclude=*.pyc' /mnt/data/full_fast_src/northbound_ems_gateway/src/nb_ems_gateway/storage/fast_bess_logger.py /mnt/data/fast_bess_v2_work/northbound_ems_gateway/src/nb_ems_gateway/storage/fast_bess_logger.py
+--- /mnt/data/full_fast_src/northbound_ems_gateway/src/nb_ems_gateway/storage/fast_bess_logger.py	2026-08-10 12:34:07.000000000 +0000
++++ /mnt/data/fast_bess_v2_work/northbound_ems_gateway/src/nb_ems_gateway/storage/fast_bess_logger.py	2026-08-10 12:52:43.109172194 +0000
+@@ -20,11 +20,17 @@
+ 
+ 
+ class FastBESSLogger:
+-    """One-second compact logger for critical BESS PCS/BMS values.
++    """One-second logger for critical PCS/BMS values.
+ 
+-    This logger samples the latest values already present in AssetManager. It does
+-    not issue extra Modbus reads, so it does not disturb the gateway polling or
+-    control path. It writes one compact SQLite row per BESS/source per interval.
++    V2 keeps the logger independent from the normal historian and supports two
++    write modes:
++
++    * compact_json: legacy v1 format. Each signal is stored as a verbose object.
++    * value_only: V2 90-day format. Each signal is stored as a scalar value only.
++
++    The logger samples the latest values already present in AssetManager. It does
++    not issue extra Modbus reads, so it does not disturb gateway polling or the
++    control path.
+     """
+ 
+     def __init__(self, config: FastBESSLoggerConfig, container: Any) -> None:
+@@ -126,30 +132,42 @@
+         good = 0
+         bad = 0
+         ages: list[int] = []
++        value_only = self.config.write_mode == 'value_only'
++
+         for signal_name in wanted:
+             sig = signals.get(signal_name)
+             if not sig:
+-                out[signal_name] = {'quality': 'missing'}
++                out[signal_name] = None if value_only else {'quality': 'missing'}
+                 bad += 1
+                 continue
++
+             updated_ts = _parse_iso_ts(sig.get('updated_utc'))
+             age_ms = int(max(0.0, now_ts - updated_ts) * 1000) if updated_ts is not None else None
+             if age_ms is not None:
+                 ages.append(age_ms)
++
+             quality = sig.get('quality', 'unknown')
+             if quality == 'good':
+                 good += 1
+             else:
+                 bad += 1
+-            out[signal_name] = {
+-                'value': sig.get('value'),
+-                'unit': sig.get('unit'),
+-                'quality': quality,
+-                'category': sig.get('category'),
+-                'display_name': sig.get('display_name'),
+-                'updated_utc': sig.get('updated_utc'),
+-                'age_ms': age_ms,
+-            }
++
++            if value_only:
++                # V2 compact storage: keep only scalar values. Unit, display name,
++                # category and per-signal timestamps remain available from the
++                # live register map/API and are not repeated every second.
++                out[signal_name] = sig.get('value')
++            else:
++                # Legacy v1 storage shape retained for fallback/debug only.
++                out[signal_name] = {
++                    'value': sig.get('value'),
++                    'unit': sig.get('unit'),
++                    'quality': quality,
++                    'category': sig.get('category'),
++                    'display_name': sig.get('display_name'),
++                    'updated_utc': sig.get('updated_utc'),
++                    'age_ms': age_ms,
++                }
+         return out, good, bad, max(ages) if ages else None
+ 
+     def sample_once(self) -> dict[str, Any]:
+@@ -158,11 +176,13 @@
+             return {'ok': False, 'reason': 'storage_disabled'}
+         if not self._profile:
+             self.load_profile()
++
+         now = datetime.now(timezone.utc)
+         now_ts = now.timestamp()
+         epoch_ms = int(now_ts * 1000)
+         ts = now.isoformat()
+         written: list[dict[str, Any]] = []
++
+         for source_id in self.config.sources:
+             ids = self._source_asset_ids(source_id)
+             pcs_values, pcs_good, pcs_bad, pcs_age = self._extract_signals(ids['pcs_asset_id'], self._profile.get('pcs_1', []), now_ts)
+@@ -172,6 +192,7 @@
+             selected = len(self._profile.get('pcs_1', [])) + len(self._profile.get('bms_1', []))
+             good = pcs_good + bms_good
+             bad = pcs_bad + bms_bad
++
+             if bad == 0:
+                 quality = 'good'
+             elif good > 0:
+@@ -180,7 +201,10 @@
+                 quality = 'bad'
+             if max_age_ms is not None and max_age_ms > int(self.config.max_data_age_sec * 1000):
+                 quality = 'stale' if good else 'bad'
++
+             sample = {
++                'schema_version': 2 if self.config.write_mode == 'value_only' else 1,
++                'write_mode': self.config.write_mode,
+                 'timestamp_utc': ts,
+                 'timestamp_epoch_ms': epoch_ms,
+                 'source_id': source_id,
+@@ -200,6 +224,7 @@
+             written.append({'source_id': source_id, 'row_id': row_id, 'quality': quality, 'good': good, 'bad': bad})
+             if row_id is not None:
+                 self.write_count += 1
++
+         self.sample_count += 1
+         self.last_sample_utc = ts
+         self._cleanup_if_due()
+@@ -214,18 +239,44 @@
+         self.last_cleanup_ts = now
+         self.last_cleanup_result = self.container.storage.cleanup_fast_bess_samples(self.config.retention_days)
+ 
++    def expand_item(self, item: dict[str, Any]) -> dict[str, Any]:
++        """Return API-friendly item.
++
++        V2 database rows store scalar values only. This method keeps the API
++        stable enough for Flutter/server consumers by returning the same keys and
++        adding profile/write-mode context. The value itself is directly available
++        at item['pcs_values'][signal_name] and item['bms_values'][signal_name].
++        """
++        item.setdefault('profile_name', self.config.profile_name)
++        item.setdefault('write_mode', self.config.write_mode)
++        item.setdefault('schema_version', 2 if self.config.write_mode == 'value_only' else 1)
++        return item
++
++    def profile_status(self) -> dict[str, Any]:
++        return {
++            'profile_name': self.config.profile_name,
++            'profile_path': self.config.profile_path,
++            'write_mode': self.config.write_mode,
++            'pcs_signals': list(self._profile.get('pcs_1', [])),
++            'bms_signals': list(self._profile.get('bms_1', [])),
++            'pcs_signal_count': len(self._profile.get('pcs_1', [])),
++            'bms_signal_count': len(self._profile.get('bms_1', [])),
++        }
++
+     def status(self) -> dict[str, Any]:
+         return {
+             'enabled': self.config.enabled,
+             'running': self._running,
+             'interval_sec': self.config.interval_sec,
+             'retention_days': self.config.retention_days,
++            'write_mode': self.config.write_mode,
+             'profile_name': self.config.profile_name,
+             'profile_path': self.config.profile_path,
+             'profile_error': self._profile_error,
+             'sources': self.config.sources,
+             'pcs_signal_count': len(self._profile.get('pcs_1', [])),
+             'bms_signal_count': len(self._profile.get('bms_1', [])),
++            'total_signal_count_per_bess': len(self._profile.get('pcs_1', [])) + len(self._profile.get('bms_1', [])),
+             'sample_count': self.sample_count,
+             'write_count': self.write_count,
+             'skipped_count': self.skipped_count,
+diff -ruN '--exclude=__pycache__' '--exclude=*.pyc' /mnt/data/full_fast_src/northbound_ems_gateway/src/nb_ems_gateway/storage/sqlite_store.py /mnt/data/fast_bess_v2_work/northbound_ems_gateway/src/nb_ems_gateway/storage/sqlite_store.py
+--- /mnt/data/full_fast_src/northbound_ems_gateway/src/nb_ems_gateway/storage/sqlite_store.py	2026-08-10 12:33:28.000000000 +0000
++++ /mnt/data/fast_bess_v2_work/northbound_ems_gateway/src/nb_ems_gateway/storage/sqlite_store.py	2026-08-10 12:53:34.373600051 +0000
+@@ -48,13 +48,26 @@
+             bad_signal_count INTEGER DEFAULT 0,
+             max_data_age_ms INTEGER,
+             quality TEXT,
+-            payload_json TEXT
++            payload_json TEXT,
++            schema_version INTEGER DEFAULT 1,
++            profile_name TEXT,
++            write_mode TEXT DEFAULT 'compact_json'
+         );
+         CREATE INDEX IF NOT EXISTS idx_fast_bess_samples_time ON fast_bess_samples(timestamp_epoch_ms);
+         CREATE INDEX IF NOT EXISTS idx_fast_bess_samples_source_time ON fast_bess_samples(source_id,timestamp_epoch_ms);
+         ''')
++        self._ensure_column('fast_bess_samples', 'schema_version', 'INTEGER DEFAULT 1')
++        self._ensure_column('fast_bess_samples', 'profile_name', 'TEXT')
++        self._ensure_column('fast_bess_samples', 'write_mode', "TEXT DEFAULT 'compact_json'")
+         self.conn.commit()
+ 
++    def _table_columns(self, table: str) -> set[str]:
++        return {row[1] for row in self.conn.execute(f'PRAGMA table_info({table})').fetchall()}
++
++    def _ensure_column(self, table: str, column: str, declaration: str) -> None:
++        if column not in self._table_columns(table):
++            self.conn.execute(f'ALTER TABLE {table} ADD COLUMN {column} {declaration}')
++
+     def db_size_bytes(self) -> int:
+         total=0
+         for p in [self.path, Path(str(self.path)+'-wal'), Path(str(self.path)+'-shm')]:
+@@ -145,12 +158,22 @@
+             return None
+         ts = sample.get('timestamp_utc') or datetime.now(timezone.utc).isoformat()
+         epoch_ms = int(sample.get('timestamp_epoch_ms') or int(time.time() * 1000))
++        write_mode = sample.get('write_mode') or 'compact_json'
++        schema_version = int(sample.get('schema_version') or (2 if write_mode == 'value_only' else 1))
++
++        # V2 compact mode intentionally does not repeat payload_json, units,
++        # display names, categories or per-signal update timestamps every second.
++        # Those static/diagnostic details remain available from the live API and
++        # profile/register map, while the DB keeps the time-series values.
++        payload_json = None if write_mode == 'value_only' else json.dumps(sample, separators=(',',':'))
++
+         cur = self.conn.execute(
+             '''INSERT INTO fast_bess_samples(
+                 timestamp_utc,timestamp_epoch_ms,source_id,bess_id,pcs_asset_id,bms_asset_id,
+                 pcs_values_json,bms_values_json,selected_signal_count,good_signal_count,
+-                bad_signal_count,max_data_age_ms,quality,payload_json
+-            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',
++                bad_signal_count,max_data_age_ms,quality,payload_json,
++                schema_version,profile_name,write_mode
++            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',
+             (
+                 ts,
+                 epoch_ms,
+@@ -165,7 +188,10 @@
+                 int(sample.get('bad_signal_count') or 0),
+                 sample.get('max_data_age_ms'),
+                 sample.get('quality'),
+-                json.dumps(sample, separators=(',',':')),
++                payload_json,
++                schema_version,
++                sample.get('profile_name'),
++                write_mode,
+             ),
+         )
+         self.conn.commit()
+@@ -271,6 +297,11 @@
+                 return json.loads(row[col] or '{}')
+             except Exception:
+                 return {'raw': row[col]}
++
++        columns = set(row.keys())
++        def get_optional(name: str, default: Any=None) -> Any:
++            return row[name] if name in columns else default
++
+         return {
+             'id': row['id'],
+             'timestamp_utc': row['timestamp_utc'],
+@@ -279,6 +310,9 @@
+             'bess_id': row['bess_id'],
+             'pcs_asset_id': row['pcs_asset_id'],
+             'bms_asset_id': row['bms_asset_id'],
++            'schema_version': get_optional('schema_version', 1),
++            'profile_name': get_optional('profile_name'),
++            'write_mode': get_optional('write_mode', 'compact_json'),
+             'pcs_values': load('pcs_values_json'),
+             'bms_values': load('bms_values_json'),
+             'selected_signal_count': row['selected_signal_count'],

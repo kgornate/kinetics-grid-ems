@@ -1,0 +1,8 @@
+● ems-v3-eth1.service - EMS Boot V3 eth1 field-side setup
+     Loaded: loaded (/etc/systemd/system/ems-v3-eth1.service; enabled; preset: disabled)
+     Active: active (exited) since Tue 2026-07-28 04:04:13 UTC; 1 week 6 days ago
+    Process: 440 ExecStart=/root/kinetics-grid-ems/ems_boot_v3/scripts/imx93_eth1_v3.sh (code=exited, status=0/SUCCESS)
+   Main PID: 440 (code=exited, status=0/SUCCESS)
+        CPU: 183ms
+
+Notice: journal has been rotated since unit was started, output may be incomplete.

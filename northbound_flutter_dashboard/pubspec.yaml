@@ -1,21 +1,24 @@
-name: northbound_flutter_dashboard
-version: 1.0.0+10
-description: NorthBound EMS Gateway dashboard with API login/auth, operator asset fields, historian, gateway events, storage, and asset-specific UI views.
+name: northbound_flutter_unityess
+description: "NorthBound Unity ESS style Flutter app"
 publish_to: 'none'
 
+version: 1.0.0+1
+
 environment:
-  sdk: '>=3.2.0 <4.0.0'
+  sdk: ^3.12.0
 
 dependencies:
   flutter:
     sdk: flutter
-  http: ^1.2.0
-  web_socket_channel: ^2.4.0
+  http: ^1.2.2
+  shared_preferences: ^2.3.2
+  archive: ^3.6.1
+  cupertino_icons: ^1.0.8
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^3.0.0
+  flutter_lints: ^6.0.0
 
 flutter:
   uses-material-design: true

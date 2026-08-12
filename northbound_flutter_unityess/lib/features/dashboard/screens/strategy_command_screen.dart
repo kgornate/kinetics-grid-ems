@@ -17,6 +17,7 @@ import 'bms_screen.dart';
 import 'dehumidifier_screen.dart';
 import 'ems_system_screen.dart';
 import 'fire_screen.dart';
+import 'fast_bess_historian_screen.dart';
 import 'home_dashboard_screen.dart';
 import 'liquid_cooling_screen.dart';
 import 'pcs_screen.dart';
@@ -88,6 +89,9 @@ class _StrategyCommandScreenState extends State<StrategyCommandScreen> {
         break;
       case DashboardPage.bms:
         target = BmsScreen(session: widget.session);
+        break;
+      case DashboardPage.historian:
+        target = FastBessHistorianScreen(session: widget.session);
         break;
       case DashboardPage.chiller:
         target = LiquidCoolingScreen(session: widget.session);
@@ -232,6 +236,7 @@ class _StrategyCommandScreenState extends State<StrategyCommandScreen> {
             onTopology: () => _go(DashboardPage.topology),
             onPcs: () => _go(DashboardPage.pcs),
             onBms: () => _go(DashboardPage.bms),
+            onHistorian: () => _go(DashboardPage.historian),
             onChiller: () => _go(DashboardPage.chiller),
             onDehumidifier: () => _go(DashboardPage.dehumidifier),
             onFire: () => _go(DashboardPage.fire),

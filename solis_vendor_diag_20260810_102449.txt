@@ -1,0 +1,324 @@
+============================================================
+SOLIS RS485 MODBUS DIAGNOSTIC REPORT
+============================================================
+Generated local : Mon Aug 10 10:24:50 UTC 2026
+Generated UTC   : Mon Aug 10 10:24:50 UTC 2026
+Hostname        : imx93frdm
+Kernel          : Linux imx93frdm 6.6.36-lts-next-g34fd186d1571 #1 SMP PREEMPT Wed Sep  4 08:22:45 UTC 2024 aarch64 GNU/Linux
+
+Protocol under test:
+Solis Grid Following RS485_MODBUS Ver3.7
+
+Configured communication:
+Port      : /dev/ems_solis_rtu
+Slave ID  : 1
+Baud      : 9600
+Data bits : 8
+Parity    : None
+Stop bits : 1
+============================================================
+
+===== 1. USB / SERIAL DEVICE =====
+lrwxrwxrwx 1 root root        12 Jul 28 04:04 /dev/ems_solis_rtu -> /dev/ttyUSB0
+lrwxrwxrwx 1 root root        13 Jul 28 04:04 /dev/serial/by-id/usb-FTDI_USB_Serial_Converter_FTB6SPL3-if00-port0 -> ../../ttyUSB0
+crw-rw---- 1 root dialout 188, 0 Aug 10 08:13 /dev/ttyUSB0
+
+===== 2. SOLIS LINK SERVICE =====
+● ems-v3-solis-link.service - EMS V3 Solis USB stable link setup
+     Loaded: loaded (/etc/systemd/system/ems-v3-solis-link.service; enabled; preset: disabled)
+     Active: active (exited) since Tue 2026-07-28 04:04:57 UTC; 1 week 6 days ago
+    Process: 775 ExecStart=/root/kinetics-grid-ems/ems_boot_v3/scripts/ems_v3_solis_link.sh (code=exited, status=0/SUCCESS)
+   Main PID: 775 (code=exited, status=0/SUCCESS)
+        CPU: 137ms
+
+Notice: journal has been rotated since unit was started, output may be incomplete.
+
+===== 3. SERIAL PORT CONFIGURATION =====
+speed 9600 baud; rows 0; columns 0; line = 0;
+intr = ^C; quit = ^\; erase = ^?; kill = ^U; eof = ^D; eol = <undef>;
+eol2 = <undef>; swtch = <undef>; start = ^Q; stop = ^S; susp = ^Z; rprnt = ^R;
+werase = ^W; lnext = ^V; discard = ^O; min = 0; time = 0;
+-parenb -parodd -cmspar cs8 hupcl -cstopb cread clocal -crtscts
+-ignbrk -brkint -ignpar -parmrk -inpck -istrip -inlcr -igncr -icrnl -ixon -ixoff
+-iuclc -ixany -imaxbel -iutf8
+-opost -olcuc -ocrnl -onlcr -onocr -onlret -ofill -ofdel nl0 cr0 tab0 bs0 vt0
+ff0
+-isig -icanon -iexten -echo -echoe -echok -echonl -noflsh -xcase -tostop
+-echoprt -echoctl -echoke -flusho -extproc
+
+===== 4. SERIAL PORT OWNER =====
+ems_solis_rtu:
+No process currently owns /dev/ems_solis_rtu
+
+ttyUSB0:
+No process currently owns /dev/ttyUSB0
+
+===== 5. RELEVANT LIVE PROCESSES =====
+774 /usr/local/bin/cloudflared --no-autoupdate --config /etc/cloudflared/config.yml tunnel run
+819 /usr/bin/python3 -m nb_ems_gateway.main --config configs/development.json
+820 /usr/bin/python3 tools/soc_only_controller.py --config configs/soc_only_field_no_solar.json --live
+33346 tee /root/solis_vendor_diag_20260810_102449.txt
+
+===== 6. RECENT USB / FTDI KERNEL LOG =====
+
+============================================================
+7. MODBUS + RAW SERIAL DIAGNOSTICS
+============================================================
+
+================================================================
+PASSIVE SERIAL LISTEN - 10 SECONDS - NO TRANSMISSION
+================================================================
+passive_total_bytes: 0
+passive_complete_hex: <BUS SILENT>
+
+================================================================
+FC04 READ INPUT: Inverter Type | address=35000 count=1
+================================================================
+connect: True
+elapsed_sec: 9.099
+response   : ReadInputRegistersResponse(dev_id=1, transaction_id=0, address=0, count=0, bits=[], registers=[4129], status=1, retries=3)
+registers  : [4129]
+
+================================================================
+FC04 READ INPUT: Product Model + DSP Version | address=2999 count=2
+================================================================
+connect: True
+ERROR: request ask for id=1 but got id=254, Skipping.
+Repeating....
+ERROR: request ask for id=1 but got id=254, Skipping.
+elapsed_sec: 11.485
+response   : ReadInputRegistersResponse(dev_id=1, transaction_id=0, address=0, count=0, bits=[], registers=[5395, 12431], status=1, retries=3)
+registers  : [5395, 12431]
+
+================================================================
+FC04 READ INPUT: DC Input Type + Active Power | address=3003 count=3
+================================================================
+connect: True
+ERROR: request ask for id=1 but got id=254, Skipping.
+ERROR: request ask for id=1 but got id=254, Skipping.
+ERROR: request ask for id=1 but got id=254, Skipping.
+elapsed_sec: 16.281
+response   : ReadInputRegistersResponse(dev_id=1, transaction_id=0, address=0, count=0, bits=[], registers=[19, 0, 5930], status=1, retries=3)
+registers  : [19, 0, 5930]
+
+================================================================
+FC04 READ INPUT: Working Mode + Temperature + Grid Frequency + Inverter Status | address=3040 count=4
+================================================================
+connect: True
+ERROR: request ask for id=1 but got id=254, Skipping.
+ERROR: request ask for id=1 but got id=254, Skipping.
+ERROR: request ask for id=1 but got id=254, Skipping.
+elapsed_sec: 8.083
+response   : ReadInputRegistersResponse(dev_id=1, transaction_id=0, address=0, count=0, bits=[], registers=[0, 574, 4992, 3], status=1, retries=1)
+registers  : [0, 574, 4992, 3]
+
+================================================================
+FC04 READ INPUT: Active Power Percentage Feedback | address=3049 count=1
+================================================================
+connect: True
+ERROR: request ask for id=1 but got id=254, Skipping.
+ERROR: request ask for id=1 but got id=254, Skipping.
+ERROR: request ask for id=1 but got id=254, Skipping.
+No response received after 3 retries, continue with next request
+Traceback (most recent call last):
+  File "<stdin>", line 33, in fc04
+  File "/usr/lib/python3.12/site-packages/pymodbus/client/mixin.py", line 137, in read_input_registers
+    return self.execute(no_response_expected, pdu_reg.ReadInputRegistersRequest(address=address, count=count, dev_id=device_id))
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/site-packages/pymodbus/client/base.py", line 190, in execute
+    return self.transaction.sync_execute(no_response_expected, request)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/site-packages/pymodbus/transaction/transaction.py", line 153, in sync_execute
+    raise ModbusIOException(txt)
+pymodbus.exceptions.ModbusIOException: Modbus Error: [Input/Output] No response received after 3 retries, continue with next request
+RESULT: FAILED
+exception: ModbusIOException('[Input/Output] No response received after 3 retries, continue with next request')
+
+================================================================
+FC04 READ INPUT: Actual Power Factor | address=3051 count=1
+================================================================
+connect: True
+ERROR: request ask for id=1 but got id=254, Skipping.
+Repeating....
+No response received after 3 retries, continue with next request
+Traceback (most recent call last):
+  File "<stdin>", line 33, in fc04
+  File "/usr/lib/python3.12/site-packages/pymodbus/client/mixin.py", line 137, in read_input_registers
+    return self.execute(no_response_expected, pdu_reg.ReadInputRegistersRequest(address=address, count=count, dev_id=device_id))
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/site-packages/pymodbus/client/base.py", line 190, in execute
+    return self.transaction.sync_execute(no_response_expected, request)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/site-packages/pymodbus/transaction/transaction.py", line 153, in sync_execute
+    raise ModbusIOException(txt)
+pymodbus.exceptions.ModbusIOException: Modbus Error: [Input/Output] No response received after 3 retries, continue with next request
+RESULT: FAILED
+exception: ModbusIOException('[Input/Output] No response received after 3 retries, continue with next request')
+
+================================================================
+FC04 READ INPUT: Reactive Power Percentage Feedback | address=3052 count=1
+================================================================
+connect: True
+ERROR: request ask for id=1 but got id=254, Skipping.
+Repeating....
+No response received after 3 retries, continue with next request
+Traceback (most recent call last):
+  File "<stdin>", line 33, in fc04
+  File "/usr/lib/python3.12/site-packages/pymodbus/client/mixin.py", line 137, in read_input_registers
+    return self.execute(no_response_expected, pdu_reg.ReadInputRegistersRequest(address=address, count=count, dev_id=device_id))
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/site-packages/pymodbus/client/base.py", line 190, in execute
+    return self.transaction.sync_execute(no_response_expected, request)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/site-packages/pymodbus/transaction/transaction.py", line 153, in sync_execute
+    raise ModbusIOException(txt)
+pymodbus.exceptions.ModbusIOException: Modbus Error: [Input/Output] No response received after 3 retries, continue with next request
+RESULT: FAILED
+exception: ModbusIOException('[Input/Output] No response received after 3 retries, continue with next request')
+
+================================================================
+FC04 READ INPUT: Active / Reactive Power Switch Feedback | address=3089 count=2
+================================================================
+connect: True
+ERROR: request ask for id=1 but got id=254, Skipping.
+Repeating....
+No response received after 3 retries, continue with next request
+Traceback (most recent call last):
+  File "<stdin>", line 33, in fc04
+  File "/usr/lib/python3.12/site-packages/pymodbus/client/mixin.py", line 137, in read_input_registers
+    return self.execute(no_response_expected, pdu_reg.ReadInputRegistersRequest(address=address, count=count, dev_id=device_id))
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/site-packages/pymodbus/client/base.py", line 190, in execute
+    return self.transaction.sync_execute(no_response_expected, request)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/site-packages/pymodbus/transaction/transaction.py", line 153, in sync_execute
+    raise ModbusIOException(txt)
+pymodbus.exceptions.ModbusIOException: Modbus Error: [Input/Output] No response received after 3 retries, continue with next request
+RESULT: FAILED
+exception: ModbusIOException('[Input/Output] No response received after 3 retries, continue with next request')
+
+================================================================
+FC03 READ HOLDING: Date / Time Holding Registers | address=2999 count=6
+================================================================
+connect: True
+ERROR: request ask for id=1 but got id=254, Skipping.
+Repeating....
+ERROR: request ask for id=1 but got id=254, Skipping.
+No response received after 3 retries, continue with next request
+Traceback (most recent call last):
+  File "<stdin>", line 63, in fc03
+  File "/usr/lib/python3.12/site-packages/pymodbus/client/mixin.py", line 114, in read_holding_registers
+    return self.execute(no_response_expected, pdu_reg.ReadHoldingRegistersRequest(address=address, count=count, dev_id=device_id))
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/site-packages/pymodbus/client/base.py", line 190, in execute
+    return self.transaction.sync_execute(no_response_expected, request)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/site-packages/pymodbus/transaction/transaction.py", line 153, in sync_execute
+    raise ModbusIOException(txt)
+pymodbus.exceptions.ModbusIOException: Modbus Error: [Input/Output] No response received after 3 retries, continue with next request
+RESULT: FAILED
+exception: ModbusIOException('[Input/Output] No response received after 3 retries, continue with next request')
+
+================================================================
+FC03 READ HOLDING: ON/OFF Holding Register | address=3006 count=1
+================================================================
+connect: True
+ERROR: request ask for id=1 but got id=254, Skipping.
+No response received after 3 retries, continue with next request
+Traceback (most recent call last):
+  File "<stdin>", line 63, in fc03
+  File "/usr/lib/python3.12/site-packages/pymodbus/client/mixin.py", line 114, in read_holding_registers
+    return self.execute(no_response_expected, pdu_reg.ReadHoldingRegistersRequest(address=address, count=count, dev_id=device_id))
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/site-packages/pymodbus/client/base.py", line 190, in execute
+    return self.transaction.sync_execute(no_response_expected, request)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/site-packages/pymodbus/transaction/transaction.py", line 153, in sync_execute
+    raise ModbusIOException(txt)
+pymodbus.exceptions.ModbusIOException: Modbus Error: [Input/Output] No response received after 3 retries, continue with next request
+RESULT: FAILED
+exception: ModbusIOException('[Input/Output] No response received after 3 retries, continue with next request')
+
+================================================================
+FC03 READ HOLDING: Active Power Percentage Setting | address=3051 count=1
+================================================================
+connect: True
+ERROR: request ask for id=1 but got id=254, Skipping.
+Repeating....
+No response received after 3 retries, continue with next request
+Traceback (most recent call last):
+  File "<stdin>", line 63, in fc03
+  File "/usr/lib/python3.12/site-packages/pymodbus/client/mixin.py", line 114, in read_holding_registers
+    return self.execute(no_response_expected, pdu_reg.ReadHoldingRegistersRequest(address=address, count=count, dev_id=device_id))
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/site-packages/pymodbus/client/base.py", line 190, in execute
+    return self.transaction.sync_execute(no_response_expected, request)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/site-packages/pymodbus/transaction/transaction.py", line 153, in sync_execute
+    raise ModbusIOException(txt)
+pymodbus.exceptions.ModbusIOException: Modbus Error: [Input/Output] No response received after 3 retries, continue with next request
+RESULT: FAILED
+exception: ModbusIOException('[Input/Output] No response received after 3 retries, continue with next request')
+
+================================================================
+FC03 READ HOLDING: Active Power Control Switch | address=3069 count=1
+================================================================
+connect: True
+ERROR: request ask for id=1 but got id=254, Skipping.
+No response received after 3 retries, continue with next request
+Traceback (most recent call last):
+  File "<stdin>", line 63, in fc03
+  File "/usr/lib/python3.12/site-packages/pymodbus/client/mixin.py", line 114, in read_holding_registers
+    return self.execute(no_response_expected, pdu_reg.ReadHoldingRegistersRequest(address=address, count=count, dev_id=device_id))
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/site-packages/pymodbus/client/base.py", line 190, in execute
+    return self.transaction.sync_execute(no_response_expected, request)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/site-packages/pymodbus/transaction/transaction.py", line 153, in sync_execute
+    raise ModbusIOException(txt)
+pymodbus.exceptions.ModbusIOException: Modbus Error: [Input/Output] No response received after 3 retries, continue with next request
+RESULT: FAILED
+exception: ModbusIOException('[Input/Output] No response received after 3 retries, continue with next request')
+
+================================================================
+FC03 READ HOLDING: Active Power Setpoint 1 | address=3080 count=1
+================================================================
+connect: True
+ERROR: request ask for id=1 but got id=254, Skipping.
+No response received after 3 retries, continue with next request
+Traceback (most recent call last):
+  File "<stdin>", line 63, in fc03
+  File "/usr/lib/python3.12/site-packages/pymodbus/client/mixin.py", line 114, in read_holding_registers
+    return self.execute(no_response_expected, pdu_reg.ReadHoldingRegistersRequest(address=address, count=count, dev_id=device_id))
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/site-packages/pymodbus/client/base.py", line 190, in execute
+    return self.transaction.sync_execute(no_response_expected, request)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/site-packages/pymodbus/transaction/transaction.py", line 153, in sync_execute
+    raise ModbusIOException(txt)
+pymodbus.exceptions.ModbusIOException: Modbus Error: [Input/Output] No response received after 3 retries, continue with next request
+RESULT: FAILED
+exception: ModbusIOException('[Input/Output] No response received after 3 retries, continue with next request')
+
+================================================================
+RAW MODBUS TEST: FC04 Inverter Type | FC=04 ADDR=35000
+================================================================
+RAW_TX: 01 04 88 b8 00 01 9a 4f
+RAW_RX_COUNT: 0
+RAW_RX: <NO RESPONSE>
+
+================================================================
+RAW MODBUS TEST: FC03 Holding Register | FC=03 ADDR=2999
+================================================================
+RAW_TX: 01 03 0b b7 00 01 36 08
+RAW_RX_COUNT: 18
+RAW_RX: 01 03 02 00 1a 39 8f ff fe ff 01 90 00 fe ff 01 90 00
+
+================================================================
+DIAGNOSTIC TEST COMPLETED
+================================================================
+IMPORTANT: NO FC06 / FC10 WRITE COMMAND WAS SENT.
+
+============================================================
+END OF SOLIS DIAGNOSTIC REPORT
+============================================================

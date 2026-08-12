@@ -1,0 +1,22 @@
+● ems-v3-soc-controller.service - EMS V3 SOC-only controller
+     Loaded: loaded (/etc/systemd/system/ems-v3-soc-controller.service; disabled; preset: disabled)
+    Drop-In: /etc/systemd/system/ems-v3-soc-controller.service.d
+             └─10-after-gateway.conf
+     Active: active (running) since Tue 2026-07-28 04:04:57 UTC; 1 week 6 days ago
+   Main PID: 820 (python3)
+      Tasks: 1 (limit: 1789)
+     Memory: 28.8M (peak: 30.3M)
+        CPU: 13min 55.651s
+     CGroup: /system.slice/ems-v3-soc-controller.service
+             └─820 /usr/bin/python3 tools/soc_only_controller.py --config configs/soc_only_field_no_solar.json --live
+
+Aug 10 12:25:31 imx93frdm sh[820]:       "id": "X",
+Aug 10 12:25:31 imx93frdm sh[820]:       "target": "ON"
+Aug 10 12:25:31 imx93frdm sh[820]:     },
+Aug 10 12:25:31 imx93frdm sh[820]:     {
+Aug 10 12:25:31 imx93frdm sh[820]:       "kind": "bess",
+Aug 10 12:25:31 imx93frdm sh[820]:       "id": "Y",
+Aug 10 12:25:31 imx93frdm sh[820]:       "target": "ON"
+Aug 10 12:25:31 imx93frdm sh[820]:     }
+Aug 10 12:25:31 imx93frdm sh[820]:   ]
+Aug 10 12:25:31 imx93frdm sh[820]: }

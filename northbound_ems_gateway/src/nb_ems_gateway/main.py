@@ -14,6 +14,7 @@ from nb_ems_gateway.dictionary.register_map import RegisterMap
 from nb_ems_gateway.polling.scheduler import PollingScheduler
 from nb_ems_gateway.protocol.reader import build_readers
 from nb_ems_gateway.server_upload.uploader import ServerUploadService
+from nb_ems_gateway.storage.fast_bess_logger import FastBESSLogger
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(name)s - %(message)s')
 
@@ -35,6 +36,7 @@ async def amain() -> None:
     container.readers = readers
     container.control_service = ControlService(container, readers)
     container.soc_protection_controller = SOCProtectionController(container)
+    container.fast_bess_logger = FastBESSLogger(config.fast_bess_logger, container)
     scheduler = PollingScheduler(container, readers)
     uploader = ServerUploadService(config.server_upload, container)
     container.server_upload_service = uploader
@@ -54,6 +56,8 @@ async def amain() -> None:
     print(f'  logs API: enabled={config.logs_api.enabled}, http://{config.logs_api.host}:{config.logs_api.port}')
     print(f'  storage: {config.storage.path}')
     print(f'  storage required mount: {config.storage.required_mount_path}')
+    print(f'  telemetry historian: enabled={config.storage.telemetry_history_enabled}, mode={config.storage.store_mode}, interval={config.storage.snapshot_interval_sec}s')
+    print(f'  fast BESS logger: enabled={config.fast_bess_logger.enabled}, interval={config.fast_bess_logger.interval_sec}s, profile={config.fast_bess_logger.profile_name}')
     print(f'  server upload: enabled={config.server_upload.enabled}, interface={config.server_upload.network_interface}')
     print(f'  auth: enabled={config.auth.enabled}, users={len(config.auth.users)}')
     print(f'  commands: enabled={config.api.commands_enabled}')
@@ -66,6 +70,8 @@ async def amain() -> None:
             await scheduler.stop()
             return
         await uploader.start()
+        if container.fast_bess_logger:
+            await container.fast_bess_logger.start()
         await container.soc_protection_controller.start()
         app = create_app(container)
         main_server = uvicorn.Server(uvicorn.Config(app, host=config.api.host, port=config.api.port, log_level='info'))
@@ -79,6 +85,8 @@ async def amain() -> None:
         await uploader.stop()
         if container.soc_protection_controller:
             await container.soc_protection_controller.stop()
+        if container.fast_bess_logger:
+            await container.fast_bess_logger.stop()
         await scheduler.stop()
         container.close()
 

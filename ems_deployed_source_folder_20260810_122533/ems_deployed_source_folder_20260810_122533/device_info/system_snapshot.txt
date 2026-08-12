@@ -1,0 +1,177 @@
+===== DATE =====
+Mon Aug 10 12:25:35 UTC 2026
+
+===== HOSTNAME =====
+imx93frdm
+
+===== UNAME =====
+Linux imx93frdm 6.6.36-lts-next-g34fd186d1571 #1 SMP PREEMPT Wed Sep  4 08:22:45 UTC 2024 aarch64 GNU/Linux
+
+===== OS RELEASE =====
+ID=fsl-imx-xwayland
+NAME="NXP i.MX Release Distro"
+VERSION="6.6-scarthgap (scarthgap)"
+VERSION_ID=6.6-scarthgap
+VERSION_CODENAME="scarthgap"
+PRETTY_NAME="NXP i.MX Release Distro 6.6-scarthgap (scarthgap)"
+CPE_NAME="cpe:/o:openembedded:fsl-imx-xwayland:6.6-scarthgap"
+
+===== DISK =====
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/root       6.7G  4.0G  2.4G  63% /
+devtmpfs        746M  4.0K  746M   1% /dev
+tmpfs           940M     0  940M   0% /dev/shm
+tmpfs           376M   65M  311M  18% /run
+tmpfs           940M  8.0K  940M   1% /tmp
+tmpfs           940M  767M  173M  82% /var/volatile
+tmpfs           188M  8.0K  188M   1% /run/user/0
+/dev/mmcblk0p1   84M   39M   45M  46% /run/media/boot-mmcblk0p1
+/dev/mmcblk1p1  117G  412M  111G   1% /mnt/ems-logs
+
+===== MEMORY =====
+               total        used        free      shared  buff/cache   available
+Mem:           1.8Gi       1.2Gi       445Mi       832Mi       1.1Gi       662Mi
+Swap:             0B          0B          0B
+
+===== IP ADDRESS =====
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+       valid_lft forever preferred_lft forever
+    inet6 ::1/128 scope host noprefixroute 
+       valid_lft forever preferred_lft forever
+2: eth0: <BROADCAST,MULTICAST> mtu 1500 qdisc noop state DOWN group default qlen 1000
+    link/ether 3e:2c:7a:41:66:52 brd ff:ff:ff:ff:ff:ff
+3: eth1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc mq state UP group default qlen 1000
+    link/ether fa:d6:d3:1c:1f:e5 brd ff:ff:ff:ff:ff:ff
+    inet 192.168.100.2/24 scope global eth1
+       valid_lft forever preferred_lft forever
+    inet6 ::f8d6:d3ff:fe1c:1fe5/64 scope global dynamic mngtmpaddr proto kernel_ra 
+       valid_lft 297sec preferred_lft 117sec
+    inet6 fe80::f8d6:d3ff:fe1c:1fe5/64 scope link proto kernel_ll 
+       valid_lft forever preferred_lft forever
+4: can0: <NOARP,ECHO> mtu 16 qdisc noop state DOWN group default qlen 10
+    link/can 
+5: mlan0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc mq state UP group default qlen 1000
+    link/ether b8:f4:4f:aa:a1:3d brd ff:ff:ff:ff:ff:ff
+    inet 192.168.1.101/24 brd 192.168.1.255 scope global mlan0
+       valid_lft forever preferred_lft forever
+    inet6 fe80::baf4:4fff:feaa:a13d/64 scope link proto kernel_ll 
+       valid_lft forever preferred_lft forever
+6: uap0: <BROADCAST,MULTICAST> mtu 1500 qdisc noop state DOWN group default qlen 1000
+    link/ether ba:f4:4f:aa:a2:3d brd ff:ff:ff:ff:ff:ff
+7: wfd0: <BROADCAST,MULTICAST> mtu 1500 qdisc noop state DOWN group default qlen 1000
+    link/ether ba:f4:4f:aa:a1:3d brd ff:ff:ff:ff:ff:ff
+
+===== IP ROUTE =====
+default via 192.168.1.1 dev mlan0 metric 10 
+192.168.1.0/24 dev mlan0 proto kernel scope link src 192.168.1.101 
+192.168.100.0/24 dev eth1 proto kernel scope link src 192.168.100.2 
+192.168.100.151 dev eth1 scope link src 192.168.100.2 
+192.168.100.153 dev eth1 scope link src 192.168.100.2 
+
+===== PROCESSES =====
+    PID    PPID CMD                         %MEM %CPU
+    819       1 /usr/bin/python3 -m nb_ems_  6.6 49.9
+    774       1 /usr/local/bin/cloudflared   4.3  0.2
+    820       1 /usr/bin/python3 tools/soc_  1.4  0.0
+    444       1 /usr/bin/weston --log=/run/  0.9  0.0
+    146       1 /usr/lib/systemd/systemd-jo  0.9  0.1
+      1       0 /sbin/init                   0.5  0.0
+    189       1 /usr/lib/systemd/systemd-ud  0.5  0.0
+    587     444 /usr/libexec/weston-keyboar  0.5  0.0
+    475       1 /usr/lib/systemd/systemd --  0.4  0.0
+  34082       1 sshd: root@pts/0             0.4  0.1
+    588     444 /usr/libexec/weston-desktop  0.3  0.0
+    334       1 /usr/sbin/ntpd -u ntp:ntp -  0.3  0.0
+    197       1 /usr/lib/systemd/systemd-re  0.3  0.0
+    361       1 /usr/lib/systemd/systemd-lo  0.3  0.0
+    202       1 /usr/lib/systemd/systemd-ti  0.3  0.0
+  33939     194 systemd-userwork: waiting..  0.3  0.0
+    623       1 wpa_supplicant -B -Dnl80211  0.2  0.0
+    194       1 /usr/lib/systemd/systemd-us  0.2  0.0
+    338       1 /usr/libexec/parsec/parsec   0.2  0.6
+  34163     194 systemd-userwork: waiting..  0.2  0.3
+  34164     194 systemd-userwork: waiting..  0.2  0.0
+    336       1 /usr/sbin/ofonod -n          0.2  0.0
+  34084   34082 -sh                          0.2  0.0
+    319       1 /usr/bin/dbus-daemon --syst  0.1  0.0
+    310       1 avahi-daemon: running [imx9  0.1  0.0
+    478     475 (sd-pam)                     0.1  0.0
+    526     444 (sd-pam)                     0.1  0.0
+  34226   34165 ps -eo pid,ppid,cmd,%mem,%c  0.1  100
+  34165   34084 bash -lc set -e; TS=$(date   0.1  2.9
+    145       1 /usr/sbin/rpcbind -w -f      0.1  0.0
+    412     310 avahi-daemon: chroot helper  0.0  0.0
+    348       1 /usr/sbin/syslogd -F         0.0  0.0
+    304       1 /usr/sbin/atd -f             0.0  0.0
+    311       1 /usr/sbin/crond -n           0.0  0.0
+    322       1 /usr/bin/firmwared -d /lib/  0.0  0.0
+    443       1 /sbin/agetty -8 -L ttyLP0 1  0.0  0.0
+    542       1 /usr/sbin/tee-supplicant     0.0  0.0
+    441       1 /sbin/agetty -o -p -- \u --  0.0  0.0
+  34227   34165 head -100                    0.0  0.0
+      2       0 [kthreadd]                   0.0  0.0
+      3       2 [pool_workqueue_release]     0.0  0.0
+      4       2 [kworker/R-rcu_g]            0.0  0.0
+      5       2 [kworker/R-rcu_p]            0.0  0.0
+      6       2 [kworker/R-slub_]            0.0  0.0
+      7       2 [kworker/R-netns]            0.0  0.0
+     12       2 [kworker/R-mm_pe]            0.0  0.0
+     13       2 [rcu_tasks_kthread]          0.0  0.0
+     14       2 [rcu_tasks_trace_kthread]    0.0  0.0
+     15       2 [ksoftirqd/0]                0.0  0.0
+     16       2 [rcu_preempt]                0.0  0.0
+     17       2 [migration/0]                0.0  0.0
+     18       2 [cpuhp/0]                    0.0  0.0
+     19       2 [cpuhp/1]                    0.0  0.0
+     20       2 [migration/1]                0.0  0.0
+     21       2 [ksoftirqd/1]                0.0  0.0
+     24       2 [kdevtmpfs]                  0.0  0.0
+     25       2 [kworker/R-inet_]            0.0  0.0
+     27       2 [kauditd]                    0.0  0.0
+     28       2 [oom_reaper]                 0.0  0.0
+     29       2 [kworker/R-write]            0.0  0.0
+     30       2 [kcompactd0]                 0.0  0.0
+     31       2 [ksmd]                       0.0  0.0
+     32       2 [khugepaged]                 0.0  0.0
+     33       2 [kworker/R-kinte]            0.0  0.0
+     34       2 [kworker/R-kbloc]            0.0  0.0
+     35       2 [kworker/R-blkcg]            0.0  0.0
+     36       2 [kworker/R-tpm_d]            0.0  0.0
+     38       2 [kworker/R-ata_s]            0.0  0.0
+     39       2 [kworker/R-edac-]            0.0  0.0
+     40       2 [kworker/R-devfr]            0.0  0.0
+     41       2 [watchdogd]                  0.0  0.0
+     43       2 [kworker/0:1H-mmc_complete]  0.0  0.0
+     44       2 [kworker/R-rpcio]            0.0  0.0
+     45       2 [kworker/R-xprti]            0.0  0.0
+     46       2 [kworker/R-cfg80]            0.0  0.0
+     47       2 [kswapd0]                    0.0  0.0
+     48       2 [kworker/R-nfsio]            0.0  0.0
+     49       2 [kworker/R-kpcit]            0.0  0.0
+     56       2 [kworker/R-nvme-]            0.0  0.0
+     57       2 [kworker/R-nvme-]            0.0  0.0
+     58       2 [kworker/R-nvme-]            0.0  0.0
+     60       2 [kworker/1:1H-kblockd]       0.0  0.0
+     61       2 [kworker/R-vfio-]            0.0  0.0
+     62       2 [kworker/R-uas]              0.0  0.0
+     64       2 [kworker/R-sdhci]            0.0  0.0
+     65       2 [irq/24-mmc0]                0.0  0.0
+     66       2 [hwrng]                      0.0  0.0
+     67       2 [kworker/R-mmc_c]            0.0  0.0
+     68       2 [kworker/R-tls-s]            0.0  0.0
+     69       2 [kworker/R-mld]              0.0  0.0
+     70       2 [kworker/R-ipv6_]            0.0  0.0
+     71       2 [krfcommd]                   0.0  0.0
+     72       2 [kworker/R-kstrp]            0.0  0.0
+     73       2 [pxp_dispatch]               0.0  0.0
+     81       2 [kworker/R-ci_ot]            0.0  0.0
+     82       2 [kworker/R-remot]            0.0  0.0
+     86       2 [irq/109-1-0022]             0.0  0.0
+     87       2 [2-0050]                     0.0  0.0
+     88       2 [irq/109-2-0050]             0.0  0.0
+
+===== USB SERIAL =====
+lrwxrwxrwx 1 root root        13 Jul 28 04:04 /dev/serial/by-id/usb-FTDI_USB_Serial_Converter_FTB6SPL3-if00-port0 -> ../../ttyUSB0
+crw-rw---- 1 root dialout 188, 0 Aug 10 11:20 /dev/ttyUSB0
