@@ -1,0 +1,12 @@
+{
+  "edge_ai_status": "ANOMALY",
+  "jsonl_path": "/mnt/ems-logs/northbound_ems_gateway/edge_ai_poc/live_inference_v0_3/phase7_2_live_inference_v0_3.jsonl",
+  "latest_age_sec": 19.66,
+  "latest_json_exists": true,
+  "latest_json_path": "/mnt/ems-logs/northbound_ems_gateway/edge_ai_poc/live_inference_v0_3/latest_ml_health_v0_3.json",
+  "ok": true,
+  "phase": "9",
+  "service": "edge-ai-api",
+  "stale_after_sec": 30.0,
+  "uptime_sec": 2744.59
+}

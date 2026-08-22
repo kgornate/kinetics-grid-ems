@@ -1,0 +1,16 @@
+[Unit]
+Description=Edge AI Live Inference - BESS anomaly detection
+After=network-online.target ems-v3-gateway.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/kinetics-grid-ems/northbound_ems_gateway/edge_ai_poc/runtime_v0_3/phase7_runtime_bundle_v0_3
+EnvironmentFile=/etc/edge-ai-live-infer.env
+ExecStart=/usr/bin/python3 -u scripts/eai_phase7_2_live_dual_infer.py --interval-sec 5
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

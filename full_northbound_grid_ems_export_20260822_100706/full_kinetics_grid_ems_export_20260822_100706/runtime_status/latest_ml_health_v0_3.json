@@ -1,0 +1,88 @@
+{
+  "cycle_index": 130,
+  "cycle_latency_ms": 19636.48,
+  "cycle_time": "2026-08-22T10:06:46.854227+00:00",
+  "model_info": {
+    "feature_count": 33,
+    "model_dir": "model",
+    "model_file": "iforest_model_v0_3.joblib",
+    "model_type": "IsolationForest",
+    "preprocessor": "StandardScaler",
+    "runtime_format": "joblib",
+    "scaler_file": "standard_scaler_v0_3.joblib",
+    "threshold": 0.5691796048965233
+  },
+  "ok": true,
+  "phase": "8",
+  "sources": {
+    "external_ems_1": {
+      "anomaly_score_ml": 0.614253,
+      "bess_id": "bess_1",
+      "cycle_index": 130,
+      "cycle_time": "2026-08-22T10:06:46.854227+00:00",
+      "feature_count": 33,
+      "inference_latency_ms": 6559.98,
+      "key_features": {
+        "bms_cell_voltage_spread": 70.0,
+        "bms_fault_flag_count": 1.0,
+        "bms_temperature_spread": 2.799999,
+        "pcs_dc_current_vs_bms_current_delta": 0.1,
+        "pcs_dc_voltage_vs_bms_voltage_delta": 2.800049,
+        "pcs_fault_flag_count": 0.0,
+        "pcs_phase_current_imbalance": 0.2,
+        "pcs_phase_voltage_imbalance": 0.300003
+      },
+      "ml_predicted_anomaly": true,
+      "model_info": {
+        "feature_count": 33,
+        "model_dir": "model",
+        "model_file": "iforest_model_v0_3.joblib",
+        "model_type": "IsolationForest",
+        "preprocessor": "StandardScaler",
+        "runtime_format": "joblib",
+        "scaler_file": "standard_scaler_v0_3.joblib",
+        "threshold": 0.5691796048965233
+      },
+      "ok": true,
+      "phase": "8",
+      "source_id": "external_ems_1",
+      "threshold": 0.5691796048965233,
+      "timestamp_epoch_ms": 1787393213414
+    },
+    "external_ems_2": {
+      "anomaly_score_ml": 0.504967,
+      "bess_id": "bess_2",
+      "cycle_index": 130,
+      "cycle_time": "2026-08-22T10:06:46.854227+00:00",
+      "feature_count": 33,
+      "inference_latency_ms": 13071.55,
+      "key_features": {
+        "bms_cell_voltage_spread": 1.0,
+        "bms_fault_flag_count": 0.0,
+        "bms_temperature_spread": 2.5,
+        "pcs_dc_current_vs_bms_current_delta": 21.100001,
+        "pcs_dc_voltage_vs_bms_voltage_delta": 2.899963,
+        "pcs_fault_flag_count": 0.0,
+        "pcs_phase_current_imbalance": 1.800001,
+        "pcs_phase_voltage_imbalance": 1.100006
+      },
+      "ml_predicted_anomaly": false,
+      "model_info": {
+        "feature_count": 33,
+        "model_dir": "model",
+        "model_file": "iforest_model_v0_3.joblib",
+        "model_type": "IsolationForest",
+        "preprocessor": "StandardScaler",
+        "runtime_format": "joblib",
+        "scaler_file": "standard_scaler_v0_3.joblib",
+        "threshold": 0.5691796048965233
+      },
+      "ok": true,
+      "phase": "8",
+      "source_id": "external_ems_2",
+      "threshold": 0.5691796048965233,
+      "timestamp_epoch_ms": 1787393226486
+    }
+  },
+  "started_at": "2026-08-22T09:31:05.553911+00:00"
+}

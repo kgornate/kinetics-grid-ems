@@ -1,0 +1,37 @@
+===== PHASE 6.2 KEY FINDINGS =====
+Threshold = 0.5691796048965233
+Feature count = 33
+
+DATASET SUMMARY
+normal_validation: rows=80000, ml_anomaly_rows=400, ml_anomaly_percent=0.5
+normal_test: rows=42772, ml_anomaly_rows=226, ml_anomaly_percent=0.528
+warning_abnormal_test: rows=5779, ml_anomaly_rows=2742, ml_anomaly_percent=47.448
+data_quality_test: rows=21, ml_anomaly_rows=0, ml_anomaly_percent=0.0
+
+WARNING/ABNORMAL OVERLAP
+warning_abnormal_rows = 5779
+warning_abnormal_ml_detected_rows = 2742
+warning_abnormal_ml_detected_percent = 47.448
+rule_abnormal_rows = 7
+rule_abnormal_ml_detected_rows = 7
+ml_event_windows = 470
+
+TOP REASON CATEGORIES
+pcs_bms_current_mismatch: total=2759, ml_detected=1835, ml_percent=66.51, max_score=0.7403
+pcs_phase_current_imbalance: total=1277, ml_detected=1137, ml_percent=89.04, max_score=0.7403
+pcs_bms_voltage_mismatch: total=1211, ml_detected=854, ml_percent=70.52, max_score=0.6876
+pcs_phase_voltage_imbalance: total=1476, ml_detected=638, ml_percent=43.22, max_score=0.6876
+pcs_fault_or_alarm: total=295, ml_detected=219, ml_percent=74.24, max_score=0.6736
+bms_cell_voltage_spread: total=1618, ml_detected=114, ml_percent=7.05, max_score=0.6652
+
+TOP ML EVENTS
+external_ems_1 bess_1 2026-08-14T04:57:45.618581+00:00 to 2026-08-14T04:58:31.618584+00:00 rows=12 max_ml=0.740252 cats=pcs_phase_current_imbalance;pcs_bms_current_mismatch
+external_ems_1 bess_1 2026-08-14T05:28:21.618634+00:00 to 2026-08-14T05:28:26.618636+00:00 rows=6 max_ml=0.73905 cats=pcs_phase_current_imbalance;pcs_bms_current_mismatch
+external_ems_1 bess_1 2026-08-14T05:22:33.629494+00:00 to 2026-08-14T05:23:29.618561+00:00 rows=33 max_ml=0.733085 cats=pcs_phase_current_imbalance;pcs_bms_current_mismatch
+external_ems_1 bess_1 2026-08-14T05:18:15.629300+00:00 to 2026-08-14T05:18:54.618584+00:00 rows=14 max_ml=0.729446 cats=pcs_phase_current_imbalance;pcs_bms_current_mismatch
+external_ems_1 bess_1 2026-08-14T05:24:02.629676+00:00 to 2026-08-14T05:24:19.628677+00:00 rows=12 max_ml=0.704065 cats=pcs_bms_current_mismatch;pcs_phase_current_imbalance
+external_ems_1 bess_1 2026-08-14T05:00:39.618578+00:00 to 2026-08-14T05:01:13.618582+00:00 rows=20 max_ml=0.6979 cats=pcs_phase_current_imbalance;pcs_bms_current_mismatch
+external_ems_1 bess_1 2026-08-14T04:56:42.629866+00:00 to 2026-08-14T04:57:02.618591+00:00 rows=15 max_ml=0.697322 cats=pcs_bms_current_mismatch;pcs_phase_current_imbalance
+external_ems_1 bess_1 2026-08-12T06:28:37.618580+00:00 to 2026-08-12T06:29:48.619261+00:00 rows=27 max_ml=0.695141 cats=pcs_bms_current_mismatch;pcs_phase_current_imbalance;pcs_bms_voltage_mismatch
+external_ems_1 bess_1 2026-08-13T08:08:10.629190+00:00 to 2026-08-13T08:09:38.618612+00:00 rows=35 max_ml=0.69483 cats=pcs_phase_current_imbalance;pcs_bms_current_mismatch
+external_ems_1 bess_1 2026-08-14T05:26:46.629337+00:00 to 2026-08-14T05:26:47.618582+00:00 rows=2 max_ml=0.69189 cats=pcs_phase_current_imbalance;pcs_bms_current_mismatch

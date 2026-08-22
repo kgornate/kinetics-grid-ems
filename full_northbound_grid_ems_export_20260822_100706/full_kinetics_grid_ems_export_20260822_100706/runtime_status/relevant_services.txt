@@ -1,0 +1,10 @@
+  cloudflared.service                                                                       loaded    active   running Cloudflared tunnel (V3)
+  edge-ai-api.service                                                                       loaded    active   running Edge AI Local API - latest ML health endpoint
+  edge-ai-live-infer.service                                                                loaded    active   running Edge AI Live Inference - BESS anomaly detection
+  ems-v3-boot-summary.service                                                               loaded    inactive dead    EMS V3 boot summary on console
+  ems-v3-eth1.service                                                                       loaded    active   exited  EMS Boot V3 eth1 field-side setup
+  ems-v3-gateway.service                                                                    loaded    active   running EMS V3 Full Gateway
+  ems-v3-soc-controller.service                                                             loaded    active   running EMS V3 SOC-only controller
+  ems-v3-solis-link.service                                                                 loaded    active   exited  EMS V3 Solis USB stable link setup
+  ems-v3-wifi.service                                                                       loaded    active   exited  EMS Boot V3 Wi-Fi setup
+  systemd-remount-fs.service                                                                loaded    active   exited  Remount Root and Kernel File Systems

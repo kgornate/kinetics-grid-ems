@@ -1,0 +1,20 @@
+● edge-ai-live-infer.service - Edge AI Live Inference - BESS anomaly detection
+     Loaded: loaded (/etc/systemd/system/edge-ai-live-infer.service; enabled; preset: disabled)
+     Active: active (running) since Sat 2026-08-22 09:30:46 UTC; 36min ago
+   Main PID: 4227 (python3)
+      Tasks: 3 (limit: 1789)
+     Memory: 159.1M (peak: 160.5M)
+        CPU: 1min 18.892s
+     CGroup: /system.slice/edge-ai-live-infer.service
+             └─4227 /usr/bin/python3 -u scripts/eai_phase7_2_live_dual_infer.py --interval-sec 5
+
+Aug 22 10:06:07 imx93frdm python3[4227]: [2026-08-22T10:06:07.618641+00:00] live inference cycle #128
+Aug 22 10:06:20 imx93frdm python3[4227]:   external_ems_1 | bess_1 | score=0.620711 | threshold=0.569180 | status=ANOMALY | latency=13120.63 ms
+Aug 22 10:06:27 imx93frdm python3[4227]:   external_ems_2 | bess_2 | score=0.501114 | threshold=0.569180 | status=NORMAL | latency=6597.83 ms
+Aug 22 10:06:27 imx93frdm python3[4227]:   cycle_latency=19720.7 ms
+Aug 22 10:06:27 imx93frdm python3[4227]: [2026-08-22T10:06:27.342011+00:00] live inference cycle #129
+Aug 22 10:06:40 imx93frdm python3[4227]:   external_ems_1 | bess_1 | score=0.619227 | threshold=0.569180 | status=ANOMALY | latency=12868.77 ms
+Aug 22 10:06:46 imx93frdm python3[4227]:   external_ems_2 | bess_2 | score=0.499064 | threshold=0.569180 | status=NORMAL | latency=6638.38 ms
+Aug 22 10:06:46 imx93frdm python3[4227]:   cycle_latency=19509.59 ms
+Aug 22 10:06:46 imx93frdm python3[4227]: [2026-08-22T10:06:46.854227+00:00] live inference cycle #130
+Aug 22 10:06:53 imx93frdm python3[4227]:   external_ems_1 | bess_1 | score=0.614253 | threshold=0.569180 | status=ANOMALY | latency=6559.98 ms

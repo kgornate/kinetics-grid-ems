@@ -1,0 +1,15 @@
+[Unit]
+Description=Edge AI Local API - latest ML health endpoint
+After=network-online.target edge-ai-live-infer.service
+Wants=network-online.target edge-ai-live-infer.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/kinetics-grid-ems/northbound_ems_gateway/edge_ai_poc/runtime_v0_3/phase7_runtime_bundle_v0_3
+ExecStart=/usr/bin/python3 -u scripts/eai_phase7_3_edge_ai_api.py --host 127.0.0.1 --port 8011
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

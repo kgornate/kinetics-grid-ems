@@ -1,0 +1,20 @@
+● edge-ai-api.service - Edge AI Local API - latest ML health endpoint
+     Loaded: loaded (/etc/systemd/system/edge-ai-api.service; enabled; preset: disabled)
+     Active: active (running) since Sat 2026-08-22 09:21:21 UTC; 45min ago
+   Main PID: 3925 (python3)
+      Tasks: 1 (limit: 1789)
+     Memory: 12.4M (peak: 14.4M)
+        CPU: 1.652s
+     CGroup: /system.slice/edge-ai-api.service
+             └─3925 /usr/bin/python3 -u scripts/eai_phase7_3_edge_ai_api.py --host 127.0.0.1 --port 8011
+
+Aug 22 09:40:09 imx93frdm python3[3925]: 127.0.0.1 - "GET / HTTP/1.1" 200 -
+Aug 22 09:40:15 imx93frdm python3[3925]: 127.0.0.1 - "GET / HTTP/1.1" 200 -
+Aug 22 09:40:21 imx93frdm python3[3925]: 127.0.0.1 - "GET / HTTP/1.1" 200 -
+Aug 22 09:40:26 imx93frdm python3[3925]: 127.0.0.1 - "GET / HTTP/1.1" 200 -
+Aug 22 09:40:32 imx93frdm python3[3925]: 127.0.0.1 - "GET / HTTP/1.1" 200 -
+Aug 22 09:40:37 imx93frdm python3[3925]: 127.0.0.1 - "GET / HTTP/1.1" 200 -
+Aug 22 09:40:43 imx93frdm python3[3925]: 127.0.0.1 - "GET / HTTP/1.1" 200 -
+Aug 22 09:40:48 imx93frdm python3[3925]: 127.0.0.1 - "GET / HTTP/1.1" 200 -
+Aug 22 09:40:54 imx93frdm python3[3925]: 127.0.0.1 - "GET / HTTP/1.1" 200 -
+Aug 22 09:40:59 imx93frdm python3[3925]: 127.0.0.1 - "GET / HTTP/1.1" 200 -

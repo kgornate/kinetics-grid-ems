@@ -1,0 +1,20 @@
+● ems-v3-gateway.service - EMS V3 Full Gateway
+     Loaded: loaded (/etc/systemd/system/ems-v3-gateway.service; disabled; preset: disabled)
+     Active: active (running) since Sat 2026-08-22 09:30:35 UTC; 36min ago
+   Main PID: 4182 (python3)
+      Tasks: 5 (limit: 1789)
+     Memory: 78.9M (peak: 80.9M)
+        CPU: 19min 29.612s
+     CGroup: /system.slice/ems-v3-gateway.service
+             └─4182 /usr/bin/python3 -m nb_ems_gateway.main --config configs/development.json
+
+Aug 22 10:06:53 imx93frdm nb_ems_gateway_start.sh[4182]: INFO:     127.0.0.1:47750 - "GET /api/assets/external_ems_1_pcs/telemetry?compact=true&page=1&page_size=500 HTTP/1.1" 200 OK
+Aug 22 10:06:53 imx93frdm nb_ems_gateway_start.sh[4182]: INFO:     127.0.0.1:51600 - "GET /api/assets/external_ems_1_pcs/telemetry?compact=true&page=2&page_size=500 HTTP/1.1" 200 OK
+Aug 22 10:06:53 imx93frdm nb_ems_gateway_start.sh[4182]: INFO:     127.0.0.1:51606 - "GET /api/assets/external_ems_1_bms/telemetry?compact=true&page=1&page_size=500 HTTP/1.1" 200 OK
+Aug 22 10:06:53 imx93frdm nb_ems_gateway_start.sh[4182]: INFO:     127.0.0.1:51608 - "GET /api/assets/external_ems_1_bms/telemetry?compact=true&page=2&page_size=500 HTTP/1.1" 200 OK
+Aug 22 10:06:59 imx93frdm nb_ems_gateway_start.sh[4182]: INFO:     103.211.52.244:0 - "GET /api/telemetry/key-signals HTTP/1.1" 200 OK
+Aug 22 10:06:59 imx93frdm nb_ems_gateway_start.sh[4182]: INFO:     127.0.0.1:51620 - "GET /api/assets/external_ems_2_pcs/telemetry?compact=true&page=1&page_size=500 HTTP/1.1" 200 OK
+Aug 22 10:06:59 imx93frdm nb_ems_gateway_start.sh[4182]: INFO:     103.211.52.244:0 - "GET /api/alarms HTTP/1.1" 200 OK
+Aug 22 10:06:59 imx93frdm nb_ems_gateway_start.sh[4182]: INFO:     127.0.0.1:51646 - "GET /api/assets/external_ems_2_pcs/telemetry?compact=true&page=2&page_size=500 HTTP/1.1" 200 OK
+Aug 22 10:06:59 imx93frdm nb_ems_gateway_start.sh[4182]: INFO:     127.0.0.1:51654 - "GET /api/assets/external_ems_2_bms/telemetry?compact=true&page=1&page_size=500 HTTP/1.1" 200 OK
+Aug 22 10:07:06 imx93frdm nb_ems_gateway_start.sh[4182]: INFO:     127.0.0.1:51656 - "GET /api/assets/external_ems_2_bms/telemetry?compact=true&page=2&page_size=500 HTTP/1.1" 200 OK

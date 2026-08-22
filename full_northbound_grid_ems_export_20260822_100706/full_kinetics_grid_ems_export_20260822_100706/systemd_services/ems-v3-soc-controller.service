@@ -1,0 +1,17 @@
+[Unit]
+Description=EMS V3 SOC-only controller
+After=ems-v3-eth1.service ems-v3-wifi.service cloudflared.service
+Wants=ems-v3-eth1.service ems-v3-wifi.service cloudflared.service
+
+[Service]
+Type=simple
+WorkingDirectory=/root/kinetics-grid-ems/northbound_ems_gateway
+ExecStart=/bin/sh -lc 'exec /usr/bin/python3 tools/soc_only_controller.py --config configs/soc_only_field_no_solar.json --live'
+Restart=always
+RestartSec=5
+KillMode=process
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
