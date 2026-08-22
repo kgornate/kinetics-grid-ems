@@ -1,0 +1,238 @@
+{
+  "version": "v0_3",
+  "source": "/mnt/ems-logs/northbound_ems_gateway/edge_ai_poc/data/ml_v0_3/normal_train_v0_3.csv",
+  "method": "standard_scaler",
+  "features": {
+    "pcs_phase_voltage_imbalance": {
+      "count": 300000,
+      "mean": 0.7784933333333236,
+      "std": 0.9947986205106417,
+      "min": 0.0,
+      "max": 18.6
+    },
+    "pcs_phase_current_imbalance": {
+      "count": 300000,
+      "mean": 1.3214593333333493,
+      "std": 1.4759811286329356,
+      "min": 0.0,
+      "max": 22.6
+    },
+    "pcs_dc_voltage_vs_bms_voltage_delta": {
+      "count": 300000,
+      "mean": 1.5142643333333405,
+      "std": 1.0293045356067583,
+      "min": 0.0,
+      "max": 5.9
+    },
+    "pcs_dc_current_vs_bms_current_delta": {
+      "count": 300000,
+      "mean": 6.531822000000004,
+      "std": 7.546192274499027,
+      "min": 0.0,
+      "max": 41.7
+    },
+    "pcs_soc_vs_bms_soc_delta": {
+      "count": 300000,
+      "mean": 0.016218999999999997,
+      "std": 0.04284837794220801,
+      "min": 0.0,
+      "max": 0.5
+    },
+    "bms_temperature_spread": {
+      "count": 300000,
+      "mean": 1.3663533333333304,
+      "std": 0.43359266041321665,
+      "min": 0.6,
+      "max": 2.5
+    },
+    "bms_cell_voltage_spread": {
+      "count": 300000,
+      "mean": 1.5942366666666854,
+      "std": 1.2009541727137802,
+      "min": 0.0,
+      "max": 11.0
+    },
+    "pcs_phase_a_voltage": {
+      "count": 300000,
+      "mean": 237.31851799999737,
+      "std": 9.237561654760166,
+      "min": 0.3,
+      "max": 259.7
+    },
+    "pcs_phase_b_voltage": {
+      "count": 300000,
+      "mean": 236.96381466666628,
+      "std": 9.293590486157548,
+      "min": 0.2,
+      "max": 259.8
+    },
+    "pcs_phase_c_voltage": {
+      "count": 300000,
+      "mean": 237.3403556666695,
+      "std": 9.216362101787498,
+      "min": 0.2,
+      "max": 260.2
+    },
+    "pcs_phase_a_current": {
+      "count": 300000,
+      "mean": 14.723255000000387,
+      "std": 13.161677188114474,
+      "min": 0.7,
+      "max": 121.3
+    },
+    "pcs_phase_b_current": {
+      "count": 300000,
+      "mean": 13.981240333333519,
+      "std": 12.995477163856917,
+      "min": 0.6,
+      "max": 126.0
+    },
+    "pcs_phase_c_current": {
+      "count": 300000,
+      "mean": 13.954689999999948,
+      "std": 13.084515847077363,
+      "min": 0.6,
+      "max": 131.4
+    },
+    "pcs_dc_voltage": {
+      "count": 300000,
+      "mean": 860.6819753333353,
+      "std": 7.422302675944457,
+      "min": 844.8,
+      "max": 883.3
+    },
+    "pcs_dc_current": {
+      "count": 300000,
+      "mean": 1.8717293333333453,
+      "std": 12.380064452823488,
+      "min": -97.2,
+      "max": 45.9
+    },
+    "pcs_grid_frequency": {
+      "count": 300000,
+      "mean": 49.97346490000055,
+      "std": 0.11195529426793933,
+      "min": 49.72,
+      "max": 50.41
+    },
+    "pcs_charge_discharge_power": {
+      "count": 300000,
+      "mean": 0.0,
+      "std": 0.0,
+      "min": 0.0,
+      "max": 0.0
+    },
+    "pcs_total_active_power": {
+      "count": 300000,
+      "mean": 0.12819966666666824,
+      "std": 10.865917324644071,
+      "min": -86.5,
+      "max": 28.4
+    },
+    "pcs_soc": {
+      "count": 300000,
+      "mean": 67.53655333333387,
+      "std": 22.266446753714224,
+      "min": 25.0,
+      "max": 95.1
+    },
+    "bms_cluster_total_voltage": {
+      "count": 300000,
+      "mean": 860.2639696666915,
+      "std": 6.636568816931067,
+      "min": 846.1,
+      "max": 881.6
+    },
+    "bms_cluster_total_current": {
+      "count": 300000,
+      "mean": -0.08186000000000813,
+      "std": 12.303062673913114,
+      "min": -69.0,
+      "max": 34.6
+    },
+    "bms_can_hall_sampling_current": {
+      "count": 300000,
+      "mean": -0.22772200000000642,
+      "std": 12.04945629985188,
+      "min": -62.7,
+      "max": 35.6
+    },
+    "bms_display_soc": {
+      "count": 300000,
+      "mean": 67.55108966666539,
+      "std": 22.284424982438964,
+      "min": 25.0,
+      "max": 95.1
+    },
+    "bms_soh": {
+      "count": 300000,
+      "mean": 100.0,
+      "std": 0.0,
+      "min": 100.0,
+      "max": 100.0
+    },
+    "bms_cell_max_voltage": {
+      "count": 300000,
+      "mean": 3315.124449999946,
+      "std": 26.320873684060416,
+      "min": 3254.0,
+      "max": 3412.0
+    },
+    "bms_cell_min_voltage": {
+      "count": 300000,
+      "mean": 3313.530550000015,
+      "std": 26.41643136616895,
+      "min": 3252.0,
+      "max": 3406.0
+    },
+    "bms_battery_max_temperature": {
+      "count": 300000,
+      "mean": 25.490385666666516,
+      "std": 0.45270919408963,
+      "min": 24.6,
+      "max": 26.8
+    },
+    "bms_battery_min_temperature": {
+      "count": 300000,
+      "mean": 24.124032333333922,
+      "std": 0.18280315007642597,
+      "min": 23.8,
+      "max": 25.3
+    },
+    "bms_average_temperature": {
+      "count": 300000,
+      "mean": 24.471992333333315,
+      "std": 0.20252392614460898,
+      "min": 24.1,
+      "max": 25.8
+    },
+    "bms_insulation_resistance": {
+      "count": 300000,
+      "mean": 20000.0,
+      "std": 0.0,
+      "min": 20000.0,
+      "max": 20000.0
+    },
+    "bms_pre_charge_total_voltage": {
+      "count": 300000,
+      "mean": 856.1495033333224,
+      "std": 0.24999992331083798,
+      "min": 855.9,
+      "max": 856.4
+    },
+    "pcs_fault_flag_count": {
+      "count": 300000,
+      "mean": 0.0,
+      "std": 0.0,
+      "min": 0.0,
+      "max": 0.0
+    },
+    "bms_fault_flag_count": {
+      "count": 300000,
+      "mean": 0.0,
+      "std": 0.0,
+      "min": 0.0,
+      "max": 0.0
+    }
+  }
+}
