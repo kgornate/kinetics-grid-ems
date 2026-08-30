@@ -5,6 +5,7 @@ import '../../auth/screens/environment_select_screen.dart';
 import '../../auth/services/session_store.dart';
 import '../widgets/dashboard_nav_actions.dart';
 import 'bms_screen.dart';
+import 'fast_bess_historian_screen.dart';
 import 'dehumidifier_screen.dart';
 import 'fire_screen.dart';
 import 'home_dashboard_screen.dart';
@@ -35,6 +36,7 @@ class _DashboardShellScreenState extends State<DashboardShellScreen> {
   late final Widget _topologyPage;
   late final Widget _pcsPage;
   late final Widget _bmsPage;
+  late final Widget _historianPage;
   late final Widget _chillerPage;
   late final Widget _dehumidifierPage;
   late final Widget _firePage;
@@ -51,6 +53,7 @@ class _DashboardShellScreenState extends State<DashboardShellScreen> {
     _topologyPage = TopologyScreen(session: widget.session, onNavigate: _goToPage, onLogout: _logout);
     _pcsPage = PcsScreen(session: widget.session, onNavigate: _goToPage, onLogout: _logout);
     _bmsPage = BmsScreen(session: widget.session, onNavigate: _goToPage, onLogout: _logout);
+    _historianPage = FastBessHistorianScreen(session: widget.session, onNavigate: _goToPage, onLogout: _logout);
     _chillerPage = LiquidCoolingScreen(session: widget.session, onNavigate: _goToPage, onLogout: _logout);
     _dehumidifierPage = DehumidifierScreen(session: widget.session, onNavigate: _goToPage, onLogout: _logout);
     _firePage = FireScreen(session: widget.session, onNavigate: _goToPage, onLogout: _logout);
@@ -80,17 +83,18 @@ class _DashboardShellScreenState extends State<DashboardShellScreen> {
       DashboardPage.topology => 1,
       DashboardPage.pcs => 2,
       DashboardPage.bms => 3,
-      DashboardPage.chiller => 4,
-      DashboardPage.dehumidifier => 5,
-      DashboardPage.fire => 6,
-      DashboardPage.utilityMeter => 7,
-      DashboardPage.emsSystem => 8,
-      DashboardPage.strategy => 9,
+      DashboardPage.historian => 4,
+      DashboardPage.chiller => 5,
+      DashboardPage.dehumidifier => 6,
+      DashboardPage.fire => 7,
+      DashboardPage.utilityMeter => 8,
+      DashboardPage.emsSystem => 9,
+      DashboardPage.strategy => 10,
     };
 
     return IndexedStack(
       index: index,
-      children: [_homePage, _topologyPage, _pcsPage, _bmsPage, _chillerPage, _dehumidifierPage, _firePage, _utilityMeterPage, _emsSystemPage, _strategyPage],
+      children: [_homePage, _topologyPage, _pcsPage, _bmsPage, _historianPage, _chillerPage, _dehumidifierPage, _firePage, _utilityMeterPage, _emsSystemPage, _strategyPage],
     );
   }
 }

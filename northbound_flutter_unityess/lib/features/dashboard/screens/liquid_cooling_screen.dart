@@ -14,6 +14,7 @@ import '../widgets/dashboard_nav_actions.dart';
 import '../widgets/home_kpi_tile.dart';
 import '../widgets/mini_trend_card.dart';
 import 'bms_screen.dart';
+import 'fast_bess_historian_screen.dart';
 import 'home_dashboard_screen.dart';
 import 'pcs_screen.dart';
 import 'topology_screen.dart';
@@ -88,6 +89,9 @@ class _LiquidCoolingScreenState extends State<LiquidCoolingScreen> {
         break;
       case DashboardPage.bms:
         target = BmsScreen(session: widget.session);
+        break;
+      case DashboardPage.historian:
+        target = FastBessHistorianScreen(session: widget.session);
         break;
       case DashboardPage.chiller:
         return;
@@ -232,6 +236,7 @@ class _LiquidCoolingScreenState extends State<LiquidCoolingScreen> {
             onTopology: () => _go(DashboardPage.topology),
             onPcs: () => _go(DashboardPage.pcs),
             onBms: () => _go(DashboardPage.bms),
+            onHistorian: () => widget.onNavigate?.call(DashboardPage.historian),
             onChiller: () {},
             onDehumidifier: () => _go(DashboardPage.dehumidifier),
             onFire: () => _go(DashboardPage.fire),

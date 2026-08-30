@@ -322,6 +322,7 @@ Future<void> _logout() async {
             onTopology: _goTopology,
             onPcs: _goPcs,
             onBms: () {},
+            onHistorian: () => widget.onNavigate?.call(DashboardPage.historian),
             onChiller: _goChiller,
             onDehumidifier: _goDehumidifier,
             onFire: _goFire,

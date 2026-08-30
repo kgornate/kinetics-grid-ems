@@ -112,6 +112,62 @@ class NorthboundApiClient {
     return jsonDecode(response.body) as Map<String, dynamic>;
   }
 
+  Future<Map<String, dynamic>> getFastBessStatus() async {
+    final response = await _client.get(
+      _uri('/api/fast-bess/status'),
+      headers: _headers(),
+    );
+    _throwIfNeeded(response);
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> getFastBessProfile() async {
+    final response = await _client.get(
+      _uri('/api/fast-bess/profile'),
+      headers: _headers(),
+    );
+    _throwIfNeeded(response);
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> getFastBessLatest({
+    String format = 'compact',
+  }) async {
+    final response = await _client.get(
+      _uri('/api/fast-bess/latest', {'format': format}),
+      headers: _headers(),
+    );
+    _throwIfNeeded(response);
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> getFastBessHistory({
+    String? sourceId,
+    int? fromEpochMs,
+    int? toEpochMs,
+    int limit = 100,
+    String order = 'desc',
+    String format = 'compact',
+  }) async {
+    final query = <String, dynamic>{
+      'limit': limit,
+      'order': order,
+      'format': format,
+    };
+    if (sourceId != null && sourceId.isNotEmpty) {
+      query['source_id'] = sourceId;
+    }
+    if (fromEpochMs != null) query['from_epoch_ms'] = fromEpochMs;
+    if (toEpochMs != null) query['to_epoch_ms'] = toEpochMs;
+
+    final response = await _client.get(
+      _uri('/api/fast-bess/history', query),
+      headers: _headers(),
+    );
+    _throwIfNeeded(response);
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
   Future<Map<String, dynamic>> getControllerStatus() async {
     final response = await _client.get(
       _uri('/api/controller/status'),

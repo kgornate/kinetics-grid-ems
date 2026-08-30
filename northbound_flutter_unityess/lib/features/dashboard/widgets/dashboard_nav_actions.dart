@@ -5,6 +5,7 @@ enum DashboardPage {
   topology,
   pcs,
   bms,
+  historian,
   chiller,
   dehumidifier,
   fire,
@@ -22,6 +23,7 @@ class DashboardNavActions extends StatelessWidget {
     required this.onTopology,
     required this.onPcs,
     required this.onBms,
+    required this.onHistorian,
     required this.onChiller,
     required this.onDehumidifier,
     required this.onFire,
@@ -38,6 +40,7 @@ class DashboardNavActions extends StatelessWidget {
   final VoidCallback onTopology;
   final VoidCallback onPcs;
   final VoidCallback onBms;
+  final VoidCallback onHistorian;
   final VoidCallback onChiller;
   final VoidCallback onDehumidifier;
   final VoidCallback onFire;
@@ -82,6 +85,8 @@ class DashboardNavActions extends StatelessWidget {
         navButton('PCS', DashboardPage.pcs, onPcs),
         const SizedBox(width: 4),
         navButton('BMS', DashboardPage.bms, onBms),
+        const SizedBox(width: 4),
+        navButton('Historian', DashboardPage.historian, onHistorian),
         const SizedBox(width: 4),
         navButton('Chiller', DashboardPage.chiller, onChiller),
         const SizedBox(width: 4),
