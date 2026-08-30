@@ -3,23 +3,7 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
-
-class _NorthboundCacheEntry {
-  _NorthboundCacheEntry(this.createdAt, this.payload);
-
-  final DateTime createdAt;
-  final Map<String, dynamic> payload;
-
-  bool isFresh(Duration ttl) => DateTime.now().difference(createdAt) < ttl;
-}
-
 class NorthboundApiClient {
-  static const Duration sourcesSummaryCacheTtl = Duration(seconds: 8);
-  static const Duration assetsCacheTtl = Duration(seconds: 60);
-
-  static final Map<String, _NorthboundCacheEntry> _sourcesSummaryCache = {};
-  static final Map<String, _NorthboundCacheEntry> _assetsCache = {};
-
   NorthboundApiClient({
     required this.baseUrl,
     this.token,
@@ -29,17 +13,6 @@ class NorthboundApiClient {
   final String baseUrl;
   final String? token;
   final http.Client _client;
-
-  String _cacheScope() => '$baseUrl|${token ?? ''}';
-
-  static Map<String, dynamic> _clone(Map<String, dynamic> payload) {
-    return jsonDecode(jsonEncode(payload)) as Map<String, dynamic>;
-  }
-
-  static void clearCaches() {
-    _sourcesSummaryCache.clear();
-    _assetsCache.clear();
-  }
 
   Map<String, String> _headers({bool json = false}) {
     final headers = <String, String>{};
@@ -82,38 +55,22 @@ class NorthboundApiClient {
     return jsonDecode(response.body) as Map<String, dynamic>;
   }
 
-  Future<Map<String, dynamic>> getSourcesSummary({bool forceRefresh = false}) async {
-    final key = '${_cacheScope()}|sources-summary';
-    final cached = _sourcesSummaryCache[key];
-    if (!forceRefresh && cached != null && cached.isFresh(sourcesSummaryCacheTtl)) {
-      return _clone(cached.payload);
-    }
-
+  Future<Map<String, dynamic>> getSourcesSummary() async {
     final response = await _client.get(
       _uri('/api/sources/summary'),
       headers: _headers(),
     );
     _throwIfNeeded(response);
-    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
-    _sourcesSummaryCache[key] = _NorthboundCacheEntry(DateTime.now(), decoded);
-    return _clone(decoded);
+    return jsonDecode(response.body) as Map<String, dynamic>;
   }
 
-  Future<Map<String, dynamic>> getAssets({String? sourceId, bool forceRefresh = false}) async {
-    final key = '${_cacheScope()}|assets|${sourceId ?? 'all'}';
-    final cached = _assetsCache[key];
-    if (!forceRefresh && cached != null && cached.isFresh(assetsCacheTtl)) {
-      return _clone(cached.payload);
-    }
-
+  Future<Map<String, dynamic>> getAssets({String? sourceId}) async {
     final response = await _client.get(
       _uri('/api/assets', sourceId == null ? null : {'source_id': sourceId}),
       headers: _headers(),
     );
     _throwIfNeeded(response);
-    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
-    _assetsCache[key] = _NorthboundCacheEntry(DateTime.now(), decoded);
-    return _clone(decoded);
+    return jsonDecode(response.body) as Map<String, dynamic>;
   }
 
   Future<Map<String, dynamic>> getAssetTelemetry(
@@ -149,61 +106,106 @@ class NorthboundApiClient {
     return jsonDecode(response.body) as Map<String, dynamic>;
   }
 
+  Future<Map<String, dynamic>> getAlarms() async {
+    final response = await _client.get(_uri('/api/alarms'), headers: _headers());
+    _throwIfNeeded(response);
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
 
-  Future<Map<String, dynamic>> getFastBessStatus() async {
+  Future<Map<String, dynamic>> getControllerStatus() async {
     final response = await _client.get(
-      _uri('/api/fast-bess/status'),
+      _uri('/api/controller/status'),
       headers: _headers(),
     );
     _throwIfNeeded(response);
     return jsonDecode(response.body) as Map<String, dynamic>;
   }
 
-  Future<Map<String, dynamic>> getFastBessProfile() async {
-    final response = await _client.get(
-      _uri('/api/fast-bess/profile'),
-      headers: _headers(),
-    );
-    _throwIfNeeded(response);
-    return jsonDecode(response.body) as Map<String, dynamic>;
-  }
-
-  Future<Map<String, dynamic>> getFastBessLatest({String format = 'compact'}) async {
-    final response = await _client.get(
-      _uri('/api/fast-bess/latest', {'format': format}),
-      headers: _headers(),
-    );
-    _throwIfNeeded(response);
-    return jsonDecode(response.body) as Map<String, dynamic>;
-  }
-
-  Future<Map<String, dynamic>> getFastBessHistory({
-    String? sourceId,
-    int? fromEpochMs,
-    int? toEpochMs,
-    int limit = 1000,
+  Future<Map<String, dynamic>> getControllerHistory({
+    int limit = 50,
+    int offset = 0,
     String order = 'desc',
-    String format = 'compact',
+    String? eventType,
+    String? severity,
+    String? device,
+    String? result,
   }) async {
     final query = <String, dynamic>{
       'limit': limit,
+      'offset': offset,
       'order': order,
-      'format': format,
     };
-    if (sourceId != null && sourceId.isNotEmpty) query['source_id'] = sourceId;
-    if (fromEpochMs != null) query['from_epoch_ms'] = fromEpochMs;
-    if (toEpochMs != null) query['to_epoch_ms'] = toEpochMs;
+    if (eventType != null && eventType.isNotEmpty) query['event_type'] = eventType;
+    if (severity != null && severity.isNotEmpty) query['severity'] = severity;
+    if (device != null && device.isNotEmpty) query['device'] = device;
+    if (result != null && result.isNotEmpty) query['result'] = result;
 
     final response = await _client.get(
-      _uri('/api/fast-bess/history', query),
+      _uri('/api/controller/history', query),
       headers: _headers(),
     );
     _throwIfNeeded(response);
     return jsonDecode(response.body) as Map<String, dynamic>;
   }
 
-  Future<Map<String, dynamic>> getAlarms() async {
-    final response = await _client.get(_uri('/api/alarms'), headers: _headers());
+  Future<Map<String, dynamic>> getSolisStatus() async {
+    final response = await _client.get(
+      _uri('/api/solis/status'),
+      headers: _headers(),
+    );
+    _throwIfNeeded(response);
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> getSolisHistory({
+    int limit = 50,
+    int offset = 0,
+    String order = 'desc',
+    String? eventType,
+    String? result,
+  }) async {
+    final query = <String, dynamic>{
+      'limit': limit,
+      'offset': offset,
+      'order': order,
+    };
+    if (eventType != null && eventType.isNotEmpty) query['event_type'] = eventType;
+    if (result != null && result.isNotEmpty) query['result'] = result;
+
+    final response = await _client.get(
+      _uri('/api/solis/history', query),
+      headers: _headers(),
+    );
+    _throwIfNeeded(response);
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> getControllerSettings() async {
+    final response = await _client.get(
+      _uri('/api/controller/settings'),
+      headers: _headers(),
+    );
+    _throwIfNeeded(response);
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> updateControllerSettings({
+    double? highLimit,
+    double? recoveryLimit,
+    double? lowCutoffLimit,
+    double? lowRecoveryLimit,
+  }) async {
+    final body = <String, dynamic>{};
+    if (highLimit != null) body['high_limit'] = highLimit;
+    if (recoveryLimit != null) body['recovery_limit'] = recoveryLimit;
+    if (lowCutoffLimit != null) body['low_cutoff_limit'] = lowCutoffLimit;
+    if (lowRecoveryLimit != null) body['low_recovery_limit'] = lowRecoveryLimit;
+
+    final response = await _client.patch(
+      _uri('/api/admin/controller/settings'),
+      headers: _headers(json: true),
+      body: jsonEncode(body),
+    );
     _throwIfNeeded(response);
     return jsonDecode(response.body) as Map<String, dynamic>;
   }

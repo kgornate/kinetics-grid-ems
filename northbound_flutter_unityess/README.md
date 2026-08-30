@@ -17,3 +17,14 @@ Existing pages preserved:
 
 
 Added Strategy / Command Panel page in this update.
+
+Latest SOC / Solis operator update:
+- Strategy navigation renamed to SOC Control
+- Live SOC/Solis automatic-controller state
+- BESS X/Y and Solis target/status cards
+- Controller event/history view
+- Runtime threshold display
+- Internal-admin-only threshold editing
+- Customer read-only threshold/status view
+- Existing EMS strategy readback preserved
+

@@ -23,7 +23,6 @@ import 'dehumidifier_screen.dart';
 import 'utility_meter_screen.dart';
 import 'ems_system_screen.dart';
 import 'strategy_command_screen.dart';
-import 'fast_bess_historian_screen.dart';
 
 class TopologyScreen extends StatefulWidget {
   final AuthSession session;
@@ -110,17 +109,8 @@ class _TopologyScreenState extends State<TopologyScreen> {
     );
   }
 
-Future<void> _goHistorian() async {
-  if (widget.onNavigate != null) {
-    widget.onNavigate!(DashboardPage.historian);
-    return;
-  }
-  _timer?.cancel();
-  if (!mounted) return;
-  Navigator.of(context).pushReplacement(
-    MaterialPageRoute(builder: (_) => FastBessHistorianScreen(session: widget.session)),
-  );
-}
+
+
 
 Future<void> _goDehumidifier() async {
   if (widget.onNavigate != null) {
@@ -306,7 +296,6 @@ Future<void> _logout() async {
             onTopology: () {},
             onPcs: _goPcs,
             onBms: _goBms,
-            onHistorian: _goHistorian,
             onChiller: _goChiller,
             onDehumidifier: _goDehumidifier,
             onFire: _goFire,
