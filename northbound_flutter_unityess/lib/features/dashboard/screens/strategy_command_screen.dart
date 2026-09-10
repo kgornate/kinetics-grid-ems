@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../../core/api/northbound_api_client.dart';
+import '../../../core/download/file_download.dart';
+import '../../../core/export/controller_history_exporter.dart';
 import '../../auth/models/auth_session.dart';
 import '../../auth/screens/environment_select_screen.dart';
 import '../../auth/services/session_store.dart';
@@ -55,6 +57,24 @@ class _StrategyCommandScreenState extends State<StrategyCommandScreen> {
   ControllerSettingsSnapshot? _controllerSettings;
   List<ControllerHistoryEvent> _history = const [];
   String _historyFilter = 'All';
+  bool _historyLoading = false;
+  bool _historyFullRangeLoading = false;
+  bool _cancelHistoryFullRange = false;
+  bool _historyExporting = false;
+  String? _historyError;
+  String? _historyMessage;
+  String _historyRangeMode = 'quick';
+  String _historyQuickRange = '1h';
+  DateTime? _historyCustomFromLocal;
+  DateTime? _historyCustomToLocal;
+  int _historyLimit = 500;
+  String _historyOrder = 'desc';
+  int _historyRowsPerPage = 50;
+  int _historyTablePage = 0;
+  int _historyTotal = 0;
+  int _historyFullRangeLoaded = 0;
+  static const int _historyApiPageLimit = 1000;
+  static const int _historyFullRangeCap = 50000;
 
   List<SourceSummary> _sources = const [];
   List<EmsSystemSourceSnapshot> _snapshots = const [];
@@ -67,7 +87,11 @@ class _StrategyCommandScreenState extends State<StrategyCommandScreen> {
   @override
   void initState() {
     super.initState();
+    final now = DateTime.now();
+    _historyCustomToLocal = now;
+    _historyCustomFromLocal = now.subtract(const Duration(hours: 1));
     _load(initial: true);
+    _loadControllerHistory();
     _timer = Timer.periodic(_pollInterval, (_) => _load(silent: true));
   }
 
@@ -160,24 +184,15 @@ class _StrategyCommandScreenState extends State<StrategyCommandScreen> {
 
     ControllerOperatorStatus? controllerStatus = _controllerStatus;
     ControllerSettingsSnapshot? controllerSettings = _controllerSettings;
-    List<ControllerHistoryEvent> history = _history;
     String? controllerError;
 
     try {
       final results = await Future.wait<Map<String, dynamic>>([
         api.getControllerStatus(),
         api.getControllerSettings(),
-        api.getControllerHistory(limit: 80),
       ]);
       controllerStatus = ControllerOperatorStatus.fromJson(results[0]);
       controllerSettings = ControllerSettingsSnapshot.fromJson(results[1]);
-      final items = (results[2]['items'] as List? ?? const [])
-          .whereType<Map>()
-          .map((item) => ControllerHistoryEvent.fromJson(
-                item.cast<String, dynamic>(),
-              ))
-          .toList();
-      history = items;
     } catch (e) {
       if (_isAuthError(e)) {
         api.dispose();
@@ -263,7 +278,6 @@ class _StrategyCommandScreenState extends State<StrategyCommandScreen> {
     setState(() {
       _controllerStatus = controllerStatus;
       _controllerSettings = controllerSettings;
-      _history = history;
       _controllerError = controllerError;
       _sources = sources;
       _snapshots = snapshots;
@@ -464,6 +478,350 @@ class _StrategyCommandScreenState extends State<StrategyCommandScreen> {
       api.dispose();
       if (mounted) setState(() => _updatingSettings = false);
     }
+  }
+
+
+  Future<void> _loadControllerHistory({bool fullRange = false}) async {
+    final window = _selectedHistoryWindow();
+    if (window.$2.isBefore(window.$1) || window.$2.isAtSameMomentAs(window.$1)) {
+      setState(() => _historyError = 'Invalid history window. To date/time must be after From date/time.');
+      return;
+    }
+
+    if (fullRange) {
+      setState(() {
+        _historyFullRangeLoading = true;
+        _cancelHistoryFullRange = false;
+        _historyLoading = false;
+        _historyExporting = false;
+        _historyError = null;
+        _historyMessage = 'Starting full-range controller history load...';
+        _historyFullRangeLoaded = 0;
+        _historyTablePage = 0;
+        _history = const [];
+      });
+    } else {
+      setState(() {
+        _historyLoading = true;
+        _historyError = null;
+        _historyMessage = null;
+        _historyTablePage = 0;
+      });
+    }
+
+    final api = NorthboundApiClient(
+      baseUrl: widget.session.connection.baseUrl,
+      token: widget.session.accessToken,
+    );
+
+    try {
+      if (!fullRange) {
+        final response = await api.getControllerHistory(
+          limit: _historyLimit,
+          offset: 0,
+          order: _historyOrder,
+          eventType: _historyEventTypeFilter,
+          severity: _historySeverityFilter,
+          device: _historyDeviceFilter,
+          result: _historyResultFilter,
+          fromTime: _historyApiTime(window.$1),
+          toTime: _historyApiTime(window.$2),
+        );
+        final items = _controllerHistoryItems(response);
+        if (!mounted) return;
+        setState(() {
+          _history = items;
+          _historyTotal = _historyFilter == 'BESS'
+              ? _visibleHistoryItems(items).length
+              : ((response['total'] as num?)?.toInt() ?? items.length);
+          _historyLoading = false;
+          _historyFullRangeLoaded = items.length;
+          _historyMessage = 'Loaded ${items.length} event(s) for ${_selectedHistoryWindowLabel()}.';
+        });
+        return;
+      }
+
+      final collected = <ControllerHistoryEvent>[];
+      var offset = 0;
+      var total = 0;
+      var page = 0;
+      while (mounted && !_cancelHistoryFullRange) {
+        final response = await api.getControllerHistory(
+          limit: _historyApiPageLimit,
+          offset: offset,
+          order: _historyOrder,
+          eventType: _historyEventTypeFilter,
+          severity: _historySeverityFilter,
+          device: _historyDeviceFilter,
+          result: _historyResultFilter,
+          fromTime: _historyApiTime(window.$1),
+          toTime: _historyApiTime(window.$2),
+        );
+        final pageItems = _controllerHistoryItems(response);
+        total = ((response['total'] as num?)?.toInt() ?? pageItems.length);
+        if (pageItems.isEmpty) break;
+
+        collected.addAll(pageItems);
+        offset += pageItems.length;
+        page += 1;
+
+        if (!mounted) return;
+        setState(() {
+          _history = List<ControllerHistoryEvent>.unmodifiable(collected);
+          _historyTotal = total;
+          _historyFullRangeLoaded = collected.length;
+          _historyMessage = 'Loaded ${collected.length} / $total controller event(s) across $page API page(s).';
+        });
+
+        if (pageItems.length < _historyApiPageLimit || offset >= total) break;
+        if (collected.length >= _historyFullRangeCap) {
+          if (!mounted) return;
+          setState(() {
+            _historyMessage = 'Stopped at the app safety cap of $_historyFullRangeCap events. Export will contain the loaded events.';
+          });
+          break;
+        }
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+      }
+
+      if (!mounted) return;
+      final cancelled = _cancelHistoryFullRange;
+      setState(() {
+        _historyFullRangeLoading = false;
+        _cancelHistoryFullRange = false;
+        _historyFullRangeLoaded = collected.length;
+        _history = List<ControllerHistoryEvent>.unmodifiable(collected);
+        _historyTotal = _historyFilter == 'BESS'
+            ? _visibleHistoryItems(collected).length
+            : total;
+        _historyMessage = cancelled
+            ? 'Full-range load cancelled. ${collected.length} event(s) remain available for table/export.'
+            : 'Full-range load complete. ${collected.length} event(s) loaded for ${_selectedHistoryWindowLabel()}.';
+      });
+    } catch (e) {
+      if (_isAuthError(e)) {
+        await _logout();
+        return;
+      }
+      if (!mounted) return;
+      setState(() {
+        _historyLoading = false;
+        _historyFullRangeLoading = false;
+        _cancelHistoryFullRange = false;
+        _historyError = e.toString();
+      });
+    } finally {
+      api.dispose();
+    }
+  }
+
+  void _cancelControllerHistoryLoad() {
+    if (!_historyFullRangeLoading) return;
+    setState(() {
+      _cancelHistoryFullRange = true;
+      _historyMessage = 'Cancel requested. Waiting for the current API page to finish...';
+    });
+  }
+
+  List<ControllerHistoryEvent> _controllerHistoryItems(Map<String, dynamic> response) {
+    return (response['items'] as List? ?? const [])
+        .whereType<Map>()
+        .map((item) => ControllerHistoryEvent.fromJson(item.cast<String, dynamic>()))
+        .toList();
+  }
+
+  String? get _historyEventTypeFilter {
+    if (_historyFilter == 'Settings') return 'controller_settings_changed';
+    if (_historyFilter == 'BESS') return 'bess_command';
+    return null;
+  }
+
+  String? get _historySeverityFilter =>
+      _historyFilter == 'Errors' ? 'error' : null;
+
+  String? get _historyDeviceFilter =>
+      _historyFilter == 'Solis' ? 'Solis' : null;
+
+  String? get _historyResultFilter => null;
+
+  List<ControllerHistoryEvent> _visibleHistoryItems([List<ControllerHistoryEvent>? source]) {
+    final items = source ?? _history;
+    return items.where((event) {
+      switch (_historyFilter) {
+        case 'Solis':
+          return event.device == 'Solis';
+        case 'BESS':
+          return event.device == 'X' || event.device == 'Y';
+        case 'Settings':
+          return event.eventType == 'controller_settings_changed';
+        case 'Errors':
+          return event.severity.toLowerCase() == 'error' ||
+              event.result.toLowerCase() == 'failed';
+        default:
+          return true;
+      }
+    }).toList();
+  }
+
+  (DateTime, DateTime) _selectedHistoryWindow() {
+    if (_historyRangeMode == 'custom' &&
+        _historyCustomFromLocal != null &&
+        _historyCustomToLocal != null) {
+      return (_historyCustomFromLocal!, _historyCustomToLocal!);
+    }
+    final now = DateTime.now();
+    return (now.subtract(_historyQuickDuration(_historyQuickRange)), now);
+  }
+
+  Duration _historyQuickDuration(String value) {
+    switch (value) {
+      case '15m':
+        return const Duration(minutes: 15);
+      case '6h':
+        return const Duration(hours: 6);
+      case '24h':
+        return const Duration(hours: 24);
+      case '7d':
+        return const Duration(days: 7);
+      case '1h':
+      default:
+        return const Duration(hours: 1);
+    }
+  }
+
+  String _historyApiTime(DateTime local) {
+    final utc = local.toUtc();
+    String two(int value) => value.toString().padLeft(2, '0');
+    return '${utc.year.toString().padLeft(4, '0')}-${two(utc.month)}-${two(utc.day)}T${two(utc.hour)}:${two(utc.minute)}:${two(utc.second)}+00:00';
+  }
+
+  String _selectedHistoryWindowLabel() {
+    final window = _selectedHistoryWindow();
+    return '${_formatHistoryDateTime(window.$1)} to ${_formatHistoryDateTime(window.$2)}';
+  }
+
+  Future<void> _pickControllerHistoryDateTime({required bool isFrom}) async {
+    final current = isFrom
+        ? (_historyCustomFromLocal ?? DateTime.now().subtract(const Duration(hours: 1)))
+        : (_historyCustomToLocal ?? DateTime.now());
+    final date = await showDatePicker(
+      context: context,
+      initialDate: current,
+      firstDate: DateTime(2024),
+      lastDate: DateTime.now().add(const Duration(days: 1)),
+    );
+    if (date == null || !mounted) return;
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(current),
+    );
+    if (time == null || !mounted) return;
+    final selected = DateTime(date.year, date.month, date.day, time.hour, time.minute);
+    setState(() {
+      if (isFrom) {
+        _historyCustomFromLocal = selected;
+      } else {
+        _historyCustomToLocal = selected;
+      }
+      _historyTablePage = 0;
+    });
+  }
+
+  Future<void> _exportControllerHistory(String format) async {
+    final events = _visibleHistoryItems();
+    if (events.isEmpty) {
+      _showHistorySnack('Load SOC controller history first, then export.');
+      return;
+    }
+    setState(() {
+      _historyExporting = true;
+      _historyError = null;
+    });
+    try {
+      final headers = <String>[
+        'Timestamp UTC',
+        'Timestamp Local',
+        'Event Type',
+        'Severity',
+        'Device',
+        'Controller State',
+        'Decision',
+        'BESS X SOC %',
+        'BESS Y SOC %',
+        'Solis State',
+        'Solis Power kW',
+        'Target',
+        'Result',
+        'Message',
+        'Payload',
+      ];
+      final rows = events.map((event) => <Object?>[
+            event.timestampUtc,
+            _formatTime(event.timestampUtc),
+            event.eventType,
+            event.severity,
+            event.device,
+            event.controllerState,
+            event.decision,
+            event.socX,
+            event.socY,
+            event.solisState,
+            event.solisPowerKw,
+            event.target,
+            event.result,
+            event.message,
+            event.payload.toString(),
+          ]).toList(growable: false);
+      final stamp = _historyFileStamp(DateTime.now());
+      final range = _historyRangeMode == 'quick' ? _historyQuickRange : 'custom';
+      final baseName = 'soc_controller_history_${_historyFilter.toLowerCase()}_${range}_$stamp';
+      final result = format == 'xlsx'
+          ? await saveBytes(
+              bytes: ControllerHistoryExporter.buildXlsxBytes(
+                sheetName: 'SOC Controller History',
+                headers: headers,
+                rows: rows,
+              ),
+              fileName: '$baseName.xlsx',
+              mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            )
+          : await saveBytes(
+              bytes: ControllerHistoryExporter.buildCsvBytes(
+                headers: headers,
+                rows: rows,
+              ),
+              fileName: '$baseName.csv',
+              mimeType: 'text/csv;charset=utf-8',
+            );
+      if (!mounted) return;
+      setState(() {
+        _historyExporting = false;
+        _historyMessage = result.userMessage;
+      });
+      _showHistorySnack(result.userMessage);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _historyExporting = false;
+        _historyError = 'Controller history export failed: $e';
+      });
+    }
+  }
+
+  void _showHistorySnack(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  String _historyFileStamp(DateTime value) {
+    String two(int v) => v.toString().padLeft(2, '0');
+    return '${value.year}${two(value.month)}${two(value.day)}_${two(value.hour)}${two(value.minute)}${two(value.second)}';
+  }
+
+  String _formatHistoryDateTime(DateTime? value) {
+    if (value == null) return '--';
+    String two(int v) => v.toString().padLeft(2, '0');
+    return '${value.year}-${two(value.month)}-${two(value.day)} ${two(value.hour)}:${two(value.minute)}';
   }
 
   @override
@@ -964,21 +1322,15 @@ class _StrategyCommandScreenState extends State<StrategyCommandScreen> {
 
   Widget _buildHistory(BuildContext context) {
     final filters = ['All', 'Solis', 'BESS', 'Settings', 'Errors'];
-    final visible = _history.where((event) {
-      switch (_historyFilter) {
-        case 'Solis':
-          return event.device == 'Solis';
-        case 'BESS':
-          return event.device == 'X' || event.device == 'Y';
-        case 'Settings':
-          return event.eventType == 'controller_settings_changed';
-        case 'Errors':
-          return event.severity.toLowerCase() == 'error' ||
-              event.result.toLowerCase() == 'failed';
-        default:
-          return true;
-      }
-    }).take(50).toList();
+    final visible = _visibleHistoryItems();
+    final totalPages = visible.isEmpty
+        ? 1
+        : ((visible.length + _historyRowsPerPage - 1) ~/ _historyRowsPerPage);
+    if (_historyTablePage >= totalPages) _historyTablePage = totalPages - 1;
+    final startIndex = (_historyTablePage * _historyRowsPerPage).clamp(0, visible.length).toInt();
+    final endIndex = (startIndex + _historyRowsPerPage).clamp(0, visible.length).toInt();
+    final pageItems = visible.sublist(startIndex, endIndex);
+    final busy = _historyLoading || _historyFullRangeLoading || _historyExporting;
 
     return Card(
       child: Padding(
@@ -987,23 +1339,168 @@ class _StrategyCommandScreenState extends State<StrategyCommandScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
-                  child: Text(
-                    'Controller / Solis History',
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleMedium
-                        ?.copyWith(fontWeight: FontWeight.w700),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'SOC Controller Historian',
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleLarge
+                            ?.copyWith(fontWeight: FontWeight.w700),
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        'Query controller decisions, BESS actions, Solis events, settings changes and errors using quick or custom date/time ranges.',
+                        style: TextStyle(color: Color(0xFF6C7B8A)),
+                      ),
+                    ],
                   ),
                 ),
-                Text(
-                  '${_history.length} recent events',
-                  style: const TextStyle(color: Color(0xFF6C7B8A)),
+                if (_history.isNotEmpty)
+                  Text(
+                    '${visible.length} loaded / $_historyTotal matching',
+                    style: const TextStyle(color: Color(0xFF6C7B8A)),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                _historyDropdown(
+                  label: 'Range mode',
+                  value: _historyRangeMode,
+                  items: const {
+                    'quick': 'Quick range',
+                    'custom': 'Custom date/time',
+                  },
+                  onChanged: (value) => setState(() {
+                    _historyRangeMode = value;
+                    _historyTablePage = 0;
+                  }),
+                ),
+                if (_historyRangeMode == 'quick')
+                  _historyDropdown(
+                    label: 'Time range',
+                    value: _historyQuickRange,
+                    items: const {
+                      '15m': 'Last 15 min',
+                      '1h': 'Last 1 hour',
+                      '6h': 'Last 6 hours',
+                      '24h': 'Last 24 hours',
+                      '7d': 'Last 7 days',
+                    },
+                    onChanged: (value) => setState(() {
+                      _historyQuickRange = value;
+                      _historyTablePage = 0;
+                    }),
+                  ),
+                _historyDropdown(
+                  label: 'Load limit',
+                  value: _historyLimit.toString(),
+                  items: const {
+                    '100': '100 events',
+                    '500': '500 events',
+                    '1000': '1000 events',
+                  },
+                  onChanged: (value) => setState(() {
+                    _historyLimit = int.parse(value);
+                    _historyTablePage = 0;
+                  }),
+                ),
+                _historyDropdown(
+                  label: 'Order',
+                  value: _historyOrder,
+                  items: const {
+                    'desc': 'Latest first',
+                    'asc': 'Oldest first',
+                  },
+                  onChanged: (value) => setState(() {
+                    _historyOrder = value;
+                    _historyTablePage = 0;
+                  }),
+                ),
+                _historyDropdown(
+                  label: 'Rows / page',
+                  value: _historyRowsPerPage.toString(),
+                  items: const {
+                    '25': '25 rows',
+                    '50': '50 rows',
+                    '100': '100 rows',
+                  },
+                  onChanged: (value) => setState(() {
+                    _historyRowsPerPage = int.parse(value);
+                    _historyTablePage = 0;
+                  }),
                 ),
               ],
             ),
-            const SizedBox(height: 12),
+            if (_historyRangeMode == 'custom') ...[
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: busy
+                        ? null
+                        : () => _pickControllerHistoryDateTime(isFrom: true),
+                    icon: const Icon(Icons.calendar_month_rounded),
+                    label: Text('From: ${_formatHistoryDateTime(_historyCustomFromLocal)}'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: busy
+                        ? null
+                        : () => _pickControllerHistoryDateTime(isFrom: false),
+                    icon: const Icon(Icons.event_rounded),
+                    label: Text('To: ${_formatHistoryDateTime(_historyCustomToLocal)}'),
+                  ),
+                  TextButton(
+                    onPressed: busy
+                        ? null
+                        : () {
+                            final now = DateTime.now();
+                            setState(() {
+                              _historyCustomToLocal = now;
+                              _historyCustomFromLocal =
+                                  now.subtract(const Duration(hours: 1));
+                              _historyTablePage = 0;
+                            });
+                          },
+                    child: const Text('Set last 1 hour'),
+                  ),
+                  TextButton(
+                    onPressed: busy
+                        ? null
+                        : () {
+                            final now = DateTime.now();
+                            setState(() {
+                              _historyCustomToLocal = now;
+                              _historyCustomFromLocal =
+                                  now.subtract(const Duration(hours: 24));
+                              _historyTablePage = 0;
+                            });
+                          },
+                    child: const Text('Set last 24 hours'),
+                  ),
+                ],
+              ),
+            ],
+            const SizedBox(height: 10),
+            Text(
+              'Selected window: ${_selectedHistoryWindowLabel()}',
+              style: const TextStyle(
+                color: Color(0xFF5B6775),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 14),
             Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -1012,19 +1509,110 @@ class _StrategyCommandScreenState extends State<StrategyCommandScreen> {
                     (filter) => ChoiceChip(
                       label: Text(filter),
                       selected: _historyFilter == filter,
-                      onSelected: (_) =>
-                          setState(() => _historyFilter = filter),
+                      onSelected: busy
+                          ? null
+                          : (_) => setState(() {
+                                _historyFilter = filter;
+                                _historyTablePage = 0;
+                              }),
                     ),
                   )
                   .toList(),
             ),
             const SizedBox(height: 14),
-            if (visible.isEmpty)
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                FilledButton.icon(
+                  onPressed: busy ? null : () => _loadControllerHistory(),
+                  icon: const Icon(Icons.manage_search_rounded),
+                  label: Text(_historyLoading ? 'Loading...' : 'Load history'),
+                ),
+                FilledButton.tonalIcon(
+                  onPressed: busy
+                      ? null
+                      : () => _loadControllerHistory(fullRange: true),
+                  icon: const Icon(Icons.downloading_rounded),
+                  label: Text(_historyFullRangeLoading
+                      ? 'Loading full range...'
+                      : 'Load full range for export'),
+                ),
+                if (_historyFullRangeLoading)
+                  OutlinedButton.icon(
+                    onPressed: _cancelControllerHistoryLoad,
+                    icon: const Icon(Icons.stop_circle_outlined),
+                    label: const Text('Cancel loading'),
+                  ),
+                OutlinedButton.icon(
+                  onPressed: visible.isEmpty || busy
+                      ? null
+                      : () => _exportControllerHistory('csv'),
+                  icon: const Icon(Icons.download_rounded),
+                  label: const Text('Download CSV'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: visible.isEmpty || busy
+                      ? null
+                      : () => _exportControllerHistory('xlsx'),
+                  icon: const Icon(Icons.table_chart_rounded),
+                  label: Text(_historyExporting ? 'Exporting...' : 'Download Excel'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: busy
+                      ? null
+                      : () => setState(() {
+                            _history = const [];
+                            _historyTotal = 0;
+                            _historyFullRangeLoaded = 0;
+                            _historyTablePage = 0;
+                            _historyMessage = null;
+                            _historyError = null;
+                          }),
+                  icon: const Icon(Icons.clear_rounded),
+                  label: const Text('Clear table'),
+                ),
+              ],
+            ),
+            if (_historyFullRangeLoading || _historyMessage != null) ...[
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFD),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFDDE5EF)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (_historyFullRangeLoading)
+                      const LinearProgressIndicator(),
+                    if (_historyFullRangeLoading) const SizedBox(height: 8),
+                    Text(_historyMessage ?? ''),
+                    if (_historyFullRangeLoaded > 0) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        'Loaded events: $_historyFullRangeLoaded. Safety cap: $_historyFullRangeCap.',
+                        style: const TextStyle(color: Color(0xFF5B6775)),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+            if (_historyError != null) ...[
+              const SizedBox(height: 12),
+              _errorCard('SOC historian query/export error', _historyError!),
+            ],
+            const SizedBox(height: 16),
+            if (pageItems.isEmpty)
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 18),
-                child: Text('No matching controller events yet.'),
+                child: Text('No controller events loaded for the selected range/filter.'),
               )
-            else
+            else ...[
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: DataTable(
@@ -1037,10 +1625,12 @@ class _StrategyCommandScreenState extends State<StrategyCommandScreen> {
                     DataColumn(label: Text('X SOC')),
                     DataColumn(label: Text('Y SOC')),
                     DataColumn(label: Text('Solis')),
+                    DataColumn(label: Text('Power')),
+                    DataColumn(label: Text('Target')),
                     DataColumn(label: Text('Result')),
                     DataColumn(label: Text('Message')),
                   ],
-                  rows: visible.map((event) {
+                  rows: pageItems.map((event) {
                     return DataRow(cells: [
                       DataCell(Text(_formatTime(event.timestampUtc))),
                       DataCell(Text(_friendlyEventType(event.eventType))),
@@ -1055,10 +1645,16 @@ class _StrategyCommandScreenState extends State<StrategyCommandScreen> {
                       DataCell(Text(
                         event.solisState.isEmpty ? '--' : event.solisState,
                       )),
+                      DataCell(Text(
+                        event.solisPowerKw == null
+                            ? '--'
+                            : '${event.solisPowerKw!.toStringAsFixed(2)} kW',
+                      )),
+                      DataCell(Text(event.target.isEmpty ? '--' : event.target)),
                       DataCell(_resultBadge(event.result, event.severity)),
                       DataCell(
                         SizedBox(
-                          width: 330,
+                          width: 360,
                           child: Text(
                             event.message,
                             maxLines: 2,
@@ -1070,8 +1666,63 @@ class _StrategyCommandScreenState extends State<StrategyCommandScreen> {
                   }).toList(),
                 ),
               ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Text(
+                    'Rows ${startIndex + 1}-$endIndex of ${visible.length}',
+                    style: const TextStyle(color: Color(0xFF6C7B8A)),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    tooltip: 'Previous page',
+                    onPressed: _historyTablePage <= 0
+                        ? null
+                        : () => setState(() => _historyTablePage -= 1),
+                    icon: const Icon(Icons.chevron_left_rounded),
+                  ),
+                  Text('Page ${_historyTablePage + 1} / $totalPages'),
+                  IconButton(
+                    tooltip: 'Next page',
+                    onPressed: _historyTablePage >= totalPages - 1
+                        ? null
+                        : () => setState(() => _historyTablePage += 1),
+                    icon: const Icon(Icons.chevron_right_rounded),
+                  ),
+                ],
+              ),
+            ],
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _historyDropdown({
+    required String label,
+    required String value,
+    required Map<String, String> items,
+    required ValueChanged<String> onChanged,
+  }) {
+    return SizedBox(
+      width: 190,
+      child: DropdownButtonFormField<String>(
+        value: value,
+        decoration: InputDecoration(
+          labelText: label,
+          border: const OutlineInputBorder(),
+        ),
+        items: items.entries
+            .map(
+              (entry) => DropdownMenuItem<String>(
+                value: entry.key,
+                child: Text(entry.value),
+              ),
+            )
+            .toList(),
+        onChanged: (next) {
+          if (next != null) onChanged(next);
+        },
       ),
     );
   }

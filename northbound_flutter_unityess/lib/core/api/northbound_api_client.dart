@@ -185,6 +185,8 @@ class NorthboundApiClient {
     String? severity,
     String? device,
     String? result,
+    String? fromTime,
+    String? toTime,
   }) async {
     final query = <String, dynamic>{
       'limit': limit,
@@ -195,6 +197,8 @@ class NorthboundApiClient {
     if (severity != null && severity.isNotEmpty) query['severity'] = severity;
     if (device != null && device.isNotEmpty) query['device'] = device;
     if (result != null && result.isNotEmpty) query['result'] = result;
+    if (fromTime != null && fromTime.isNotEmpty) query['from_time'] = fromTime;
+    if (toTime != null && toTime.isNotEmpty) query['to_time'] = toTime;
 
     final response = await _client.get(
       _uri('/api/controller/history', query),
