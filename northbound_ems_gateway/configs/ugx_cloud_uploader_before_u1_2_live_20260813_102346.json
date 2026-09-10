@@ -1,0 +1,93 @@
+{
+  "enabled": true,
+  "dry_run": true,
+  "run_interval_sec": 5,
+  "failed_retry_interval_sec": 30,
+  "state_db_path": "/mnt/ems-logs/northbound_ems_gateway/ugx_uploader_state.db",
+  "log_payload_preview": true,
+  "ugx_server": {
+    "base_url": "https://platform.uniqgrid.com",
+    "endpoint_template": "/api/v1/{deviceToken}/telemetry",
+    "device_token": "EMSTEST",
+    "timeout_sec": 15,
+    "verify_tls": true,
+    "extra_headers": {}
+  },
+  "gateway_api": {
+    "base_url": "http://127.0.0.1:8000",
+    "username": "internal",
+    "password": null,
+    "password_env": "NB_EMS_INTERNAL_PASSWORD",
+    "access_token": null,
+    "access_token_env": null,
+    "timeout_sec": 45
+  },
+  "fast_bess_upload": {
+    "enabled": false,
+    "db_path": "/mnt/ems-logs/northbound_ems_gateway/nb_ems_gateway.db",
+    "state_key": "fast_bess_compact",
+    "max_source_rows_per_cycle": 240,
+    "max_records_per_post": 120,
+    "key_prefix": "",
+    "include_profile_metadata": false,
+    "include_quality_metadata": false,
+    "value_key_format": "{bess_id}_fast_{asset}_{signal}"
+  },
+  "full_pcs_bms_upload": {
+    "enabled": false,
+    "interval_sec": 60,
+    "state_key": "full_pcs_bms_snapshot",
+    "max_asset_page_size": 500,
+    "key_prefix": "",
+    "include_quality_metadata": false,
+    "value_key_format": "{bess_id}_full_{asset}_{signal}",
+    "sources": {
+      "external_ems_1": {
+        "bess_id": "bess_1",
+        "pcs_asset_id": "external_ems_1_pcs",
+        "bms_asset_id": "external_ems_1_bms"
+      },
+      "external_ems_2": {
+        "bess_id": "bess_2",
+        "pcs_asset_id": "external_ems_2_pcs",
+        "bms_asset_id": "external_ems_2_bms"
+      }
+    }
+  },
+  "key_aliases": {},
+  "ugx_key_mapping": {
+    "enabled": true,
+    "profile": "uniqgrid_frequency_v1_2",
+    "emit_unmapped_keys": false,
+    "include_null_expected_keys": true,
+    "include_time_fields": true,
+    "rack_sources": {
+      "r1": [
+        "bess_1",
+        "external_ems_1"
+      ],
+      "r2": [
+        "bess_2",
+        "external_ems_2"
+      ],
+      "r3": [],
+      "r4": []
+    },
+    "fabricate_cell_soc_soh": true
+  },
+  "ugx_frequency_upload": {
+    "enabled": true,
+    "state_key_prefix": "ugx_frequency",
+    "key_plan_path": "data/ugx/key_frequency_plan_v1.json",
+    "enabled_frequencies_sec": [
+      60,
+      900
+    ],
+    "allow_large_3600_upload": false,
+    "include_null_keys": false,
+    "always_include_time_fields": true,
+    "post_empty_profiles": false,
+    "max_keys_per_post": 2500,
+    "profile_name": "uniqgrid_frequency_v1_2"
+  }
+}

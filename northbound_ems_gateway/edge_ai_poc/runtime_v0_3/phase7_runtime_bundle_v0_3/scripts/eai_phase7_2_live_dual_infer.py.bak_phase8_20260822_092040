@@ -1,0 +1,124 @@
+#!/usr/bin/env python3
+
+import argparse
+import json
+import os
+import sys
+import time
+import warnings
+from datetime import datetime
+from pathlib import Path
+from types import SimpleNamespace
+
+import joblib
+
+warnings.filterwarnings("ignore", message="X does not have valid feature names.*")
+
+# Import Phase 7.1 functions
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from eai_phase7_1_live_api_infer import login, run_once
+
+
+def atomic_write_json(path, payload):
+    path = Path(path)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+    tmp.replace(path)
+
+
+def status_text(pred):
+    return "ANOMALY" if pred else "NORMAL"
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--base-url", default="http://127.0.0.1:8000")
+    ap.add_argument("--username", default="internal")
+    ap.add_argument("--password-env", default="NB_EMS_INTERNAL_PASSWORD")
+    ap.add_argument("--model-dir", default="model")
+    ap.add_argument("--sources", default="external_ems_1,external_ems_2")
+    ap.add_argument("--interval-sec", type=float, default=5.0)
+    ap.add_argument("--jsonl", default="/mnt/ems-logs/northbound_ems_gateway/edge_ai_poc/live_inference_v0_3/phase7_2_live_inference_v0_3.jsonl")
+    ap.add_argument("--latest-json", default="/mnt/ems-logs/northbound_ems_gateway/edge_ai_poc/live_inference_v0_3/latest_ml_health_v0_3.json")
+    args = ap.parse_args()
+
+    password = os.environ.get(args.password_env)
+    if not password:
+        raise SystemExit(f"Missing env var: {args.password_env}")
+
+    model_dir = Path(args.model_dir)
+
+    with open(model_dir / "ml_model_manifest_v0_3.json", "r", encoding="utf-8") as f:
+        manifest = json.load(f)
+
+    model = joblib.load(model_dir / manifest["model_file"])
+    scaler = joblib.load(model_dir / manifest["scaler_file"])
+
+    token = login(args.base_url, args.username, password)
+    sources = [s.strip() for s in args.sources.split(",") if s.strip()]
+
+    Path(args.jsonl).parent.mkdir(parents=True, exist_ok=True)
+    Path(args.latest_json).parent.mkdir(parents=True, exist_ok=True)
+
+    print("==============================================================")
+    print(" PHASE 7.2 CONTINUOUS LIVE EDGE AI INFERENCE")
+    print(" Live PCS/BMS telemetry -> 33 features -> ML anomaly score")
+    print("==============================================================")
+    print("BASE_URL       =", args.base_url)
+    print("SOURCES        =", ", ".join(sources))
+    print("FEATURE_COUNT  =", len(manifest["features"]))
+    print("THRESHOLD      =", manifest["threshold"])
+    print("JSONL_LOG      =", args.jsonl)
+    print("LATEST_JSON    =", args.latest_json)
+    print("INTERVAL_SEC   =", args.interval_sec)
+    print("==============================================================")
+
+    while True:
+        cycle_time = datetime.now().astimezone().isoformat()
+        latest = {
+            "ok": True,
+            "phase": "7.2",
+            "cycle_time": cycle_time,
+            "model_type": "IsolationForest",
+            "runtime_format": "joblib",
+            "preprocessor": "StandardScaler",
+            "feature_count": len(manifest["features"]),
+            "threshold": float(manifest["threshold"]),
+            "sources": {},
+        }
+
+        print("")
+        print(f"[{cycle_time}] live inference cycle")
+
+        for source in sources:
+            one_args = SimpleNamespace(
+                base_url=args.base_url,
+                source_id=source,
+            )
+
+            result = run_once(one_args, model, scaler, manifest, token)
+            result["cycle_time"] = cycle_time
+            result["phase"] = "7.2"
+
+            with open(args.jsonl, "a", encoding="utf-8") as f:
+                f.write(json.dumps(result, sort_keys=True) + "\n")
+
+            latest["sources"][source] = result
+
+            if result.get("ok"):
+                print(
+                    f"  {source:14s} | {result['bess_id']:6s} | "
+                    f"score={result['anomaly_score_ml']:.6f} | "
+                    f"threshold={result['threshold']:.6f} | "
+                    f"status={status_text(result['ml_predicted_anomaly'])}"
+                )
+            else:
+                latest["ok"] = False
+                print(f"  {source:14s} | ERROR | {result.get('error')}")
+
+        atomic_write_json(args.latest_json, latest)
+        time.sleep(args.interval_sec)
+
+
+if __name__ == "__main__":
+    main()

@@ -18,7 +18,7 @@ from nb_ems_gateway.storage.fast_bess_logger import FastBESSLogger
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(name)s - %(message)s')
 
-VERSION = '0.9.0-soc-protection'
+VERSION = '0.10.0-operator-control'
 
 def parse_args():
     p = argparse.ArgumentParser(description='NorthBound EMS Gateway')

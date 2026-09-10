@@ -16,11 +16,11 @@
   "solis": {
     "enabled": true,
     "transport": "rtu",
-    "serial_port": "/dev/ttyUSB0",
+    "serial_port": "/dev/ems_solis_rtu",
     "baudrate": 9600,
     "unit_id": 1,
     "timeout": 3.0,
-    "control_method": "holding_onoff_3007",
+    "control_method": "holding_onoff_3006",
     "status_read_enabled": true
   },
   "soc_logic": {
@@ -45,5 +45,16 @@
     "enable_reset_before_on": false,
     "enable_offgrid_before_on": false,
     "inter_device_command_delay_sec": 2.0
+  },
+  "operator_monitor": {
+    "enabled": true,
+    "status_path": "/var/lib/nb-ems-soc-solis-controller/operator_status.json",
+    "history_db_path": "/var/lib/nb-ems-soc-solis-controller/operator_history.db",
+    "retention_days": 30,
+    "max_events": 20000
+  },
+  "controller_settings": {
+    "enabled": true,
+    "path": "/var/lib/nb-ems-soc-solis-controller/control_settings.json"
   }
 }

@@ -1,0 +1,46 @@
+{
+  "enabled": true,
+  "identity": {
+    "site_id": "g1-test-site",
+    "gateway_id": "g1-test-gateway",
+    "schema_version": "1.0",
+    "software_version": "central-sync-g1"
+  },
+  "backend": {
+    "base_url": "http://127.0.0.1:8081",
+    "ingest_path": "/api/v1/ingest/batch",
+    "gateway_token": null,
+    "gateway_token_env": "CENTRAL_SYNC_GATEWAY_TOKEN",
+    "verify_tls": false,
+    "timeout_sec": 5.0,
+    "connect_timeout_sec": 2.0,
+    "source_ip": null,
+    "gzip_enabled": true,
+    "user_agent": "ornate-central-sync-g1-test/1.0"
+  },
+  "outbox": {
+    "path": "/mnt/ems-logs/northbound_ems_gateway/central_sync_g1_test.db",
+    "required_mount_path": "/mnt/ems-logs",
+    "fail_if_mount_missing": true,
+    "acked_retention_hours": 24,
+    "dead_letter_retention_days": 30,
+    "max_db_size_mb": 128,
+    "min_free_space_mb": 256,
+    "cleanup_interval_sec": 3600.0
+  },
+  "uploader": {
+    "scan_interval_sec": 1.0,
+    "coalescing_window_sec": 0.5,
+    "max_messages_per_request": 100,
+    "max_request_bytes": 2097152,
+    "backoff_initial_sec": 2.0,
+    "backoff_multiplier": 2.0,
+    "backoff_max_sec": 30.0,
+    "jitter_percent": 0.1,
+    "max_retry_after_sec": 60.0,
+    "status_interval_sec": 1.0,
+    "idle_sleep_sec": 0.1
+  },
+  "status_file": "/var/lib/nb-ems-central-sync/status_g1_test.json",
+  "log_level": "INFO"
+}

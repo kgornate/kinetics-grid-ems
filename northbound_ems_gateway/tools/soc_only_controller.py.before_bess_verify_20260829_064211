@@ -15,9 +15,6 @@ v1.10 field change:
 - Upper SOC and Solis transition-aware behavior from v1.8 is preserved.
 
 Default mode is dry-run. Use --live --force only after validating decisions.
-
-v1.12 adds an operator-facing status snapshot and transition/event history that the
-main northbound FastAPI gateway exposes to Flutter.
 """
 from __future__ import annotations
 
@@ -47,30 +44,6 @@ try:
     import serial
 except Exception:  # pragma: no cover
     serial = None  # type: ignore[assignment]
-
-# The field controller runs as a standalone tool from the repository checkout.
-# Add the source tree explicitly so it can share the operator-monitor store with
-# the main FastAPI gateway without requiring a separate installation step.
-_PROJECT_ROOT = Path(__file__).resolve().parents[1]
-_SRC_DIR = _PROJECT_ROOT / "src"
-if str(_SRC_DIR) not in sys.path:
-    sys.path.insert(0, str(_SRC_DIR))
-
-try:
-    from nb_ems_gateway.operator_control.store import ControllerMonitorStore
-except Exception as exc:  # pragma: no cover
-    ControllerMonitorStore = None  # type: ignore[assignment,misc]
-    _MONITOR_IMPORT_ERROR = str(exc)
-else:
-    _MONITOR_IMPORT_ERROR = None
-
-try:
-    from nb_ems_gateway.operator_control.settings import ControllerSettingsStore
-except Exception as exc:  # pragma: no cover
-    ControllerSettingsStore = None  # type: ignore[assignment,misc]
-    _SETTINGS_IMPORT_ERROR = str(exc)
-else:
-    _SETTINGS_IMPORT_ERROR = None
 
 
 @dataclass(frozen=True)
@@ -446,51 +419,11 @@ def read_ems_float(client: ModbusTcpClient, address: int, unit_id: int, byte_ord
 def write_ems_float(client: ModbusTcpClient, address: int, value: float, unit_id: int, byte_order: str, readback: bool = True) -> dict[str, Any]:
     regs = encode_float32(value, byte_order)
     rr = write_registers(client, address, regs, unit_id)
-
     if _is_modbus_error(rr):
-        raise RuntimeError(
-            f"Modbus write failed addr={address} value={value} response={rr}"
-        )
-
-    out: dict[str, Any] = {
-        "address": address,
-        "value": float(value),
-        "raw_registers": regs,
-    }
-
+        raise RuntimeError(f"Modbus write failed addr={address} value={value} response={rr}")
+    out: dict[str, Any] = {"address": address, "value": float(value), "raw_registers": regs}
     if readback:
-        attempts = []
-
-        for attempt in range(1, 4):
-            time.sleep(0.5)
-
-            actual = read_ems_float(
-                client,
-                address,
-                unit_id,
-                byte_order,
-            )
-
-            attempts.append({
-                "attempt": attempt,
-                "value": actual,
-            })
-
-            if abs(actual - float(value)) < 0.001:
-                out["readback"] = actual
-                out["readback_verified"] = True
-                out["readback_attempts"] = attempts
-                return out
-
-        out["readback"] = attempts[-1]["value"]
-        out["readback_verified"] = False
-        out["readback_attempts"] = attempts
-
-        raise RuntimeError(
-            f"BESS write verification failed addr={address} "
-            f"requested={value} readback={attempts[-1]['value']}"
-        )
-
+        out["readback"] = read_ems_float(client, address, unit_id, byte_order)
     return out
 
 
@@ -852,285 +785,6 @@ def build_action_plan(previous_state: str, desired_bess: dict[str, str], desired
     return plan
 
 
-def build_operator_status(
-    cycle: dict[str, Any],
-    *,
-    args: argparse.Namespace,
-    version: str,
-) -> dict[str, Any]:
-    """Normalize a controller cycle into a stable, Flutter-friendly status object."""
-    devices = cycle.get("devices") or {}
-    controller = cycle.get("controller_state") or {}
-    desired = cycle.get("desired_states") or {}
-    solar = cycle.get("solar_status_after") or cycle.get("solar_status_before") or {}
-    solis_state = solar.get("on_off_state")
-    solis_power_w = solar.get("active_power_w")
-    solis_online = bool(
-        solar.get("enabled")
-        and (solar.get("on_off_register_3006") or {}).get("ok")
-        and (solar.get("active_power") or {}).get("ok")
-    )
-
-    action_results: list[dict[str, Any]] = []
-    for action in cycle.get("actions") or []:
-        item = {
-            "device": action.get("device"),
-            "target": action.get("target"),
-            "skipped": bool(action.get("skipped", False)),
-            "reason": action.get("reason"),
-            "dry_run": bool(action.get("dry_run", False)),
-        }
-        if action.get("device") == "Solis":
-            wr = action.get("write_result") or {}
-            item["verified"] = bool(
-                action.get("skipped")
-                or wr.get("readback_verified")
-                or not args.live
-            )
-        else:
-            writes = action.get("writes") or []
-            item["verified"] = bool(
-                action.get("skipped")
-                or not args.live
-                or (writes and all(bool(w.get("readback_verified", not args.no_readback)) for w in writes))
-            )
-        action_results.append(item)
-
-    status = {
-        "available": True,
-        "timestamp_utc": cycle.get("timestamp_utc") or utc_now(),
-        "version": version,
-        "mode": "LIVE" if args.live else "DRY_RUN",
-        "healthy": "error" not in cycle,
-        "error": cycle.get("error"),
-        "controller": {
-            "state": controller.get("next") or controller.get("previous") or STATE_NORMAL,
-            "previous_state": controller.get("previous"),
-            "decision": cycle.get("decision"),
-            "solar_off_reason": controller.get("solar_off_reason"),
-            "low_cutoff_reason": controller.get("low_cutoff_reason"),
-            "trend": controller.get("trend") or {},
-        },
-        "thresholds": {
-            "high_soc_percent": float((cycle.get("control_settings") or {}).get("high_limit", args.high_limit)),
-            "recovery_soc_percent": float((cycle.get("control_settings") or {}).get("recovery_limit", args.recovery_limit)),
-            "low_cutoff_enabled": bool(args.low_cutoff_enable),
-            "low_cutoff_percent": float((cycle.get("control_settings") or {}).get("low_cutoff_limit", args.low_cutoff_limit)),
-            "low_recovery_percent": float((cycle.get("control_settings") or {}).get("low_recovery_limit", args.low_recovery_limit)),
-            "settings_revision": cycle.get("control_settings_revision"),
-            "settings_updated_at_utc": cycle.get("control_settings_updated_at_utc"),
-            "settings_updated_by": cycle.get("control_settings_updated_by"),
-        },
-        "bess": {
-            key: {
-                "host": (devices.get(key) or {}).get("host"),
-                "soc_percent": (devices.get(key) or {}).get("soc"),
-                "online": bool((devices.get(key) or {}).get("online", False)),
-                "target_state": (desired.get("bess") or {}).get(key),
-            }
-            for key in ("X", "Y")
-        },
-        "solis": {
-            "enabled": bool(args.solar_enable),
-            "online": solis_online,
-            "state": solis_state,
-            "target_state": desired.get("solar"),
-            "active_power_w": solis_power_w,
-            "active_power_kw": round(float(solis_power_w) / 1000.0, 3) if solis_power_w is not None else None,
-            "serial_port": args.solis_serial_port,
-            "unit_id": int(args.solis_unit_id),
-        },
-        "last_actions": action_results,
-        "action_plan": cycle.get("action_plan") or [],
-    }
-    return status
-
-
-def monitor_append_event_safe(monitor: Any, **kwargs: Any) -> None:
-    if monitor is None:
-        return
-    try:
-        monitor.append_event(**kwargs)
-    except Exception as exc:
-        print(json.dumps({
-            "timestamp_utc": utc_now(),
-            "event": "operator_monitor_event_write_failed",
-            "error": str(exc),
-        }), file=sys.stderr, flush=True)
-
-
-def persist_operator_cycle(
-    monitor: Any,
-    cycle: dict[str, Any],
-    *,
-    args: argparse.Namespace,
-    version: str,
-) -> None:
-    """Persist current state every cycle and only meaningful history events."""
-    if monitor is None:
-        return
-    try:
-        previous = monitor.read_status()
-        status = build_operator_status(cycle, args=args, version=version)
-        monitor.write_status(status)
-
-        ctrl = status["controller"]
-        bx = status["bess"]["X"]
-        by = status["bess"]["Y"]
-        solis = status["solis"]
-        common = {
-            "controller_state": ctrl.get("state"),
-            "decision": ctrl.get("decision"),
-            "soc_x": bx.get("soc_percent"),
-            "soc_y": by.get("soc_percent"),
-            "solis_state": solis.get("state"),
-            "solis_power_w": solis.get("active_power_w"),
-            "timestamp_utc": status.get("timestamp_utc"),
-        }
-
-        if cycle.get("error"):
-            monitor_append_event_safe(
-                monitor,
-                event_type="controller_cycle_error",
-                severity="error",
-                result="failed",
-                message=f"SOC/Solis controller cycle failed: {cycle['error']}",
-                payload={"error": cycle.get("error")},
-                **common,
-            )
-            return
-
-        previous_available = bool(previous.get("available"))
-        prev_ctrl = (previous.get("controller") or {}) if previous_available else {}
-        prev_solis = (previous.get("solis") or {}) if previous_available else {}
-        prev_bess = (previous.get("bess") or {}) if previous_available else {}
-
-        if not previous_available:
-            monitor_append_event_safe(
-                monitor,
-                event_type="controller_snapshot_initialized",
-                message="Operator controller status initialized",
-                result="success",
-                payload={"mode": status.get("mode")},
-                **common,
-            )
-        elif prev_ctrl.get("state") != ctrl.get("state"):
-            monitor_append_event_safe(
-                monitor,
-                event_type="controller_state_transition",
-                message=f"Controller state changed from {prev_ctrl.get('state')} to {ctrl.get('state')}",
-                result="success",
-                payload={
-                    "from_state": prev_ctrl.get("state"),
-                    "to_state": ctrl.get("state"),
-                    "solar_off_reason": ctrl.get("solar_off_reason"),
-                },
-                **common,
-            )
-
-        if previous_available and prev_ctrl.get("decision") != ctrl.get("decision"):
-            monitor_append_event_safe(
-                monitor,
-                event_type="controller_decision_changed",
-                message=f"Controller decision changed to {ctrl.get('decision')}",
-                result="success",
-                payload={
-                    "from_decision": prev_ctrl.get("decision"),
-                    "to_decision": ctrl.get("decision"),
-                },
-                **common,
-            )
-
-        for action in cycle.get("actions") or []:
-            if action.get("skipped") or action.get("dry_run"):
-                continue
-            device = str(action.get("device") or "unknown")
-            target = action.get("target")
-            if device == "Solis":
-                wr = action.get("write_result") or {}
-                verified = bool(wr.get("readback_verified"))
-                monitor_append_event_safe(
-                    monitor,
-                    event_type="solis_command",
-                    device="Solis",
-                    target=target,
-                    result="success" if verified else "failed",
-                    severity="info" if verified else "error",
-                    message=f"Solis command {target} {'verified' if verified else 'failed verification'}",
-                    payload={
-                        "method": action.get("method"),
-                        "send_address": action.get("send_address"),
-                        "value_hex": action.get("value_hex"),
-                        "write_result": wr,
-                    },
-                    **common,
-                )
-            else:
-                writes = action.get("writes") or []
-                verified = bool(writes and all(bool(w.get("readback_verified", not args.no_readback)) for w in writes))
-                monitor_append_event_safe(
-                    monitor,
-                    event_type="bess_command",
-                    device=device,
-                    target=target,
-                    result="success" if verified else "failed",
-                    severity="info" if verified else "error",
-                    message=f"BESS {device} command {target} {'verified' if verified else 'failed verification'}",
-                    payload={"writes": writes},
-                    **common,
-                )
-
-        if previous_available and prev_solis.get("state") != solis.get("state"):
-            monitor_append_event_safe(
-                monitor,
-                event_type="solis_state_changed",
-                device="Solis",
-                target=solis.get("state"),
-                result="observed",
-                message=f"Observed Solis state changed from {prev_solis.get('state')} to {solis.get('state')}",
-                payload={
-                    "from_state": prev_solis.get("state"),
-                    "to_state": solis.get("state"),
-                },
-                **common,
-            )
-
-        for device in ("X", "Y"):
-            old_online = ((prev_bess.get(device) or {}).get("online") if previous_available else None)
-            new_online = (status["bess"][device] or {}).get("online")
-            if old_online is not None and old_online != new_online:
-                monitor_append_event_safe(
-                    monitor,
-                    event_type="communication_restored" if new_online else "communication_lost",
-                    severity="info" if new_online else "warning",
-                    device=device,
-                    result="online" if new_online else "offline",
-                    message=f"BESS {device} communication {'restored' if new_online else 'lost'}",
-                    payload={},
-                    **common,
-                )
-
-        old_solis_online = prev_solis.get("online") if previous_available else None
-        new_solis_online = solis.get("online")
-        if old_solis_online is not None and old_solis_online != new_solis_online:
-            monitor_append_event_safe(
-                monitor,
-                event_type="communication_restored" if new_solis_online else "communication_lost",
-                severity="info" if new_solis_online else "warning",
-                device="Solis",
-                result="online" if new_solis_online else "offline",
-                message=f"Solis communication {'restored' if new_solis_online else 'lost'}",
-                payload={},
-                **common,
-            )
-    except Exception as exc:
-        print(json.dumps({
-            "timestamp_utc": utc_now(),
-            "event": "operator_monitor_cycle_persist_failed",
-            "error": str(exc),
-        }), file=sys.stderr, flush=True)
-
-
 def config_to_arg_defaults(path: str | None) -> dict[str, Any]:
     defaults: dict[str, Any] = {
         "x_host": "192.168.100.151",
@@ -1163,13 +817,6 @@ def config_to_arg_defaults(path: str | None) -> dict[str, Any]:
         "solis_timeout": 3.0,
         "solis_control_method": "holding_onoff_3006",
         "no_solis_status_read": False,
-        "operator_monitor_enabled": True,
-        "operator_status_path": "/var/lib/nb-ems-soc-solis-controller/operator_status.json",
-        "operator_history_db_path": "/var/lib/nb-ems-soc-solis-controller/operator_history.db",
-        "operator_retention_days": 30,
-        "operator_max_events": 20000,
-        "controller_settings_enabled": True,
-        "controller_settings_path": "/var/lib/nb-ems-soc-solis-controller/control_settings.json",
     }
     if not path:
         return defaults
@@ -1216,17 +863,6 @@ def config_to_arg_defaults(path: str | None) -> dict[str, Any]:
     defaults["enable_reset_before_on"] = bool(control.get("enable_reset_before_on", defaults["enable_reset_before_on"]))
     defaults["enable_offgrid_before_on"] = bool(control.get("enable_offgrid_before_on", defaults["enable_offgrid_before_on"]))
     defaults["inter_device_command_delay_sec"] = float(control.get("inter_device_command_delay_sec", defaults["inter_device_command_delay_sec"]))
-
-    operator_monitor = data.get("operator_monitor", {})
-    defaults["operator_monitor_enabled"] = bool(operator_monitor.get("enabled", defaults["operator_monitor_enabled"]))
-    defaults["operator_status_path"] = operator_monitor.get("status_path", defaults["operator_status_path"])
-    defaults["operator_history_db_path"] = operator_monitor.get("history_db_path", defaults["operator_history_db_path"])
-    defaults["operator_retention_days"] = int(operator_monitor.get("retention_days", defaults["operator_retention_days"]))
-    defaults["operator_max_events"] = int(operator_monitor.get("max_events", defaults["operator_max_events"]))
-
-    controller_settings = data.get("controller_settings", {})
-    defaults["controller_settings_enabled"] = bool(controller_settings.get("enabled", defaults["controller_settings_enabled"]))
-    defaults["controller_settings_path"] = controller_settings.get("path", defaults["controller_settings_path"])
     return defaults
 
 
@@ -1268,13 +904,6 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--solis-timeout", type=float, default=d["solis_timeout"])
     p.add_argument("--solis-control-method", choices=["holding_onoff_3006", "holding_onoff_3007"], default=d["solis_control_method"])
     p.add_argument("--no-solis-status-read", action="store_true", default=d["no_solis_status_read"])
-    p.add_argument("--operator-monitor-enable", action=argparse.BooleanOptionalAction, default=d["operator_monitor_enabled"], help="Publish operator status/history for the gateway API")
-    p.add_argument("--operator-status-path", default=d["operator_status_path"])
-    p.add_argument("--operator-history-db-path", default=d["operator_history_db_path"])
-    p.add_argument("--operator-retention-days", type=int, default=d["operator_retention_days"])
-    p.add_argument("--operator-max-events", type=int, default=d["operator_max_events"])
-    p.add_argument("--controller-settings-enable", action=argparse.BooleanOptionalAction, default=d["controller_settings_enabled"], help="Reload admin-configurable SOC thresholds each cycle")
-    p.add_argument("--controller-settings-path", default=d["controller_settings_path"], help="Persistent runtime SOC threshold settings file")
     return p.parse_args(remaining)
 
 
@@ -1290,72 +919,6 @@ def main() -> int:
     signal.signal(signal.SIGTERM, _handle_stop)
 
     controller_state_store = load_controller_state(args.state_file, clear=args.clear_state)
-    version = "v1.13_operator_monitor_admin_thresholds"
-
-    monitor = None
-    if args.operator_monitor_enable:
-        if ControllerMonitorStore is None:
-            print(json.dumps({
-                "timestamp_utc": utc_now(),
-                "event": "operator_monitor_disabled_import_error",
-                "error": _MONITOR_IMPORT_ERROR,
-            }), file=sys.stderr, flush=True)
-        else:
-            try:
-                monitor = ControllerMonitorStore(
-                    status_path=args.operator_status_path,
-                    history_db_path=args.operator_history_db_path,
-                )
-                monitor.cleanup(
-                    retention_days=args.operator_retention_days,
-                    max_events=args.operator_max_events,
-                )
-            except Exception as exc:
-                monitor = None
-                print(json.dumps({
-                    "timestamp_utc": utc_now(),
-                    "event": "operator_monitor_init_failed",
-                    "error": str(exc),
-                }), file=sys.stderr, flush=True)
-
-    static_control_settings = {
-        "high_limit": float(args.high_limit),
-        "recovery_limit": float(args.recovery_limit),
-        "low_cutoff_limit": float(args.low_cutoff_limit),
-        "low_recovery_limit": float(args.low_recovery_limit),
-    }
-    effective_control_settings = dict(static_control_settings)
-    control_settings_meta: dict[str, Any] = {
-        "revision": None,
-        "updated_at_utc": None,
-        "updated_by": "config_defaults",
-    }
-    controller_settings_store = None
-    if args.controller_settings_enable:
-        if ControllerSettingsStore is None:
-            print(json.dumps({
-                "timestamp_utc": utc_now(),
-                "event": "controller_settings_disabled_import_error",
-                "error": _SETTINGS_IMPORT_ERROR,
-            }), file=sys.stderr, flush=True)
-        else:
-            try:
-                controller_settings_store = ControllerSettingsStore(path=args.controller_settings_path)
-                settings_doc = controller_settings_store.ensure(static_control_settings)
-                effective_control_settings = dict(settings_doc["settings"])
-                control_settings_meta = {
-                    "revision": settings_doc.get("revision"),
-                    "updated_at_utc": settings_doc.get("updated_at_utc"),
-                    "updated_by": settings_doc.get("updated_by"),
-                }
-            except Exception as exc:
-                controller_settings_store = None
-                print(json.dumps({
-                    "timestamp_utc": utc_now(),
-                    "event": "controller_settings_init_failed_using_config_defaults",
-                    "settings_path": args.controller_settings_path,
-                    "error": str(exc),
-                }), file=sys.stderr, flush=True)
 
     x = EMSDevice("X", args.x_host, args.port, args.unit_id)
     y = EMSDevice("Y", args.y_host, args.port, args.unit_id)
@@ -1378,13 +941,13 @@ def main() -> int:
     print(json.dumps({
         "timestamp_utc": utc_now(),
         "event": "soc_solis_controller_started",
-        "version": version,
+        "version": "v1.11_raw_solis_fc06_verified",
         "mode": "LIVE_WRITES_ENABLED" if args.live else "DRY_RUN_NO_WRITES",
-        "high_limit": effective_control_settings["high_limit"],
-        "recovery_limit": effective_control_settings["recovery_limit"],
+        "high_limit": args.high_limit,
+        "recovery_limit": args.recovery_limit,
         "low_cutoff_enabled": args.low_cutoff_enable,
-        "low_cutoff_limit": effective_control_settings["low_cutoff_limit"],
-        "low_recovery_limit": effective_control_settings["low_recovery_limit"],
+        "low_cutoff_limit": args.low_cutoff_limit,
+        "low_recovery_limit": args.low_recovery_limit,
         "soc_trend_window_sec": args.soc_trend_window_sec,
         "soc_trend_negative_delta": args.soc_trend_negative_delta,
         "state_file": args.state_file,
@@ -1402,58 +965,12 @@ def main() -> int:
         },
         "optional_reset_before_on": args.enable_reset_before_on,
         "optional_offgrid_before_on": args.enable_offgrid_before_on,
-        "operator_monitor": {
-            "enabled": monitor is not None,
-            "status_path": args.operator_status_path,
-            "history_db_path": args.operator_history_db_path,
-        },
-        "controller_settings": {
-            "enabled": controller_settings_store is not None,
-            "path": args.controller_settings_path,
-            "revision": control_settings_meta.get("revision"),
-            "updated_at_utc": control_settings_meta.get("updated_at_utc"),
-            "updated_by": control_settings_meta.get("updated_by"),
-            "effective_values": effective_control_settings,
-            "reload": "each_control_cycle",
-        },
     }, indent=2))
-
-    monitor_append_event_safe(
-        monitor,
-        event_type="controller_started",
-        message="SOC/Solis automatic controller started",
-        result="running",
-        payload={
-            "version": version,
-            "mode": "LIVE" if args.live else "DRY_RUN",
-            "high_limit": effective_control_settings["high_limit"],
-            "recovery_limit": effective_control_settings["recovery_limit"],
-            "settings_revision": control_settings_meta.get("revision"),
-        },
-    )
 
     try:
         while not _stop:
             cycle: dict[str, Any] = {"timestamp_utc": utc_now(), "live": bool(args.live), "devices": {}, "actions": []}
             try:
-                if controller_settings_store is not None:
-                    try:
-                        settings_doc = controller_settings_store.read()
-                        effective_control_settings = dict(settings_doc["settings"])
-                        control_settings_meta = {
-                            "revision": settings_doc.get("revision"),
-                            "updated_at_utc": settings_doc.get("updated_at_utc"),
-                            "updated_by": settings_doc.get("updated_by"),
-                        }
-                    except Exception as settings_exc:
-                        # Keep the last validated values rather than interrupting control.
-                        cycle["controller_settings_warning"] = str(settings_exc)
-
-                cycle["control_settings"] = dict(effective_control_settings)
-                cycle["control_settings_revision"] = control_settings_meta.get("revision")
-                cycle["control_settings_updated_at_utc"] = control_settings_meta.get("updated_at_utc")
-                cycle["control_settings_updated_by"] = control_settings_meta.get("updated_by")
-
                 for key, rt in devices.items():
                     rt.soc = read_ems_float(rt.client, REG_SOC, rt.device.unit_id, args.byte_order)
                     rt.online = True
@@ -1468,11 +985,11 @@ def main() -> int:
                 decision, desired_bess, desired_solar, next_state, solar_off_reason, low_cutoff_reason, info = decide_states(
                     float(devices["X"].soc),
                     float(devices["Y"].soc),
-                    effective_control_settings["high_limit"],
-                    effective_control_settings["recovery_limit"],
-                    effective_control_settings["low_cutoff_limit"],
+                    args.high_limit,
+                    args.recovery_limit,
+                    args.low_cutoff_limit,
                     low_cutoff_enabled=args.low_cutoff_enable,
-                    low_recovery_limit=effective_control_settings["low_recovery_limit"],
+                    low_recovery_limit=args.low_recovery_limit,
                     controller_state=previous_state,
                     avg_soc_delta=trend.get("avg_soc_delta"),
                     trend_negative_delta=args.soc_trend_negative_delta,
@@ -1509,18 +1026,6 @@ def main() -> int:
                     cycle["actions"].append(action)
                     sleep_between_actions(args.inter_device_command_delay_sec, action_index=idx, action_total=len(plan))
 
-                # If a real Solis write occurred, capture the verified post-action state
-                # immediately so the operator API does not show the pre-command state
-                # until the next five-second cycle.
-                solis_write_happened = any(
-                    a.get("device") == "Solis"
-                    and not a.get("skipped")
-                    and not a.get("dry_run")
-                    for a in cycle["actions"]
-                )
-                if solis_cfg.enabled and solis_client is not None and solis_write_happened:
-                    cycle["solar_status_after"] = read_solis_status(solis_client, solis_cfg)
-
                 controller_state_store["state"] = next_state
                 controller_state_store["solar_off_reason"] = solar_off_reason
                 controller_state_store["low_cutoff_reason"] = low_cutoff_reason
@@ -1532,12 +1037,10 @@ def main() -> int:
 
             except Exception as exc:
                 cycle["error"] = str(exc)
-                persist_operator_cycle(monitor, cycle, args=args, version=version)
                 print(json.dumps(cycle, indent=2), flush=True)
                 if args.once:
                     return 2
             else:
-                persist_operator_cycle(monitor, cycle, args=args, version=version)
                 print(json.dumps(cycle, indent=2), flush=True)
 
             if args.once:
@@ -1554,13 +1057,6 @@ def main() -> int:
                 solis_client.close()
             except Exception:
                 pass
-        monitor_append_event_safe(
-            monitor,
-            event_type="controller_stopped",
-            message="SOC/Solis automatic controller stopped",
-            result="stopped",
-            payload={"version": version},
-        )
         print(json.dumps({"timestamp_utc": utc_now(), "event": "soc_solis_controller_stopped"}, indent=2))
     return 0
 

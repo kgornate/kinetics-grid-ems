@@ -1,0 +1,319 @@
+#!/usr/bin/env python3
+
+import argparse
+import json
+import os
+import time
+import urllib.request
+from pathlib import Path
+
+import joblib
+import numpy as np
+
+
+def http_json(method, url, token=None, body=None, timeout=20):
+    data = None
+    headers = {
+        "Accept": "application/json",
+    }
+
+    if body is not None:
+        data = json.dumps(body).encode("utf-8")
+        headers["Content-Type"] = "application/json"
+
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+
+    req = urllib.request.Request(url, data=data, headers=headers, method=method)
+
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return json.loads(r.read().decode("utf-8"))
+
+
+def login(base_url, username, password):
+    res = http_json(
+        "POST",
+        f"{base_url}/api/auth/login",
+        body={"username": username, "password": password},
+    )
+    return res["access_token"]
+
+
+def flatten_telemetry(obj):
+    out = {}
+
+    def walk(x):
+        if isinstance(x, dict):
+            for k, v in x.items():
+                if isinstance(v, dict) and "value" in v:
+                    out[k] = v.get("value")
+                elif isinstance(v, (int, float, str, bool)) or v is None:
+                    out[k] = v
+                else:
+                    walk(v)
+
+            # Some APIs return list items with name/signal_name/value shape.
+            key = (
+                x.get("name")
+                or x.get("signal_name")
+                or x.get("point_key")
+                or x.get("key")
+                or x.get("base_signal_name")
+            )
+            if key and "value" in x:
+                out[key] = x.get("value")
+
+        elif isinstance(x, list):
+            for item in x:
+                walk(item)
+
+    walk(obj)
+    return out
+
+
+def to_float(v):
+    if v is None or v == "":
+        raise ValueError("missing")
+    return float(v)
+
+
+def getv(d, aliases, default=None):
+    for k in aliases:
+        if k in d and d[k] is not None and d[k] != "":
+            try:
+                return float(d[k])
+            except Exception:
+                pass
+
+    if default is not None:
+        return float(default)
+
+    raise KeyError(",".join(aliases))
+
+
+def rng(*vals):
+    vals = [v for v in vals if v is not None]
+    if not vals:
+        raise ValueError("empty range")
+    return max(vals) - min(vals)
+
+
+def count_flags(d):
+    count = 0
+    for k, v in d.items():
+        lk = str(k).lower()
+        if not any(w in lk for w in ["fault", "alarm", "protect", "warning"]):
+            continue
+        try:
+            fv = float(v)
+        except Exception:
+            continue
+        if fv != 0:
+            count += 1
+    return float(count)
+
+
+def build_features(pcs, bms):
+    f = {}
+
+    pa_v = getv(pcs, ["pcs_phase_a_voltage", "phase_a_voltage", "grid_phase_a_voltage", "meter_ua"])
+    pb_v = getv(pcs, ["pcs_phase_b_voltage", "phase_b_voltage", "grid_phase_b_voltage", "meter_ub"])
+    pc_v = getv(pcs, ["pcs_phase_c_voltage", "phase_c_voltage", "grid_phase_c_voltage", "meter_uc"])
+
+    pa_i = getv(pcs, ["pcs_phase_a_current", "phase_a_current", "grid_phase_a_current", "meter_ia"])
+    pb_i = getv(pcs, ["pcs_phase_b_current", "phase_b_current", "grid_phase_b_current", "meter_ib"])
+    pc_i = getv(pcs, ["pcs_phase_c_current", "phase_c_current", "grid_phase_c_current", "meter_ic"])
+
+    pcs_dc_v = getv(pcs, ["pcs_dc_voltage", "dc_voltage", "battery_dc_voltage", "stack_volt"])
+    pcs_dc_i = getv(pcs, ["pcs_dc_current", "dc_current", "battery_dc_current", "stack_curr"])
+
+    pcs_freq = getv(pcs, ["pcs_grid_frequency", "grid_frequency", "frequency", "meter_freq"])
+    pcs_cd_power = getv(pcs, ["pcs_charge_discharge_power", "charge_discharge_power", "stack_power", "meter_pt"], default=0)
+    pcs_total_power = getv(pcs, ["pcs_total_active_power", "total_active_power", "active_power", "meter_pt", "stack_power"], default=0)
+    pcs_soc = getv(pcs, ["pcs_soc", "soc", "stack_soc", "arrsoe"], default=0)
+
+    bms_v = getv(bms, ["bms_cluster_total_voltage", "cluster_total_voltage", "stack_volt", "rack_volt_r1"])
+    bms_i = getv(bms, ["bms_cluster_total_current", "cluster_total_current", "stack_curr", "rack_curr_r1"])
+    bms_hall_i = getv(bms, ["bms_can_hall_sampling_current", "can_hall_sampling_current", "hall_sampling_current"], default=bms_i)
+    bms_soc = getv(bms, ["bms_display_soc", "display_soc", "arrsoe", "stack_soc", "clusoe_r1"])
+    bms_soh = getv(bms, ["bms_soh", "soh", "stack_soh", "rack_soh_r1"], default=100)
+
+    bms_cell_max = getv(bms, ["bms_cell_max_voltage", "cell_max_voltage", "stack_max_volt", "rack_max_volt_r1"])
+    bms_cell_min = getv(bms, ["bms_cell_min_voltage", "cell_min_voltage", "stack_min_volt", "rack_min_volt_r1"])
+    bms_temp_max = getv(bms, ["bms_battery_max_temperature", "battery_max_temperature", "stack_max_temp", "rack_max_temp_r1"])
+    bms_temp_min = getv(bms, ["bms_battery_min_temperature", "battery_min_temperature", "stack_min_temp", "rack_min_temp_r1"])
+    bms_temp_avg = getv(bms, ["bms_average_temperature", "average_temperature", "stack_ave_temp", "rack_ave_temp_r1"], default=(bms_temp_max + bms_temp_min) / 2)
+
+    bms_ins = getv(bms, ["bms_insulation_resistance", "insulation_resistance", "cluposres_r1", "clunegres_r1"], default=20000)
+    bms_prechg = getv(bms, ["bms_pre_charge_total_voltage", "pre_charge_total_voltage", "cluprechgvol_r1"], default=bms_v)
+
+    f["pcs_phase_voltage_imbalance"] = rng(pa_v, pb_v, pc_v)
+    f["pcs_phase_current_imbalance"] = rng(pa_i, pb_i, pc_i)
+    f["pcs_dc_voltage_vs_bms_voltage_delta"] = abs(pcs_dc_v - bms_v)
+    f["pcs_dc_current_vs_bms_current_delta"] = abs(pcs_dc_i - bms_i)
+    f["pcs_soc_vs_bms_soc_delta"] = abs(pcs_soc - bms_soc)
+    f["bms_temperature_spread"] = abs(bms_temp_max - bms_temp_min)
+    f["bms_cell_voltage_spread"] = abs(bms_cell_max - bms_cell_min)
+
+    f["pcs_phase_a_voltage"] = pa_v
+    f["pcs_phase_b_voltage"] = pb_v
+    f["pcs_phase_c_voltage"] = pc_v
+    f["pcs_phase_a_current"] = pa_i
+    f["pcs_phase_b_current"] = pb_i
+    f["pcs_phase_c_current"] = pc_i
+    f["pcs_dc_voltage"] = pcs_dc_v
+    f["pcs_dc_current"] = pcs_dc_i
+    f["pcs_grid_frequency"] = pcs_freq
+    f["pcs_charge_discharge_power"] = pcs_cd_power
+    f["pcs_total_active_power"] = pcs_total_power
+    f["pcs_soc"] = pcs_soc
+
+    f["bms_cluster_total_voltage"] = bms_v
+    f["bms_cluster_total_current"] = bms_i
+    f["bms_can_hall_sampling_current"] = bms_hall_i
+    f["bms_display_soc"] = bms_soc
+    f["bms_soh"] = bms_soh
+    f["bms_cell_max_voltage"] = bms_cell_max
+    f["bms_cell_min_voltage"] = bms_cell_min
+    f["bms_battery_max_temperature"] = bms_temp_max
+    f["bms_battery_min_temperature"] = bms_temp_min
+    f["bms_average_temperature"] = bms_temp_avg
+    f["bms_insulation_resistance"] = bms_ins
+    f["bms_pre_charge_total_voltage"] = bms_prechg
+
+    f["pcs_fault_flag_count"] = getv(pcs, ["pcs_fault_flag_count"], default=count_flags(pcs))
+    f["bms_fault_flag_count"] = getv(bms, ["bms_fault_flag_count"], default=count_flags(bms))
+
+    return f
+
+
+def fetch_asset(base_url, token, asset_id):
+    # page_size=500 is enough for PCS; for BMS we merge two pages because BMS can have many points.
+    merged = {}
+
+    for page in [1, 2]:
+        url = f"{base_url}/api/assets/{asset_id}/telemetry?compact=true&page={page}&page_size=500"
+        try:
+            payload = http_json("GET", url, token=token)
+            merged.update(flatten_telemetry(payload))
+        except Exception:
+            if page == 1:
+                raise
+
+    return merged
+
+
+def run_once(args, model, scaler, manifest, token):
+    source = args.source_id
+
+    pcs_asset = f"{source}_pcs"
+    bms_asset = f"{source}_bms"
+
+    pcs = fetch_asset(args.base_url, token, pcs_asset)
+    bms = fetch_asset(args.base_url, token, bms_asset)
+
+    features = manifest["features"]
+    threshold = float(manifest["threshold"])
+
+    try:
+        row = build_features(pcs, bms)
+        missing = [k for k in features if k not in row or row[k] is None]
+
+        if missing:
+            return {
+                "ok": False,
+                "source_id": source,
+                "error": "missing_features",
+                "missing_features": missing,
+                "pcs_keys_sample": sorted(list(pcs.keys()))[:80],
+                "bms_keys_sample": sorted(list(bms.keys()))[:80],
+            }
+
+        x = np.array([[to_float(row[k]) for k in features]], dtype=float)
+        xs = scaler.transform(x)
+        raw = model.score_samples(xs)
+        score = float(-raw[0])
+        pred = bool(score >= threshold)
+
+        return {
+            "ok": True,
+            "timestamp_epoch_ms": int(time.time() * 1000),
+            "source_id": source,
+            "bess_id": source.replace("external_ems_", "bess_"),
+            "feature_count": len(features),
+            "threshold": threshold,
+            "anomaly_score_ml": round(score, 6),
+            "ml_predicted_anomaly": pred,
+            "key_features": {
+                "pcs_phase_voltage_imbalance": round(row["pcs_phase_voltage_imbalance"], 6),
+                "pcs_phase_current_imbalance": round(row["pcs_phase_current_imbalance"], 6),
+                "pcs_dc_voltage_vs_bms_voltage_delta": round(row["pcs_dc_voltage_vs_bms_voltage_delta"], 6),
+                "pcs_dc_current_vs_bms_current_delta": round(row["pcs_dc_current_vs_bms_current_delta"], 6),
+                "bms_temperature_spread": round(row["bms_temperature_spread"], 6),
+                "bms_cell_voltage_spread": round(row["bms_cell_voltage_spread"], 6),
+                "pcs_fault_flag_count": row["pcs_fault_flag_count"],
+                "bms_fault_flag_count": row["bms_fault_flag_count"],
+            },
+        }
+
+    except Exception as e:
+        return {
+            "ok": False,
+            "source_id": source,
+            "error": repr(e),
+            "pcs_keys_sample": sorted(list(pcs.keys()))[:80],
+            "bms_keys_sample": sorted(list(bms.keys()))[:80],
+        }
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--base-url", default="http://127.0.0.1:8000")
+    ap.add_argument("--username", default="internal")
+    ap.add_argument("--password-env", default="NB_EMS_INTERNAL_PASSWORD")
+    ap.add_argument("--model-dir", default="model")
+    ap.add_argument("--source-id", default="external_ems_1")
+    ap.add_argument("--loop", action="store_true")
+    ap.add_argument("--interval-sec", type=float, default=5.0)
+    ap.add_argument("--output-jsonl", default="/tmp/phase7_1_live_api_infer.jsonl")
+    args = ap.parse_args()
+
+    password = os.environ.get(args.password_env)
+    if not password:
+        raise SystemExit(f"Missing password env var: {args.password_env}")
+
+    model_dir = Path(args.model_dir)
+
+    with open(model_dir / "ml_model_manifest_v0_3.json", "r", encoding="utf-8") as f:
+        manifest = json.load(f)
+
+    model = joblib.load(model_dir / manifest["model_file"])
+    scaler = joblib.load(model_dir / manifest["scaler_file"])
+
+    token = login(args.base_url, args.username, password)
+
+    print("===== PHASE 7.1 LIVE API INFERENCE START =====")
+    print("BASE_URL =", args.base_url)
+    print("SOURCE_ID =", args.source_id)
+    print("MODEL_DIR =", model_dir)
+    print("FEATURE_COUNT =", len(manifest["features"]))
+    print("THRESHOLD =", manifest["threshold"])
+    print("OUTPUT_JSONL =", args.output_jsonl)
+
+    while True:
+        result = run_once(args, model, scaler, manifest, token)
+
+        line = json.dumps(result, sort_keys=True)
+        print(line)
+
+        with open(args.output_jsonl, "a", encoding="utf-8") as f:
+            f.write(line + "\n")
+
+        if not args.loop:
+            break
+
+        time.sleep(args.interval_sec)
+
+
+if __name__ == "__main__":
+    main()
