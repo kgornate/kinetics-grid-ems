@@ -42,7 +42,7 @@ def create_app(container) -> FastAPI:
     @app.middleware('http')
     async def access_log(request: Request, call_next):
         response = await call_next(request)
-        if container.config.logging.store_access_logs and request.url.path not in ['/api/health']:
+        if container.config.logging.store_access_logs and request.url.path not in ['/api/health', '/api/fast-bess/live']:
             container.event_logger.debug(
                 'api_access',
                 f'{request.method} {request.url.path} -> {response.status_code}',

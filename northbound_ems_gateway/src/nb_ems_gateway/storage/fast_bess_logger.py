@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import threading
 import time
 from datetime import datetime, timezone
@@ -55,6 +56,9 @@ class FastBESSLogger:
         self.last_cleanup_ts = 0.0
         self.last_cleanup_result: dict[str, Any] | None = None
         self.execution_mode = 'threaded'
+        self.live_publish_count = 0
+        self.last_live_publish_utc: str | None = None
+        self.last_live_publish_error: str | None = None
 
     def load_profile(self) -> None:
         path = Path(self.config.profile_path)
@@ -156,14 +160,28 @@ class FastBESSLogger:
             'bms_asset_id': mapped.get('bms_asset_id') or f'{source_id}_bms',
         }
 
-    def _extract_signals(self, asset_id: str, wanted: list[str], now_ts: float) -> tuple[dict[str, Any], int, int, int | None]:
+    def _extract_signals(
+        self,
+        asset_id: str,
+        wanted: list[str],
+        now_ts: float,
+        *,
+        value_only: bool | None = None,
+    ) -> tuple[dict[str, Any], int, int, int | None]:
+        """Read selected signals from the live AssetManager cache only.
+
+        This method never touches SQLite and never triggers Modbus. ``value_only``
+        lets cloud producers request the compact scalar representation even if the
+        local historian is configured for expanded storage.
+        """
         asset = self.container.asset_manager.telemetry.get(asset_id, {})
         signals = asset.get('signals', {})
         out: dict[str, Any] = {}
         good = 0
         bad = 0
         ages: list[int] = []
-        value_only = self.config.write_mode == 'value_only'
+        if value_only is None:
+            value_only = self.config.write_mode == 'value_only'
 
         for signal_name in wanted:
             sig = signals.get(signal_name)
@@ -197,65 +215,176 @@ class FastBESSLogger:
                 }
         return out, good, bad, max(ages) if ages else None
 
-    def sample_once(self) -> dict[str, Any]:
-        if not self.container.storage:
-            self.skipped_count += 1
-            return {'ok': False, 'reason': 'storage_disabled'}
+    def _build_source_sample(
+        self,
+        source_id: str,
+        *,
+        now: datetime,
+        value_only: bool,
+    ) -> dict[str, Any]:
+        now_ts = now.timestamp()
+        ids = self._source_asset_ids(source_id)
+        pcs_values, pcs_good, pcs_bad, pcs_age = self._extract_signals(
+            ids['pcs_asset_id'], self._profile.get('pcs_1', []), now_ts, value_only=value_only
+        )
+        bms_values, bms_good, bms_bad, bms_age = self._extract_signals(
+            ids['bms_asset_id'], self._profile.get('bms_1', []), now_ts, value_only=value_only
+        )
+
+        max_age_ms_values = [v for v in [pcs_age, bms_age] if v is not None]
+        max_age_ms = max(max_age_ms_values) if max_age_ms_values else None
+        selected = len(self._profile.get('pcs_1', [])) + len(self._profile.get('bms_1', []))
+        good = pcs_good + bms_good
+        bad = pcs_bad + bms_bad
+
+        if bad == 0:
+            quality = 'good'
+        elif good > 0:
+            quality = 'partial'
+        else:
+            quality = 'bad'
+        if max_age_ms is not None and max_age_ms > int(self.config.max_data_age_sec * 1000):
+            quality = 'stale' if good else 'bad'
+
+        pcs_asset = self.container.asset_manager.telemetry.get(ids['pcs_asset_id'], {})
+        bms_asset = self.container.asset_manager.telemetry.get(ids['bms_asset_id'], {})
+
+        return {
+            'schema_version': 1,
+            'sample_source': 'asset_manager_live_cache',
+            'timestamp_utc': now.isoformat(),
+            'timestamp_epoch_ms': int(now_ts * 1000),
+            'source_id': source_id,
+            'bess_id': ids['bess_id'],
+            'pcs_asset_id': ids['pcs_asset_id'],
+            'bms_asset_id': ids['bms_asset_id'],
+            'profile_name': self.config.profile_name,
+            'pcs_values': pcs_values,
+            'bms_values': bms_values,
+            'pcs_signal_count': len(self._profile.get('pcs_1', [])),
+            'bms_signal_count': len(self._profile.get('bms_1', [])),
+            'selected_signal_count': selected,
+            'good_signal_count': good,
+            'bad_signal_count': bad,
+            'pcs_good_signal_count': pcs_good,
+            'pcs_bad_signal_count': pcs_bad,
+            'bms_good_signal_count': bms_good,
+            'bms_bad_signal_count': bms_bad,
+            'max_data_age_ms': max_age_ms,
+            'quality': quality,
+            'pcs_last_update_utc': pcs_asset.get('last_update_utc'),
+            'bms_last_update_utc': bms_asset.get('last_update_utc'),
+        }
+
+    def live_snapshot(self) -> dict[str, Any]:
+        """Return the current fast-BESS profile directly from live gateway memory.
+
+        This is the G3/S1 source. It performs no SQLite reads/writes and no Modbus
+        reads. The values are the latest already-decoded AssetManager cache values.
+        """
         if not self._profile:
             self.load_profile()
 
         now = datetime.now(timezone.utc)
-        now_ts = now.timestamp()
-        epoch_ms = int(now_ts * 1000)
-        ts = now.isoformat()
+        records = [
+            self._build_source_sample(source_id, now=now, value_only=True)
+            for source_id in self.config.sources
+        ]
+        return {
+            'schema_version': 1,
+            'sample_source': 'asset_manager_live_cache',
+            'persisted_source': False,
+            'sampled_at_utc': now.isoformat(),
+            'sampled_at_epoch_ms': int(now.timestamp() * 1000),
+            'profile_name': self.config.profile_name,
+            'pcs_signal_count': len(self._profile.get('pcs_1', [])),
+            'bms_signal_count': len(self._profile.get('bms_1', [])),
+            'total_signal_count_per_bess': len(self._profile.get('pcs_1', [])) + len(self._profile.get('bms_1', [])),
+            'source_count': len(records),
+            'records': records,
+        }
+
+    def _publish_live_snapshot(self, snapshot: dict[str, Any]) -> None:
+        if not self.config.publish_live_snapshot:
+            return
+        path = Path(self.config.live_snapshot_path)
+        tmp = path.with_name(path.name + '.tmp')
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            raw = json.dumps(snapshot, separators=(',', ':'), ensure_ascii=False) + '\n'
+            tmp.write_text(raw, encoding='utf-8')
+            os.chmod(tmp, 0o640)
+            os.replace(tmp, path)
+            self.live_publish_count += 1
+            self.last_live_publish_utc = snapshot.get('sampled_at_utc')
+            self.last_live_publish_error = None
+        except Exception as exc:
+            self.last_live_publish_error = f"{type(exc).__name__}: {exc}"
+            try:
+                tmp.unlink(missing_ok=True)
+            except Exception:
+                pass
+            return
+
+    def sample_once(self) -> dict[str, Any]:
+        # G3 live-cloud publication is intentionally independent of the on-disk
+        # historian. Build/publish the RAM snapshot first from AssetManager cache;
+        # historian persistence remains a parallel best-effort branch.
+        if not self._profile:
+            self.load_profile()
+
+        snapshot = self.live_snapshot()
+        self._publish_live_snapshot(snapshot)
+
+        if not self.container.storage:
+            self.skipped_count += 1
+            self.sample_count += 1
+            self.last_sample_utc = snapshot['sampled_at_utc']
+            return {
+                'ok': True,
+                'timestamp_utc': self.last_sample_utc,
+                'live_snapshot_path': self.config.live_snapshot_path if self.config.publish_live_snapshot else None,
+                'history_written': False,
+                'reason': 'storage_disabled',
+                'written': [],
+            }
+
         written: list[dict[str, Any]] = []
 
-        for source_id in self.config.sources:
-            ids = self._source_asset_ids(source_id)
-            pcs_values, pcs_good, pcs_bad, pcs_age = self._extract_signals(ids['pcs_asset_id'], self._profile.get('pcs_1', []), now_ts)
-            bms_values, bms_good, bms_bad, bms_age = self._extract_signals(ids['bms_asset_id'], self._profile.get('bms_1', []), now_ts)
-            max_age_ms_values = [v for v in [pcs_age, bms_age] if v is not None]
-            max_age_ms = max(max_age_ms_values) if max_age_ms_values else None
-            selected = len(self._profile.get('pcs_1', [])) + len(self._profile.get('bms_1', []))
-            good = pcs_good + bms_good
-            bad = pcs_bad + bms_bad
+        for live_sample in snapshot['records']:
+            sample = dict(live_sample)
+            # Preserve the historical on-disk schema semantics. The S1 RAM
+            # snapshot stays independent from the SQLite historian schema.
+            sample['schema_version'] = 2 if self.config.write_mode == 'value_only' else 1
+            sample['write_mode'] = self.config.write_mode
+            for key in [
+                'sample_source', 'pcs_signal_count', 'bms_signal_count',
+                'pcs_good_signal_count', 'pcs_bad_signal_count',
+                'bms_good_signal_count', 'bms_bad_signal_count',
+                'pcs_last_update_utc', 'bms_last_update_utc',
+            ]:
+                sample.pop(key, None)
 
-            if bad == 0:
-                quality = 'good'
-            elif good > 0:
-                quality = 'partial'
-            else:
-                quality = 'bad'
-            if max_age_ms is not None and max_age_ms > int(self.config.max_data_age_sec * 1000):
-                quality = 'stale' if good else 'bad'
-
-            sample = {
-                'schema_version': 2 if self.config.write_mode == 'value_only' else 1,
-                'write_mode': self.config.write_mode,
-                'timestamp_utc': ts,
-                'timestamp_epoch_ms': epoch_ms,
-                'source_id': source_id,
-                'bess_id': ids['bess_id'],
-                'pcs_asset_id': ids['pcs_asset_id'],
-                'bms_asset_id': ids['bms_asset_id'],
-                'profile_name': self.config.profile_name,
-                'pcs_values': pcs_values,
-                'bms_values': bms_values,
-                'selected_signal_count': selected,
-                'good_signal_count': good,
-                'bad_signal_count': bad,
-                'max_data_age_ms': max_age_ms,
-                'quality': quality,
-            }
             row_id = self.container.storage.insert_fast_bess_sample(sample)
-            written.append({'source_id': source_id, 'row_id': row_id, 'quality': quality, 'good': good, 'bad': bad})
+            written.append({
+                'source_id': sample['source_id'],
+                'row_id': row_id,
+                'quality': sample['quality'],
+                'good': sample['good_signal_count'],
+                'bad': sample['bad_signal_count'],
+            })
             if row_id is not None:
                 self.write_count += 1
 
         self.sample_count += 1
-        self.last_sample_utc = ts
+        self.last_sample_utc = snapshot['sampled_at_utc']
         self._cleanup_if_due()
-        return {'ok': True, 'timestamp_utc': ts, 'written': written}
+        return {
+            'ok': True,
+            'timestamp_utc': self.last_sample_utc,
+            'live_snapshot_path': self.config.live_snapshot_path if self.config.publish_live_snapshot else None,
+            'written': written,
+        }
 
     def _cleanup_if_due(self) -> None:
         if not self.container.storage:
@@ -304,5 +433,10 @@ class FastBESSLogger:
             'skipped_count': self.skipped_count,
             'last_sample_utc': self.last_sample_utc,
             'last_cleanup_result': self.last_cleanup_result,
+            'publish_live_snapshot': self.config.publish_live_snapshot,
+            'live_snapshot_path': self.config.live_snapshot_path,
+            'live_publish_count': self.live_publish_count,
+            'last_live_publish_utc': self.last_live_publish_utc,
+            'last_live_publish_error': self.last_live_publish_error,
             'last_error': self.last_error,
         }

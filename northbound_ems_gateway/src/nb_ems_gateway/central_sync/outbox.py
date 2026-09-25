@@ -73,6 +73,17 @@ class OutboxStore:
         self._lock = threading.RLock()
         self.conn = sqlite3.connect(self.path, timeout=30.0, check_same_thread=False)
         self.conn.row_factory = sqlite3.Row
+
+        # CENTRAL_SYNC_TEMP_STORE_MEMORY_V1
+        #
+        # SQLite may create temporary files for ORDER BY / sorting.
+        # On this field image that temporary-file path caused
+        # OperationalError('database or disk is full') even though the
+        # persistent outbox filesystem had ample free space.
+        #
+        # Keep only SQLite temporary working data in memory.
+        # The actual outbox database remains persistent on /mnt/ems-logs.
+        self.conn.execute("PRAGMA temp_store=MEMORY")
         self.conn.execute("PRAGMA busy_timeout=30000")
         try:
             self.conn.execute("PRAGMA journal_mode=WAL")
@@ -370,13 +381,23 @@ class OutboxStore:
             ).fetchall()
         return [dict(row) for row in rows]
 
-    def cleanup(self, *, acked_retention_hours: int, dead_letter_retention_days: int) -> dict[str, int]:
+    def cleanup(
+        self,
+        *,
+        acked_retention_hours: int,
+        dead_letter_retention_days: int,
+        transport_attempt_retention_days: int,
+    ) -> dict[str, int]:
         now = time.time()
         acked_cutoff = datetime.fromtimestamp(
             now - max(0, acked_retention_hours) * 3600, timezone.utc
         ).isoformat().replace("+00:00", "Z")
         dead_cutoff = datetime.fromtimestamp(
             now - max(0, dead_letter_retention_days) * 86400, timezone.utc
+        ).isoformat().replace("+00:00", "Z")
+        attempt_cutoff = datetime.fromtimestamp(
+            now - max(0, transport_attempt_retention_days) * 86400,
+            timezone.utc,
         ).isoformat().replace("+00:00", "Z")
         with self._lock:
             a = self.conn.execute(
@@ -387,8 +408,17 @@ class OutboxStore:
                 "DELETE FROM outbox_messages WHERE state='dead' AND last_attempt_utc < ?",
                 (dead_cutoff,),
             ).rowcount
+            t = self.conn.execute(
+                "DELETE FROM transport_attempts WHERE attempted_utc < ?",
+                (attempt_cutoff,),
+            ).rowcount
             self.conn.commit()
-        return {"acked_deleted": int(a), "dead_deleted": int(d)}
+
+        return {
+            "acked_deleted": int(a),
+            "dead_deleted": int(d),
+            "transport_attempts_deleted": int(t),
+        }
 
     def db_size_bytes(self) -> int:
         total = 0

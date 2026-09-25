@@ -27,6 +27,21 @@ def fast_bess_profile(request: Request) -> dict:
     return c.fast_bess_logger.profile_status()
 
 
+@router.get('/api/fast-bess/live')
+def fast_bess_live(request: Request) -> dict:
+    """Return S1-ready PCS/BMS values directly from the live AssetManager cache.
+
+    This endpoint does not query SQLite and does not trigger Modbus reads.
+    """
+    c = request.app.state.container
+    if not c.fast_bess_logger:
+        raise HTTPException(503, 'fast BESS profile unavailable')
+    try:
+        return c.fast_bess_logger.live_snapshot()
+    except Exception as exc:
+        raise HTTPException(503, f'live fast BESS snapshot unavailable: {exc}') from exc
+
+
 @router.get('/api/fast-bess/latest')
 def fast_bess_latest(
     request: Request,

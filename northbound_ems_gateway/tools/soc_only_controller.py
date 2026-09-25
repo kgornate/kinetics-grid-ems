@@ -18,6 +18,14 @@ Default mode is dry-run. Use --live --force only after validating decisions.
 
 v1.12 adds an operator-facing status snapshot and transition/event history that the
 main northbound FastAPI gateway exposes to Flutter.
+
+v1.14 adds the PV Powertech SOC-based solar derating strategy validated in field:
+- both BESS SOC > derate_soc_limit (default 90%) -> keep Solis ON and limit active power
+  to derate_power_kw (default 20 kW)
+- both BESS SOC >= high_limit (default 98%) -> retain the existing Solis OFF logic
+- one BESS above the derate threshold while the other is <= it -> normal solar output
+- field-proven Solis active-power control uses FC06/FC03 holding register 3051
+  (10000 = 100%); 20 kW on the validated 100 kW inverter maps to raw 2000 (20%).
 """
 from __future__ import annotations
 
@@ -101,6 +109,8 @@ class SolisConfig:
     timeout: float = 3.0
     control_method: str = "holding_onoff_3006"
     status_read_enabled: bool = True
+    rated_power_kw: float = 100.0
+    normal_power_percent: float = 110.0
 
 
 # Chinese EMS / Unity261PV confirmed registers, Float32 encoded.
@@ -117,17 +127,26 @@ SOLIS_COIL_GRID_ON_OFF_5000 = 5000
 SOLIS_HOLDING_ON_OFF_REGISTER = 3006
 SOLIS_HOLDING_ON_VALUE = 0x00BE
 SOLIS_HOLDING_OFF_VALUE = 0x00DE
-SOLIS_POWER_LIMIT_SWITCH_3070_SEND_ADDRESS = 3069
-SOLIS_POWER_LIMIT_VALUE_3052_SEND_ADDRESS = 3051
+SOLIS_POWER_CONTROL_ENABLE_REGISTER = 3069
+SOLIS_POWER_CONTROL_ENABLE_VALUE = 0x00AA
+SOLIS_POWER_LIMIT_PERCENT_REGISTER = 3051
+SOLIS_POWER_LIMIT_PERCENT_FEEDBACK_REGISTER = 3049
+SOLIS_LIMITED_POWER_FEEDBACK_REGISTER = 3044
+SOLIS_POWER_LIMIT_SWITCH_FEEDBACK_REGISTER = 3089
+SOLIS_LIMITING_STATUS_REGISTER = 3094
 
 STATE_NORMAL = "NORMAL"
 STATE_X_HIGH_ONLY = "X_HIGH_ONLY"
 STATE_Y_HIGH_ONLY = "Y_HIGH_ONLY"
+STATE_BOTH_SOLAR_DERATED = "BOTH_SOLAR_DERATED"
 STATE_BOTH_HIGH_SOLAR_OFF = "BOTH_HIGH_SOLAR_OFF"
 STATE_X_LOW_CUTOFF = "X_LOW_CUTOFF"
 STATE_Y_LOW_CUTOFF = "Y_LOW_CUTOFF"
 STATE_BOTH_LOW_CUTOFF_LOCKOUT = "BOTH_LOW_CUTOFF_LOCKOUT"
 
+SOLAR_NORMAL = "ON_NORMAL"
+SOLAR_DERATED = "ON_DERATED"
+SOLAR_OFF = "OFF"
 SOLAR_HOLD = "HOLD"
 
 _stop = False
@@ -436,14 +455,14 @@ def write_coil(client: Any, address: int, value: bool, unit_id: int) -> Any:
     ])
 
 
-def read_ems_float(client: ModbusTcpClient, address: int, unit_id: int, byte_order: str) -> float:
+def _read_ems_float_once(client: ModbusTcpClient, address: int, unit_id: int, byte_order: str) -> float:
     rr = read_holding_registers(client, address, 2, unit_id)
     if _is_modbus_error(rr):
         raise RuntimeError(f"Modbus read failed addr={address} response={rr}")
     return decode_float32(list(rr.registers), byte_order)
 
 
-def write_ems_float(client: ModbusTcpClient, address: int, value: float, unit_id: int, byte_order: str, readback: bool = True) -> dict[str, Any]:
+def _write_ems_float_once(client: ModbusTcpClient, address: int, value: float, unit_id: int, byte_order: str, readback: bool = True) -> dict[str, Any]:
     regs = encode_float32(value, byte_order)
     rr = write_registers(client, address, regs, unit_id)
 
@@ -492,6 +511,138 @@ def write_ems_float(client: ModbusTcpClient, address: int, value: float, unit_id
         )
 
     return out
+
+
+
+# ---------------------------------------------------------------------------
+# AUTO_RECONNECT_V1
+#
+# Field self-recovery for stale/broken EMS Modbus-TCP sessions.
+#
+# The original read/write implementations are preserved as:
+#
+#   _read_ems_float_once()
+#   _write_ems_float_once()
+#
+# These wrappers close and reconnect the SAME ModbusTcpClient whenever an
+# operation throws a communication exception, then retry the operation.
+#
+# This does NOT change SOC logic, thresholds, register addresses, byte order,
+# BESS commands or Solis control behavior.
+# ---------------------------------------------------------------------------
+
+def _ems_operation_with_reconnect(
+    client: ModbusTcpClient,
+    operation: Any,
+    operation_name: str,
+    max_attempts: int = 3,
+) -> Any:
+    import time as _time
+
+    last_exc: Exception | None = None
+
+    for attempt in range(1, max_attempts + 1):
+        try:
+            return operation()
+
+        except Exception as exc:
+            last_exc = exc
+
+            print(
+                f"[EMS-RECONNECT] {operation_name} failed "
+                f"attempt={attempt}/{max_attempts}: "
+                f"{type(exc).__name__}: {exc}",
+                flush=True,
+            )
+
+            if attempt >= max_attempts:
+                break
+
+            # Throw away the stale TCP socket.
+            try:
+                client.close()
+            except Exception:
+                pass
+
+            # Small backoff so the remote EMS TCP server has time to recover.
+            delay = 0.5 * attempt
+            _time.sleep(delay)
+
+            try:
+                connected = client.connect()
+
+                # pymodbus normally returns bool. Treat explicit False as
+                # failure; tolerate versions which return None on success.
+                if connected is False:
+                    raise ConnectionError(
+                        "ModbusTcpClient.connect() returned False"
+                    )
+
+                print(
+                    f"[EMS-RECONNECT] {operation_name}: "
+                    f"TCP reconnect successful",
+                    flush=True,
+                )
+
+            except Exception as reconnect_exc:
+                last_exc = reconnect_exc
+
+                print(
+                    f"[EMS-RECONNECT] {operation_name}: "
+                    f"reconnect failed: "
+                    f"{type(reconnect_exc).__name__}: "
+                    f"{reconnect_exc}",
+                    flush=True,
+                )
+
+    if last_exc is not None:
+        raise last_exc
+
+    raise RuntimeError(
+        f"{operation_name}: Modbus operation failed without exception"
+    )
+
+
+def read_ems_float(
+    client: ModbusTcpClient,
+    address: int,
+    unit_id: int,
+    byte_order: str,
+) -> float:
+
+    return _ems_operation_with_reconnect(
+        client,
+        lambda: _read_ems_float_once(
+            client,
+            address,
+            unit_id,
+            byte_order,
+        ),
+        operation_name=f"EMS read address={address}",
+    )
+
+
+def write_ems_float(
+    client: ModbusTcpClient,
+    address: int,
+    value: float,
+    unit_id: int,
+    byte_order: str,
+    readback: bool = True,
+) -> dict[str, Any]:
+
+    return _ems_operation_with_reconnect(
+        client,
+        lambda: _write_ems_float_once(
+            client,
+            address,
+            value,
+            unit_id,
+            byte_order,
+            readback,
+        ),
+        operation_name=f"EMS write address={address}",
+    )
 
 
 def make_ems_client(device: EMSDevice, timeout: float) -> ModbusTcpClient:
@@ -571,19 +722,28 @@ def decide_states(
     recovery_limit: float,
     low_cutoff_limit: float,
     *,
+    derate_soc_limit: float,
     low_cutoff_enabled: bool,
     low_recovery_limit: float,
     controller_state: str,
     avg_soc_delta: float | None,
     trend_negative_delta: float,
 ) -> tuple[str, dict[str, str], str, str, str | None, str | None, dict[str, Any]]:
-    """Return decision, BESS states, solar state, next state, solar reason, low reason and details.
+    """Return controller decision and desired BESS/Solis state.
 
-    Lower cutoff is highest priority only when enabled. Low-cutoff states are latched
-    while the protected BESS is still below low_recovery_limit. Once latest SOC has
-    recovered, the stale low state is cleared and normal/upper SOC logic resumes.
+    Priority order:
+    1. Optional low-SOC BESS protection (existing behavior).
+    2. Existing latched BOTH_HIGH solar-OFF recovery behavior.
+    3. Both BESS >= high_limit -> solar OFF.
+    4. Both BESS > derate_soc_limit -> solar ON but active-power derated.
+    5. Otherwise solar ON at normal/unrestricted field setting.
+
+    The derate comparison is intentionally strict (>) to match the approved requirement,
+    while the high/OFF comparison remains inclusive (>=).
     """
     low_recovery_limit = max(float(low_recovery_limit), float(low_cutoff_limit))
+    derate_soc_limit = float(derate_soc_limit)
+    high_limit = float(high_limit)
     low_state_active = controller_state in {STATE_X_LOW_CUTOFF, STATE_Y_LOW_CUTOFF, STATE_BOTH_LOW_CUTOFF_LOCKOUT}
 
     x_low = bool(low_cutoff_enabled) and soc_x <= low_cutoff_limit
@@ -592,8 +752,12 @@ def decide_states(
     y_low_recovered = soc_y >= low_recovery_limit
     x_high = soc_x >= high_limit
     y_high = soc_y >= high_limit
+    x_above_derate = soc_x > derate_soc_limit
+    y_above_derate = soc_y > derate_soc_limit
+    both_above_derate = x_above_derate and y_above_derate
     any_at_or_below_recovery = min(soc_x, soc_y) <= recovery_limit
     soc_decreasing = avg_soc_delta is not None and avg_soc_delta < -abs(float(trend_negative_delta))
+
     info = {
         "state_before": controller_state,
         "low_cutoff_enabled": bool(low_cutoff_enabled),
@@ -604,6 +768,11 @@ def decide_states(
         "low_recovery_limit": low_recovery_limit,
         "x_low_recovered": x_low_recovered,
         "y_low_recovered": y_low_recovered,
+        "derate_soc_limit": derate_soc_limit,
+        "x_above_derate": x_above_derate,
+        "y_above_derate": y_above_derate,
+        "both_above_derate": both_above_derate,
+        "high_limit": high_limit,
         "x_high": x_high,
         "y_high": y_high,
         "any_at_or_below_recovery": any_at_or_below_recovery,
@@ -616,7 +785,7 @@ def decide_states(
         info["low_state_release"] = "low_cutoff_disabled"
         controller_state = STATE_NORMAL
 
-    # New/current lower-side protection. Highest priority before upper SOC/solar logic.
+    # Existing lower-side protection remains highest priority when enabled.
     if low_cutoff_enabled:
         if x_low and y_low:
             return "both_low_cutoff_both_off", {"X": "OFF", "Y": "OFF"}, SOLAR_HOLD, STATE_BOTH_LOW_CUTOFF_LOCKOUT, None, "BOTH_SOC_BELOW_LOW_LIMIT", info
@@ -625,7 +794,6 @@ def decide_states(
         if y_low:
             return "y_low_cutoff_x_on_y_off", {"X": "ON", "Y": "OFF"}, SOLAR_HOLD, STATE_Y_LOW_CUTOFF, None, "Y_SOC_BELOW_LOW_LIMIT", info
 
-        # Previously latched lower states. Hold only until the relevant BESS SOC has recovered.
         if controller_state == STATE_BOTH_LOW_CUTOFF_LOCKOUT:
             if x_low_recovered and y_low_recovered:
                 info["low_state_release"] = "both_soc_recovered"
@@ -645,19 +813,34 @@ def decide_states(
             else:
                 return "y_low_cutoff_hold_x_on_y_off_until_recovery", {"X": "ON", "Y": "OFF"}, SOLAR_HOLD, STATE_Y_LOW_CUTOFF, None, "Y_SOC_BELOW_LOW_RECOVERY", info
 
-    # Existing upper-side recovery state. Only this state uses SOC trend.
+    # Retain the previously validated high-SOC OFF latch/recovery semantics exactly.
     if controller_state == STATE_BOTH_HIGH_SOLAR_OFF:
         if any_at_or_below_recovery and soc_decreasing:
-            return "post_both_high_recovered_solar_on_both_bess_on", {"X": "ON", "Y": "ON"}, "ON", STATE_NORMAL, None, None, info
-        return "both_high_solar_off_waiting_for_recovery", {"X": "ON", "Y": "ON"}, "OFF", STATE_BOTH_HIGH_SOLAR_OFF, "BOTH_BESS_HIGH", None, info
+            return "post_both_high_recovered_solar_normal_both_bess_on", {"X": "ON", "Y": "ON"}, SOLAR_NORMAL, STATE_NORMAL, None, None, info
+        return "both_high_solar_off_waiting_for_recovery", {"X": "ON", "Y": "ON"}, SOLAR_OFF, STATE_BOTH_HIGH_SOLAR_OFF, "BOTH_BESS_HIGH", None, info
 
+    # High/OFF threshold retains existing BESS behavior.
     if x_high and y_high:
-        return "both_high_keep_both_on_solar_off", {"X": "ON", "Y": "ON"}, "OFF", STATE_BOTH_HIGH_SOLAR_OFF, "BOTH_BESS_HIGH", None, info
+        return "both_high_keep_both_on_solar_off", {"X": "ON", "Y": "ON"}, SOLAR_OFF, STATE_BOTH_HIGH_SOLAR_OFF, "BOTH_BESS_HIGH", None, info
+
+    # A single BESS at/above 98% remains protected by switching that BESS OFF.
+    # Solar is derated only when BOTH BESS are already above the 90% derate threshold.
     if x_high and not y_high:
-        return "only_x_high_x_off_y_on_solar_on", {"X": "OFF", "Y": "ON"}, "ON", STATE_X_HIGH_ONLY, None, None, info
+        solar_target = SOLAR_DERATED if both_above_derate else SOLAR_NORMAL
+        state = STATE_X_HIGH_ONLY
+        decision = "only_x_high_x_off_y_on_solar_derated" if both_above_derate else "only_x_high_x_off_y_on_solar_normal"
+        return decision, {"X": "OFF", "Y": "ON"}, solar_target, state, None, None, info
+
     if y_high and not x_high:
-        return "only_y_high_x_on_y_off_solar_on", {"X": "ON", "Y": "OFF"}, "ON", STATE_Y_HIGH_ONLY, None, None, info
-    return "normal_keep_both_on_solar_on", {"X": "ON", "Y": "ON"}, "ON", STATE_NORMAL, None, None, info
+        solar_target = SOLAR_DERATED if both_above_derate else SOLAR_NORMAL
+        state = STATE_Y_HIGH_ONLY
+        decision = "only_y_high_x_on_y_off_solar_derated" if both_above_derate else "only_y_high_x_on_y_off_solar_normal"
+        return decision, {"X": "ON", "Y": "OFF"}, solar_target, state, None, None, info
+
+    if both_above_derate:
+        return "both_above_90_keep_bess_on_solar_derated", {"X": "ON", "Y": "ON"}, SOLAR_DERATED, STATE_BOTH_SOLAR_DERATED, None, None, info
+
+    return "normal_keep_both_on_solar_normal", {"X": "ON", "Y": "ON"}, SOLAR_NORMAL, STATE_NORMAL, None, None, info
 
 
 def command_bess(
@@ -699,7 +882,39 @@ def command_bess(
     return {"device": rt.device.name, "target": target, "dry_run": False, "writes": writes}
 
 
-def read_solis_status(client: Any, cfg: SolisConfig) -> dict[str, Any]:
+def _u16s_to_s32(values: Iterable[int]) -> int:
+    regs = list(values)
+    if len(regs) != 2:
+        raise ValueError(f"S32 decode needs exactly 2 registers, got {len(regs)}")
+    raw = (int(regs[0]) << 16) | int(regs[1])
+    if raw & 0x80000000:
+        raw -= 0x100000000
+    return raw
+
+
+def _percent_to_solis_raw(percent: float) -> int:
+    raw = int(round(float(percent) * 100.0))
+    if not 0 <= raw <= 11000:
+        raise ValueError(f"Solis active-power percentage must map to raw 0..11000, got {raw}")
+    return raw
+
+
+def _kw_to_solis_percent_raw(power_kw: float, rated_power_kw: float) -> int:
+    rated = float(rated_power_kw)
+    power = float(power_kw)
+    if rated <= 0:
+        raise ValueError("Solis rated_power_kw must be > 0")
+    if power < 0:
+        raise ValueError("Solis target power must be >= 0 kW")
+    raw = int(round((power / rated) * 10000.0))
+    if not 0 <= raw <= 11000:
+        raise ValueError(
+            f"Solis target {power} kW with rated_power_kw={rated} maps to unsupported raw {raw}"
+        )
+    return raw
+
+
+def read_solis_status(client: Any, cfg: SolisConfig, *, extended: bool = False) -> dict[str, Any]:
     if not cfg.enabled:
         return {"enabled": False}
     if not cfg.status_read_enabled:
@@ -710,6 +925,8 @@ def read_solis_status(client: Any, cfg: SolisConfig) -> dict[str, Any]:
         "transport": "raw_rtu_pyserial",
         "serial_port": cfg.serial_port,
         "unit_id": cfg.unit_id,
+        "rated_power_kw": float(cfg.rated_power_kw),
+        "normal_power_percent": float(cfg.normal_power_percent),
     }
 
     state = client.read_holding_u16(SOLIS_HOLDING_ON_OFF_REGISTER)
@@ -718,25 +935,94 @@ def read_solis_status(client: Any, cfg: SolisConfig) -> dict[str, Any]:
         value = int(state["value"])
         out["on_off_state"] = "ON" if value == SOLIS_HOLDING_ON_VALUE else "OFF" if value == SOLIS_HOLDING_OFF_VALUE else f"UNKNOWN_0x{value:04X}"
 
-    # Keep telemetry lightweight: active power is FC04 3004-3005 (S32, 1 W).
+    # Primary physical feedback: active power FC04 3004-3005, S32, 1 W.
     power = client.read_input_u16s(3004, 2)
     out["active_power"] = power
     if power.get("ok"):
-        hi, lo = [int(v) for v in power["values"]]
-        raw = (hi << 16) | lo
-        if raw & 0x80000000:
-            raw -= 0x100000000
-        out["active_power_w"] = raw
+        active_power_w = _u16s_to_s32(power["values"])
+        out["active_power_w"] = active_power_w
+        out["active_power_kw"] = round(active_power_w / 1000.0, 3)
+
+    # Current active-power percentage command. Field-validated: 11000=110%, 2000=20%.
+    pct_setting = client.read_holding_u16(SOLIS_POWER_LIMIT_PERCENT_REGISTER)
+    out["power_limit_percent_register_3051"] = pct_setting
+    if pct_setting.get("ok"):
+        raw = int(pct_setting["value"])
+        out["power_limit_percent_raw"] = raw
+        out["power_limit_percent"] = raw / 100.0
+        out["power_limit_equivalent_kw"] = round(float(cfg.rated_power_kw) * raw / 10000.0, 3)
+
+    # The mirrored percentage feedback is lightweight enough to read each cycle.
+    pct_feedback = client.read_input_u16s(SOLIS_POWER_LIMIT_PERCENT_FEEDBACK_REGISTER, 1)
+    out["power_limit_percent_feedback_3049"] = pct_feedback
+    if pct_feedback.get("ok"):
+        raw = int(pct_feedback["values"][0])
+        out["power_limit_feedback_raw"] = raw
+        out["power_limit_feedback_percent"] = raw / 100.0
+
+    if extended:
+        limited = client.read_input_u16s(SOLIS_LIMITED_POWER_FEEDBACK_REGISTER, 2)
+        out["limited_power_feedback_3044_3045"] = limited
+        if limited.get("ok"):
+            limited_w = _u16s_to_s32(limited["values"])
+            out["limited_power_feedback_w"] = limited_w
+            out["limited_power_feedback_kw"] = round(limited_w / 1000.0, 3)
+
+        switch = client.read_input_u16s(SOLIS_POWER_LIMIT_SWITCH_FEEDBACK_REGISTER, 1)
+        out["power_limit_switch_feedback_3089"] = switch
+        if switch.get("ok"):
+            out["power_limit_switch_raw"] = int(switch["values"][0])
+
+        limiting = client.read_input_u16s(SOLIS_LIMITING_STATUS_REGISTER, 1)
+        out["limiting_status_3094"] = limiting
+        if limiting.get("ok"):
+            out["limiting_status_raw"] = int(limiting["values"][0])
 
     return out
 
 
-def command_solis(client: Any, cfg: SolisConfig, target: str, *, live: bool, force: bool = False) -> dict[str, Any]:
+def _solis_power_feedback(client: Any, cfg: SolisConfig, expected_raw: int) -> dict[str, Any]:
+    """Read the field-proven command/feedback chain after a 3051 change."""
+    feedback = read_solis_status(client, cfg, extended=True)
+    pct_raw = feedback.get("power_limit_feedback_raw")
+    setting_raw = feedback.get("power_limit_percent_raw")
+    expected_w = int(round(float(cfg.rated_power_kw) * 1000.0 * expected_raw / 10000.0))
+    limited_w = feedback.get("limited_power_feedback_w")
+
+    feedback["expected_power_limit_raw"] = int(expected_raw)
+    feedback["expected_limited_power_w"] = expected_w
+    feedback["setting_verified"] = setting_raw == expected_raw
+    feedback["percentage_feedback_verified"] = pct_raw == expected_raw
+    # Allow a small reporting tolerance on the derived kW feedback.
+    feedback["limited_power_feedback_verified"] = (
+        limited_w is not None and abs(int(limited_w) - expected_w) <= max(100, int(abs(expected_w) * 0.01))
+    )
+    feedback["verified"] = bool(
+        feedback["setting_verified"] and feedback["percentage_feedback_verified"]
+    )
+    return feedback
+
+
+def command_solis(
+    client: Any,
+    cfg: SolisConfig,
+    target: str,
+    *,
+    derate_power_kw: float,
+    live: bool,
+    force: bool = False,
+) -> dict[str, Any]:
+    """Apply Solis ON/OFF plus field-validated active-power percentage control.
+
+    For ON_NORMAL and ON_DERATED the active-power setpoint is prepared BEFORE an ON
+    transition. This avoids briefly starting an inverter at the wrong power limit.
+    Holding 3069 is only checked; it is intentionally not rewritten automatically.
+    """
     if target == SOLAR_HOLD:
         return {"device": "Solis", "target": SOLAR_HOLD, "skipped": True, "reason": "hold_no_solar_command"}
     if not cfg.enabled:
         return {"device": "Solis", "enabled": False, "target": target, "skipped": True}
-    if target not in {"ON", "OFF"}:
+    if target not in {SOLAR_NORMAL, SOLAR_DERATED, SOLAR_OFF}:
         raise ValueError(f"Invalid Solis target={target}")
     if client is None:
         raise RuntimeError("Solis client not connected")
@@ -747,66 +1033,163 @@ def command_solis(client: Any, cfg: SolisConfig, target: str, *, live: bool, for
             f"Unsupported control_method={cfg.control_method}"
         )
 
-    target_value = SOLIS_HOLDING_ON_VALUE if target == "ON" else SOLIS_HOLDING_OFF_VALUE
-    before = client.read_holding_u16(SOLIS_HOLDING_ON_OFF_REGISTER)
+    writes: list[dict[str, Any]] = []
 
-    if not before.get("ok"):
+    # Solar OFF retains the previously field-validated ON/OFF implementation.
+    if target == SOLAR_OFF:
+        before = client.read_holding_u16(SOLIS_HOLDING_ON_OFF_REGISTER)
+        if not before.get("ok"):
+            if live:
+                raise RuntimeError(
+                    "Solis FC03 pre-read of holding register 3006 failed; refusing blind FC06 OFF write: "
+                    f"{before}"
+                )
+            return {
+                "device": "Solis", "target": target, "dry_run": True,
+                "method": "raw_fc06_holding_3006_with_fc03_readback",
+                "state_before": before, "warning": "pre_read_failed_no_write_in_dry_run",
+            }
+        if int(before.get("value")) == SOLIS_HOLDING_OFF_VALUE and not force:
+            return {
+                "device": "Solis", "target": target, "skipped": True,
+                "reason": "already_in_target_state", "state_before": before,
+            }
+        if not live:
+            return {
+                "device": "Solis", "target": target, "dry_run": True,
+                "method": "raw_fc06_holding_3006_with_fc03_readback",
+                "send_address": SOLIS_HOLDING_ON_OFF_REGISTER,
+                "value_hex": f"0x{SOLIS_HOLDING_OFF_VALUE:04X}", "state_before": before,
+            }
+        result = client.write_holding_u16_verified(
+            SOLIS_HOLDING_ON_OFF_REGISTER, SOLIS_HOLDING_OFF_VALUE, retries=2
+        )
+        if not result.get("ok"):
+            raise RuntimeError(
+                f"Solis OFF FC06 write was not verified by FC03 readback on register {SOLIS_HOLDING_ON_OFF_REGISTER}: {result}"
+            )
+        writes.append({
+            "kind": "on_off", "address": SOLIS_HOLDING_ON_OFF_REGISTER,
+            "value": SOLIS_HOLDING_OFF_VALUE, "value_hex": f"0x{SOLIS_HOLDING_OFF_VALUE:04X}",
+            "verified": True, "result": result,
+        })
+        return {
+            "device": "Solis", "target": target, "dry_run": False,
+            "method": "field_validated_solis_control", "writes": writes,
+            "write_result": result,
+        }
+
+    desired_raw = (
+        _percent_to_solis_raw(cfg.normal_power_percent)
+        if target == SOLAR_NORMAL
+        else _kw_to_solis_percent_raw(derate_power_kw, cfg.rated_power_kw)
+    )
+    desired_percent = desired_raw / 100.0
+    desired_kw = float(cfg.rated_power_kw) * desired_raw / 10000.0
+
+    current_limit = client.read_holding_u16(SOLIS_POWER_LIMIT_PERCENT_REGISTER)
+    if not current_limit.get("ok"):
         if live:
             raise RuntimeError(
-                "Solis FC03 pre-read of holding register 3006 failed; refusing blind FC06 write: "
-                f"{before}"
+                f"Solis FC03 pre-read of holding register {SOLIS_POWER_LIMIT_PERCENT_REGISTER} failed; "
+                f"refusing blind active-power write: {current_limit}"
             )
         return {
-            "device": "Solis",
-            "target": target,
-            "dry_run": True,
-            "method": "raw_fc06_holding_3006_with_fc03_readback",
-            "send_address": SOLIS_HOLDING_ON_OFF_REGISTER,
-            "value_hex": f"0x{target_value:04X}",
-            "state_before": before,
-            "warning": "pre_read_failed_no_write_in_dry_run",
+            "device": "Solis", "target": target, "dry_run": True,
+            "desired_power_percent_raw": desired_raw, "desired_power_percent": desired_percent,
+            "desired_power_kw": desired_kw, "power_limit_before": current_limit,
+            "warning": "power_limit_pre_read_failed_no_write_in_dry_run",
         }
 
-    if int(before.get("value")) == target_value and not force:
-        return {
-            "device": "Solis",
-            "target": target,
-            "skipped": True,
-            "reason": "already_in_target_state",
-            "method": "raw_fc06_holding_3006_with_fc03_readback",
-            "state_before": before,
-        }
+    current_raw = int(current_limit["value"])
+    need_power_write = force or current_raw != desired_raw
 
-    if not live:
-        return {
-            "device": "Solis",
-            "target": target,
-            "dry_run": True,
-            "method": "raw_fc06_holding_3006_with_fc03_readback",
-            "send_address": SOLIS_HOLDING_ON_OFF_REGISTER,
-            "value_hex": f"0x{target_value:04X}",
-            "state_before": before,
-        }
+    if need_power_write:
+        enable = client.read_holding_u16(SOLIS_POWER_CONTROL_ENABLE_REGISTER)
+        if not enable.get("ok"):
+            if live:
+                raise RuntimeError(
+                    f"Solis FC03 pre-read of active-power enable register {SOLIS_POWER_CONTROL_ENABLE_REGISTER} failed; "
+                    f"refusing blind power-limit write: {enable}"
+                )
+        elif int(enable.get("value")) != SOLIS_POWER_CONTROL_ENABLE_VALUE:
+            raise RuntimeError(
+                f"Solis active-power control is not enabled: register {SOLIS_POWER_CONTROL_ENABLE_REGISTER}="
+                f"0x{int(enable.get('value')):04X}; expected 0x{SOLIS_POWER_CONTROL_ENABLE_VALUE:04X}. "
+                "Controller will not modify this persistent setting automatically."
+            )
 
-    result = client.write_holding_u16_verified(
-        SOLIS_HOLDING_ON_OFF_REGISTER,
-        target_value,
-        retries=2,
-    )
-    if not result.get("ok"):
-        raise RuntimeError(
-            f"Solis {target} FC06 write was not verified by FC03 readback on register "
-            f"{SOLIS_HOLDING_ON_OFF_REGISTER}: {result}"
+        if not live:
+            return {
+                "device": "Solis", "target": target, "dry_run": True,
+                "method": "fc06_holding_3051_percentage_with_fc03_readback",
+                "send_address": SOLIS_POWER_LIMIT_PERCENT_REGISTER,
+                "value": desired_raw, "desired_power_percent": desired_percent,
+                "desired_power_kw": desired_kw, "power_limit_before": current_limit,
+            }
+
+        result = client.write_holding_u16_verified(
+            SOLIS_POWER_LIMIT_PERCENT_REGISTER, desired_raw, retries=2
         )
+        if not result.get("ok"):
+            raise RuntimeError(
+                f"Solis active-power FC06 write was not verified by FC03 readback on register "
+                f"{SOLIS_POWER_LIMIT_PERCENT_REGISTER}: {result}"
+            )
+        feedback = _solis_power_feedback(client, cfg, desired_raw)
+        writes.append({
+            "kind": "active_power_percent", "address": SOLIS_POWER_LIMIT_PERCENT_REGISTER,
+            "value": desired_raw, "percent": desired_percent, "equivalent_kw": desired_kw,
+            "verified": bool(result.get("readback_verified")),
+            "feedback_verified": bool(feedback.get("verified")),
+            "result": result, "feedback": feedback,
+        })
+
+    # Ensure the inverter is ON after preparing the requested active-power ceiling.
+    onoff = client.read_holding_u16(SOLIS_HOLDING_ON_OFF_REGISTER)
+    if not onoff.get("ok"):
+        if live:
+            raise RuntimeError(
+                "Solis FC03 pre-read of holding register 3006 failed; refusing blind FC06 ON write: "
+                f"{onoff}"
+            )
+    else:
+        need_on_write = force or int(onoff.get("value")) != SOLIS_HOLDING_ON_VALUE
+        if need_on_write:
+            if not live:
+                return {
+                    "device": "Solis", "target": target, "dry_run": True,
+                    "desired_power_percent_raw": desired_raw, "desired_power_percent": desired_percent,
+                    "desired_power_kw": desired_kw, "power_limit_before": current_limit,
+                    "on_off_before": onoff,
+                }
+            result = client.write_holding_u16_verified(
+                SOLIS_HOLDING_ON_OFF_REGISTER, SOLIS_HOLDING_ON_VALUE, retries=2
+            )
+            if not result.get("ok"):
+                raise RuntimeError(
+                    f"Solis ON FC06 write was not verified by FC03 readback on register {SOLIS_HOLDING_ON_OFF_REGISTER}: {result}"
+                )
+            writes.append({
+                "kind": "on_off", "address": SOLIS_HOLDING_ON_OFF_REGISTER,
+                "value": SOLIS_HOLDING_ON_VALUE, "value_hex": f"0x{SOLIS_HOLDING_ON_VALUE:04X}",
+                "verified": True, "result": result,
+            })
+
+    if not writes:
+        return {
+            "device": "Solis", "target": target, "skipped": True,
+            "reason": "already_in_target_power_mode_and_on",
+            "desired_power_percent_raw": desired_raw, "desired_power_percent": desired_percent,
+            "desired_power_kw": desired_kw, "power_limit_before": current_limit, "on_off_before": onoff,
+        }
 
     return {
-        "device": "Solis",
-        "target": target,
-        "dry_run": False,
-        "method": "raw_fc06_holding_3006_with_fc03_readback",
-        "send_address": SOLIS_HOLDING_ON_OFF_REGISTER,
-        "value_hex": f"0x{target_value:04X}",
-        "write_result": result,
+        "device": "Solis", "target": target, "dry_run": False,
+        "method": "field_validated_solis_control", "writes": writes,
+        "desired_power_percent_raw": desired_raw, "desired_power_percent": desired_percent,
+        "desired_power_kw": desired_kw,
+        "write_result": (writes[-1].get("result") if writes else None),
     }
 
 
@@ -814,7 +1197,6 @@ def build_action_plan(previous_state: str, desired_bess: dict[str, str], desired
     """Build ordered action plan: (kind, key, target)."""
     plan: list[tuple[str, str, str]] = []
 
-    # Lower cutoff is BESS safety priority. No Solis command is issued when desired_solar=HOLD.
     if desired_solar == SOLAR_HOLD:
         if previous_state == STATE_X_LOW_CUTOFF:
             order = ["X", "Y"]
@@ -827,12 +1209,13 @@ def build_action_plan(previous_state: str, desired_bess: dict[str, str], desired
                 plan.append(("bess", key, desired_bess[key]))
         return plan
 
-    # v1.8 transition: one-high -> both-high. Solar OFF first, then previously OFF BESS ON.
+    # Preserve the validated safety ordering: when both BESS hit the OFF threshold,
+    # switch solar OFF before re-enabling a BESS that was previously isolated.
     both_bess_on = desired_bess.get("X") == "ON" and desired_bess.get("Y") == "ON"
-    both_high_target = desired_solar == "OFF" and both_bess_on
+    both_high_target = desired_solar == SOLAR_OFF and both_bess_on
     if both_high_target:
         if solar_enabled:
-            plan.append(("solar", "Solis", "OFF"))
+            plan.append(("solar", "Solis", SOLAR_OFF))
         if previous_state == STATE_X_HIGH_ONLY:
             plan.append(("bess", "X", "ON"))
             plan.append(("bess", "Y", "ON"))
@@ -847,7 +1230,7 @@ def build_action_plan(previous_state: str, desired_bess: dict[str, str], desired
     for key in ("X", "Y"):
         if key in desired_bess:
             plan.append(("bess", key, desired_bess[key]))
-    if solar_enabled and desired_solar in {"ON", "OFF"}:
+    if solar_enabled and desired_solar in {SOLAR_NORMAL, SOLAR_DERATED, SOLAR_OFF}:
         plan.append(("solar", "Solis", desired_solar))
     return plan
 
@@ -881,11 +1264,11 @@ def build_operator_status(
             "dry_run": bool(action.get("dry_run", False)),
         }
         if action.get("device") == "Solis":
-            wr = action.get("write_result") or {}
+            writes = action.get("writes") or []
             item["verified"] = bool(
                 action.get("skipped")
-                or wr.get("readback_verified")
                 or not args.live
+                or (writes and all(bool(w.get("verified")) for w in writes))
             )
         else:
             writes = action.get("writes") or []
@@ -912,6 +1295,8 @@ def build_operator_status(
             "trend": controller.get("trend") or {},
         },
         "thresholds": {
+            "derate_soc_percent": float((cycle.get("control_settings") or {}).get("derate_soc_limit", args.derate_soc_limit)),
+            "derate_power_kw": float((cycle.get("control_settings") or {}).get("derate_power_kw", args.derate_power_kw)),
             "high_soc_percent": float((cycle.get("control_settings") or {}).get("high_limit", args.high_limit)),
             "recovery_soc_percent": float((cycle.get("control_settings") or {}).get("recovery_limit", args.recovery_limit)),
             "low_cutoff_enabled": bool(args.low_cutoff_enable),
@@ -934,9 +1319,31 @@ def build_operator_status(
             "enabled": bool(args.solar_enable),
             "online": solis_online,
             "state": solis_state,
-            "target_state": desired.get("solar"),
+            # Keep legacy ON/OFF target_state compatible with the existing Flutter UI.
+            "target_state": (
+                "ON" if desired.get("solar") in {SOLAR_NORMAL, SOLAR_DERATED}
+                else "OFF" if desired.get("solar") == SOLAR_OFF
+                else SOLAR_HOLD
+            ),
+            "power_mode": (
+                "DERATED" if desired.get("solar") == SOLAR_DERATED
+                else "NORMAL" if desired.get("solar") == SOLAR_NORMAL
+                else "OFF" if desired.get("solar") == SOLAR_OFF
+                else "HOLD"
+            ),
+            "target_power_kw": (
+                float((cycle.get("control_settings") or {}).get("derate_power_kw", args.derate_power_kw))
+                if desired.get("solar") == SOLAR_DERATED else None
+            ),
             "active_power_w": solis_power_w,
             "active_power_kw": round(float(solis_power_w) / 1000.0, 3) if solis_power_w is not None else None,
+            "power_limit_percent_raw": solar.get("power_limit_percent_raw"),
+            "power_limit_percent": solar.get("power_limit_percent"),
+            "power_limit_feedback_raw": solar.get("power_limit_feedback_raw"),
+            "power_limit_feedback_percent": solar.get("power_limit_feedback_percent"),
+            "power_limit_equivalent_kw": solar.get("power_limit_equivalent_kw"),
+            "limited_power_feedback_w": solar.get("limited_power_feedback_w"),
+            "limiting_status_raw": solar.get("limiting_status_raw"),
             "serial_port": args.solis_serial_port,
             "unit_id": int(args.solis_unit_id),
         },
@@ -1047,8 +1454,8 @@ def persist_operator_cycle(
             device = str(action.get("device") or "unknown")
             target = action.get("target")
             if device == "Solis":
-                wr = action.get("write_result") or {}
-                verified = bool(wr.get("readback_verified"))
+                writes = action.get("writes") or []
+                verified = bool(writes and all(bool(w.get("verified")) for w in writes))
                 monitor_append_event_safe(
                     monitor,
                     event_type="solis_command",
@@ -1059,9 +1466,10 @@ def persist_operator_cycle(
                     message=f"Solis command {target} {'verified' if verified else 'failed verification'}",
                     payload={
                         "method": action.get("method"),
-                        "send_address": action.get("send_address"),
-                        "value_hex": action.get("value_hex"),
-                        "write_result": wr,
+                        "desired_power_percent_raw": action.get("desired_power_percent_raw"),
+                        "desired_power_percent": action.get("desired_power_percent"),
+                        "desired_power_kw": action.get("desired_power_kw"),
+                        "writes": writes,
                     },
                     **common,
                 )
@@ -1079,6 +1487,23 @@ def persist_operator_cycle(
                     payload={"writes": writes},
                     **common,
                 )
+
+        if previous_available and prev_solis.get("power_mode") != solis.get("power_mode"):
+            monitor_append_event_safe(
+                monitor,
+                event_type="solis_power_mode_changed",
+                device="Solis",
+                target=solis.get("power_mode"),
+                result="observed",
+                message=f"Solis power mode changed from {prev_solis.get('power_mode')} to {solis.get('power_mode')}",
+                payload={
+                    "from_power_mode": prev_solis.get("power_mode"),
+                    "to_power_mode": solis.get("power_mode"),
+                    "target_power_kw": solis.get("target_power_kw"),
+                    "power_limit_percent": solis.get("power_limit_percent"),
+                },
+                **common,
+            )
 
         if previous_available and prev_solis.get("state") != solis.get("state"):
             monitor_append_event_safe(
@@ -1138,6 +1563,8 @@ def config_to_arg_defaults(path: str | None) -> dict[str, Any]:
         "port": 502,
         "unit_id": 1,
         "byte_order": "ABCD",
+        "derate_soc_limit": 90.0,
+        "derate_power_kw": 20.0,
         "high_limit": 98.0,
         "recovery_limit": 75.0,
         "low_cutoff_enabled": False,
@@ -1162,6 +1589,8 @@ def config_to_arg_defaults(path: str | None) -> dict[str, Any]:
         "solis_unit_id": 1,
         "solis_timeout": 3.0,
         "solis_control_method": "holding_onoff_3006",
+        "solis_rated_power_kw": 100.0,
+        "solis_normal_power_percent": 110.0,
         "no_solis_status_read": False,
         "operator_monitor_enabled": True,
         "operator_status_path": "/var/lib/nb-ems-soc-solis-controller/operator_status.json",
@@ -1191,9 +1620,13 @@ def config_to_arg_defaults(path: str | None) -> dict[str, Any]:
     defaults["solis_unit_id"] = int(solis.get("unit_id", defaults["solis_unit_id"]))
     defaults["solis_timeout"] = float(solis.get("timeout", defaults["solis_timeout"]))
     defaults["solis_control_method"] = solis.get("control_method", defaults["solis_control_method"])
+    defaults["solis_rated_power_kw"] = float(solis.get("rated_power_kw", defaults["solis_rated_power_kw"]))
+    defaults["solis_normal_power_percent"] = float(solis.get("normal_power_percent", defaults["solis_normal_power_percent"]))
     defaults["no_solis_status_read"] = not bool(solis.get("status_read_enabled", not defaults["no_solis_status_read"]))
 
     soc_logic = data.get("soc_logic", {})
+    defaults["derate_soc_limit"] = float(soc_logic.get("derate_soc_limit", defaults["derate_soc_limit"]))
+    defaults["derate_power_kw"] = float(soc_logic.get("derate_power_kw", defaults["derate_power_kw"]))
     defaults["high_limit"] = float(soc_logic.get("high_limit", defaults["high_limit"]))
     defaults["recovery_limit"] = float(soc_logic.get("recovery_limit", defaults["recovery_limit"]))
     low_enabled = bool(soc_logic.get("low_cutoff_enabled", defaults["low_cutoff_enabled"]))
@@ -1242,6 +1675,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--port", type=int, default=d["port"])
     p.add_argument("--unit-id", type=int, default=d["unit_id"])
     p.add_argument("--byte-order", default=d["byte_order"], choices=["ABCD", "BADC", "CDAB", "DCBA"])
+    p.add_argument("--derate-soc-limit", type=float, default=d["derate_soc_limit"], help="Both BESS strictly above this SOC enter solar derating")
+    p.add_argument("--derate-power-kw", type=float, default=d["derate_power_kw"], help="Solar active-power target during derating")
     p.add_argument("--high-limit", type=float, default=d["high_limit"])
     p.add_argument("--recovery-limit", type=float, default=d["recovery_limit"])
     p.add_argument("--low-cutoff-enable", action=argparse.BooleanOptionalAction, default=d["low_cutoff_enabled"], help="Enable lower SOC cutoff protection")
@@ -1267,6 +1702,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--solis-unit-id", type=int, default=d["solis_unit_id"])
     p.add_argument("--solis-timeout", type=float, default=d["solis_timeout"])
     p.add_argument("--solis-control-method", choices=["holding_onoff_3006", "holding_onoff_3007"], default=d["solis_control_method"])
+    p.add_argument("--solis-rated-power-kw", type=float, default=d["solis_rated_power_kw"], help="Rated active-power base used to convert kW derate target to register 3051 percentage")
+    p.add_argument("--solis-normal-power-percent", type=float, default=d["solis_normal_power_percent"], help="Normal/unrestricted register 3051 setting; field baseline is 110 percent")
     p.add_argument("--no-solis-status-read", action="store_true", default=d["no_solis_status_read"])
     p.add_argument("--operator-monitor-enable", action=argparse.BooleanOptionalAction, default=d["operator_monitor_enabled"], help="Publish operator status/history for the gateway API")
     p.add_argument("--operator-status-path", default=d["operator_status_path"])
@@ -1290,7 +1727,7 @@ def main() -> int:
     signal.signal(signal.SIGTERM, _handle_stop)
 
     controller_state_store = load_controller_state(args.state_file, clear=args.clear_state)
-    version = "v1.13_operator_monitor_admin_thresholds"
+    version = "v1.14_soc_solar_derate_90_98"
 
     monitor = None
     if args.operator_monitor_enable:
@@ -1319,6 +1756,8 @@ def main() -> int:
                 }), file=sys.stderr, flush=True)
 
     static_control_settings = {
+        "derate_soc_limit": float(args.derate_soc_limit),
+        "derate_power_kw": float(args.derate_power_kw),
         "high_limit": float(args.high_limit),
         "recovery_limit": float(args.recovery_limit),
         "low_cutoff_limit": float(args.low_cutoff_limit),
@@ -1372,6 +1811,8 @@ def main() -> int:
         timeout=args.solis_timeout,
         control_method=args.solis_control_method,
         status_read_enabled=not args.no_solis_status_read,
+        rated_power_kw=float(args.solis_rated_power_kw),
+        normal_power_percent=float(args.solis_normal_power_percent),
     )
     solis_client = make_solis_client(solis_cfg) if solis_cfg.enabled else None
 
@@ -1380,6 +1821,8 @@ def main() -> int:
         "event": "soc_solis_controller_started",
         "version": version,
         "mode": "LIVE_WRITES_ENABLED" if args.live else "DRY_RUN_NO_WRITES",
+        "derate_soc_limit": effective_control_settings["derate_soc_limit"],
+        "derate_power_kw": effective_control_settings["derate_power_kw"],
         "high_limit": effective_control_settings["high_limit"],
         "recovery_limit": effective_control_settings["recovery_limit"],
         "low_cutoff_enabled": args.low_cutoff_enable,
@@ -1399,6 +1842,8 @@ def main() -> int:
             "baudrate": solis_cfg.baudrate,
             "unit_id": solis_cfg.unit_id,
             "control_method": solis_cfg.control_method,
+            "rated_power_kw": solis_cfg.rated_power_kw,
+            "normal_power_percent": solis_cfg.normal_power_percent,
         },
         "optional_reset_before_on": args.enable_reset_before_on,
         "optional_offgrid_before_on": args.enable_offgrid_before_on,
@@ -1426,6 +1871,8 @@ def main() -> int:
         payload={
             "version": version,
             "mode": "LIVE" if args.live else "DRY_RUN",
+            "derate_soc_limit": effective_control_settings["derate_soc_limit"],
+            "derate_power_kw": effective_control_settings["derate_power_kw"],
             "high_limit": effective_control_settings["high_limit"],
             "recovery_limit": effective_control_settings["recovery_limit"],
             "settings_revision": control_settings_meta.get("revision"),
@@ -1471,6 +1918,7 @@ def main() -> int:
                     effective_control_settings["high_limit"],
                     effective_control_settings["recovery_limit"],
                     effective_control_settings["low_cutoff_limit"],
+                    derate_soc_limit=effective_control_settings["derate_soc_limit"],
                     low_cutoff_enabled=args.low_cutoff_enable,
                     low_recovery_limit=effective_control_settings["low_recovery_limit"],
                     controller_state=previous_state,
@@ -1494,7 +1942,11 @@ def main() -> int:
 
                 for idx, (kind, key, target) in enumerate(plan):
                     if kind == "solar":
-                        action = command_solis(solis_client, solis_cfg, target, live=args.live, force=args.force)  # type: ignore[arg-type]
+                        action = command_solis(
+                            solis_client, solis_cfg, target,
+                            derate_power_kw=effective_control_settings["derate_power_kw"],
+                            live=args.live, force=args.force,
+                        )  # type: ignore[arg-type]
                     else:
                         action = command_bess(
                             devices[key],
@@ -1519,7 +1971,7 @@ def main() -> int:
                     for a in cycle["actions"]
                 )
                 if solis_cfg.enabled and solis_client is not None and solis_write_happened:
-                    cycle["solar_status_after"] = read_solis_status(solis_client, solis_cfg)
+                    cycle["solar_status_after"] = read_solis_status(solis_client, solis_cfg, extended=True)
 
                 controller_state_store["state"] = next_state
                 controller_state_store["solar_off_reason"] = solar_off_reason

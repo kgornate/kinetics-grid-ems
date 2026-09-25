@@ -107,7 +107,17 @@ class FastBESSLoggerConfig(BaseModel):
     max_data_age_sec: float = 10.0
     cleanup_interval_sec: float = 3600.0
     log_start_stop_events: bool = True
+    publish_live_snapshot: bool = True
+    live_snapshot_path: str = "/run/nb-ems/fast_bess_live.json"
     source_asset_map: dict[str, dict[str, str]] = Field(default_factory=dict)
+
+
+class GeneralAssetLivePublisherConfig(BaseModel):
+    enabled: bool = True
+    interval_sec: float = 1.0
+    policy_manifest_path: str = "data/central_sync/canonical_signal_policy_frozen_v1_1.json"
+    live_snapshot_path: str = "/run/nb-ems/general_asset_live.json"
+    strict_contract: bool = True
 
 class ServerUploadConfig(BaseModel):
     enabled: bool = False
@@ -179,6 +189,7 @@ class AppConfig(BaseModel):
     logs_api: LogsAPIConfig = Field(default_factory=LogsAPIConfig)
     storage: StorageConfig = Field(default_factory=StorageConfig)
     fast_bess_logger: FastBESSLoggerConfig = Field(default_factory=FastBESSLoggerConfig)
+    general_asset_live_publisher: GeneralAssetLivePublisherConfig = Field(default_factory=GeneralAssetLivePublisherConfig)
     server_upload: ServerUploadConfig = Field(default_factory=ServerUploadConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
     auth: AuthConfig = Field(default_factory=AuthConfig)

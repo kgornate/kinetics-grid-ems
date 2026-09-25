@@ -26,6 +26,7 @@ class DependencyContainer:
     server_upload_service: Any | None = None
     soc_protection_controller: Any | None = None
     fast_bess_logger: Any | None = None
+    general_asset_live_publisher: Any | None = None
 
     @classmethod
     def create(cls, *, config: AppConfig, register_map: RegisterMap) -> 'DependencyContainer':
@@ -75,6 +76,16 @@ class DependencyContainer:
         if not self.fast_bess_logger:
             return {'enabled': self.config.fast_bess_logger.enabled, 'running': False}
         return self.fast_bess_logger.status()
+
+    def general_asset_live_publisher_status(self) -> dict[str, Any]:
+        if not self.general_asset_live_publisher:
+            return {
+                'enabled': self.config.general_asset_live_publisher.enabled,
+                'running': False,
+                'live_snapshot_path': self.config.general_asset_live_publisher.live_snapshot_path,
+                'policy_manifest_path': self.config.general_asset_live_publisher.policy_manifest_path,
+            }
+        return self.general_asset_live_publisher.status()
 
     def server_upload_status(self) -> dict[str, Any]:
         if not self.server_upload_service:

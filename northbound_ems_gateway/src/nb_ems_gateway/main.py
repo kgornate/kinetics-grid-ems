@@ -4,6 +4,7 @@ import asyncio
 import logging
 
 import uvicorn
+from nb_ems_gateway.api.public_http_maintenance import install_public_http_maintenance
 
 from nb_ems_gateway.api.server import create_app
 from nb_ems_gateway.app.dependency_container import DependencyContainer
@@ -15,6 +16,7 @@ from nb_ems_gateway.polling.scheduler import PollingScheduler
 from nb_ems_gateway.protocol.reader import build_readers
 from nb_ems_gateway.server_upload.uploader import ServerUploadService
 from nb_ems_gateway.storage.fast_bess_logger import FastBESSLogger
+from nb_ems_gateway.assets.general_asset_live_publisher import GeneralAssetLivePublisher
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(name)s - %(message)s')
 
@@ -37,6 +39,7 @@ async def amain() -> None:
     container.control_service = ControlService(container, readers)
     container.soc_protection_controller = SOCProtectionController(container)
     container.fast_bess_logger = FastBESSLogger(config.fast_bess_logger, container)
+    container.general_asset_live_publisher = GeneralAssetLivePublisher(config.general_asset_live_publisher, container)
     scheduler = PollingScheduler(container, readers)
     uploader = ServerUploadService(config.server_upload, container)
     container.server_upload_service = uploader
@@ -58,6 +61,7 @@ async def amain() -> None:
     print(f'  storage required mount: {config.storage.required_mount_path}')
     print(f'  telemetry historian: enabled={config.storage.telemetry_history_enabled}, mode={config.storage.store_mode}, interval={config.storage.snapshot_interval_sec}s')
     print(f'  fast BESS logger: enabled={config.fast_bess_logger.enabled}, interval={config.fast_bess_logger.interval_sec}s, profile={config.fast_bess_logger.profile_name}')
+    print(f'  general asset live publisher: enabled={config.general_asset_live_publisher.enabled}, interval={config.general_asset_live_publisher.interval_sec}s, path={config.general_asset_live_publisher.live_snapshot_path}')
     print(f'  server upload: enabled={config.server_upload.enabled}, interface={config.server_upload.network_interface}')
     print(f'  auth: enabled={config.auth.enabled}, users={len(config.auth.users)}')
     print(f'  commands: enabled={config.api.commands_enabled}')
@@ -72,11 +76,21 @@ async def amain() -> None:
         await uploader.start()
         if container.fast_bess_logger:
             await container.fast_bess_logger.start()
+        if container.general_asset_live_publisher:
+            await container.general_asset_live_publisher.start()
         await container.soc_protection_controller.start()
         app = create_app(container)
+        # Public HTTP maintenance gate.
+        # Localhost APIs remain available.
+        # Public Cloudflare HTTP is blocked only when
+        # /etc/nb_ems_block_public_http exists.
+        install_public_http_maintenance(app)
+
         main_server = uvicorn.Server(uvicorn.Config(app, host=config.api.host, port=config.api.port, log_level='info'))
+
         if config.logs_api.enabled and config.logs_api.port != config.api.port:
             logs_app = create_app(container)
+            install_public_http_maintenance(logs_app)
             logs_server = uvicorn.Server(uvicorn.Config(logs_app, host=config.logs_api.host, port=config.logs_api.port, log_level='info'))
             await asyncio.gather(main_server.serve(), logs_server.serve())
         else:
@@ -85,6 +99,8 @@ async def amain() -> None:
         await uploader.stop()
         if container.soc_protection_controller:
             await container.soc_protection_controller.stop()
+        if container.general_asset_live_publisher:
+            await container.general_asset_live_publisher.stop()
         if container.fast_bess_logger:
             await container.fast_bess_logger.stop()
         await scheduler.stop()

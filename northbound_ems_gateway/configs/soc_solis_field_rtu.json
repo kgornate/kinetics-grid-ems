@@ -21,9 +21,13 @@
     "unit_id": 1,
     "timeout": 3.0,
     "control_method": "holding_onoff_3006",
-    "status_read_enabled": true
+    "status_read_enabled": true,
+    "rated_power_kw": 100.0,
+    "normal_power_percent": 110.0
   },
   "soc_logic": {
+    "derate_soc_limit": 90.0,
+    "derate_power_kw": 20.0,
     "high_limit": 98.0,
     "recovery_limit": 75.0,
     "low_cutoff_limit": 10.0,

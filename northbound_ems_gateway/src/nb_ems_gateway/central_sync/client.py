@@ -1,90 +1,443 @@
 from __future__ import annotations
 
+import asyncio
 import gzip
 import json
+import logging
+import os
+import time
 from dataclasses import dataclass
 from typing import Any
 
 import httpx
 
-from .config import CentralBackendConfig
+
+log = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# CENTRAL_SYNC_AUTO_AUTH_V1
+#
+# Production authentication model:
+#
+# permanent:
+#   CENTRAL_SYNC_GATEWAY_CLIENT_ID
+#   CENTRAL_SYNC_GATEWAY_CLIENT_SECRET
+#
+# temporary:
+#   access_token obtained from:
+#   POST /api/v1/gateway-auth/token
+#
+# Behavior:
+# - automatically obtains token
+# - caches token only in process memory
+# - refreshes before expiration
+# - force-refreshes once on HTTP 401
+# - never crashes Central Sync because auth server is unavailable
+# - leaves outbox retry logic to uploader
+#
+# Static CENTRAL_SYNC_GATEWAY_TOKEN remains supported as fallback.
+# ---------------------------------------------------------------------------
 
 
 @dataclass
 class TransportResponse:
-    status_code: int | None
-    body: dict[str, Any] | None
-    text: str
-    retry_after_sec: float | None = None
+    status_code: int
+    body: dict[str, Any] | None = None
+    text: str = ""
     exception: str | None = None
+    retry_after_sec: float | None = None
 
     @property
     def ok(self) -> bool:
-        return self.status_code is not None and 200 <= self.status_code < 300
+        return 200 <= self.status_code < 300
 
 
 class CentralBackendClient:
-    def __init__(self, config: CentralBackendConfig, gateway_id: str) -> None:
+    TOKEN_REFRESH_MARGIN_SEC = 60.0
+
+    def __init__(self, config: Any, gateway_id: str) -> None:
         self.config = config
         self.gateway_id = gateway_id
-        transport = httpx.AsyncHTTPTransport(
-            local_address=config.source_ip,
-            verify=config.verify_tls,
-            retries=0,
-        )
-        timeout = httpx.Timeout(config.timeout_sec, connect=config.connect_timeout_sec)
-        self.client = httpx.AsyncClient(
-            transport=transport,
-            timeout=timeout,
-            headers={"User-Agent": config.user_agent},
+
+        self.base_url = str(
+            getattr(config, "base_url", "")
+        ).rstrip("/")
+
+        self.ingest_path = str(
+            getattr(config, "ingest_path", "/api/v1/ingest/batch")
         )
 
-    async def post_batch(self, json_bytes: bytes) -> TransportResponse:
-        headers = {
+        self.ingest_url = (
+            self.base_url
+            + "/"
+            + self.ingest_path.lstrip("/")
+        )
+
+        self.auth_path = os.environ.get(
+            "CENTRAL_SYNC_GATEWAY_AUTH_PATH",
+            "/api/v1/gateway-auth/token",
+        )
+
+        self.auth_url = (
+            self.base_url
+            + "/"
+            + self.auth_path.lstrip("/")
+        )
+
+        self.client_id = os.environ.get(
+            "CENTRAL_SYNC_GATEWAY_CLIENT_ID"
+        )
+
+        self.client_secret = os.environ.get(
+            "CENTRAL_SYNC_GATEWAY_CLIENT_SECRET"
+        )
+
+        configured_token = getattr(
+            config,
+            "gateway_token",
+            None,
+        )
+
+        token_env = str(
+            getattr(
+                config,
+                "gateway_token_env",
+                "CENTRAL_SYNC_GATEWAY_TOKEN",
+            )
+        )
+
+        self.static_token = (
+            configured_token
+            or os.environ.get(token_env)
+            or None
+        )
+
+        self.verify_tls = bool(
+            getattr(config, "verify_tls", True)
+        )
+
+        timeout_sec = float(
+            getattr(config, "timeout_sec", 15.0)
+        )
+
+        connect_timeout_sec = float(
+            getattr(config, "connect_timeout_sec", 5.0)
+        )
+
+        self.gzip_enabled = bool(
+            getattr(config, "gzip_enabled", False)
+        )
+
+        self.user_agent = str(
+            getattr(
+                config,
+                "user_agent",
+                "ornate-central-sync/1.0",
+            )
+        )
+
+        source_ip = getattr(config, "source_ip", None)
+
+        transport = None
+
+        if source_ip:
+            transport = httpx.AsyncHTTPTransport(
+                local_address=str(source_ip)
+            )
+
+        timeout = httpx.Timeout(
+            timeout_sec,
+            connect=connect_timeout_sec,
+        )
+
+        self.http = httpx.AsyncClient(
+            timeout=timeout,
+            verify=self.verify_tls,
+            transport=transport,
+            headers={
+                "User-Agent": self.user_agent,
+            },
+        )
+
+        self._access_token: str | None = None
+        self._token_expiry_monotonic: float = 0.0
+        self._auth_lock = asyncio.Lock()
+
+        self.auth_request_count = 0
+        self.auth_success_count = 0
+        self.auth_failure_count = 0
+        self.auth_refresh_count = 0
+        self.last_auth_error: str | None = None
+
+    # ------------------------------------------------------------------
+    # Authentication
+    # ------------------------------------------------------------------
+
+    @property
+    def dynamic_auth_available(self) -> bool:
+        return bool(
+            self.client_id
+            and self.client_secret
+        )
+
+    def _token_is_valid(self) -> bool:
+        if not self._access_token:
+            return False
+
+        return (
+            time.monotonic()
+            < self._token_expiry_monotonic
+            - self.TOKEN_REFRESH_MARGIN_SEC
+        )
+
+    async def _obtain_token(
+        self,
+        *,
+        force: bool = False,
+    ) -> str | None:
+
+        # No client credentials available: retain compatibility with
+        # the original static bearer-token mode.
+        if not self.dynamic_auth_available:
+            return self.static_token
+
+        if not force and self._token_is_valid():
+            return self._access_token
+
+        async with self._auth_lock:
+
+            # Another coroutine may have refreshed while we waited.
+            if not force and self._token_is_valid():
+                return self._access_token
+
+            self.auth_request_count += 1
+
+            try:
+                response = await self.http.post(
+                    self.auth_url,
+                    json={
+                        "client_id": self.client_id,
+                        "client_secret": self.client_secret,
+                    },
+                    headers={
+                        "Content-Type": "application/json",
+                    },
+                )
+
+            except Exception as exc:
+                self.auth_failure_count += 1
+                self.last_auth_error = (
+                    f"{type(exc).__name__}: {exc}"
+                )
+
+                log.warning(
+                    "gateway token request failed: %s",
+                    self.last_auth_error,
+                )
+
+                # If a static token exists, preserve backwards
+                # compatibility rather than failing the process.
+                return self.static_token
+
+            if response.status_code != 200:
+                self.auth_failure_count += 1
+
+                self.last_auth_error = (
+                    f"HTTP {response.status_code}: "
+                    f"{response.text[:300]}"
+                )
+
+                log.warning(
+                    "gateway authentication rejected: "
+                    "status=%s",
+                    response.status_code,
+                )
+
+                return self.static_token
+
+            try:
+                body = response.json()
+
+                token = str(body["access_token"])
+
+                expires_in = float(
+                    body.get("expires_in", 900)
+                )
+
+            except Exception as exc:
+                self.auth_failure_count += 1
+
+                self.last_auth_error = (
+                    f"invalid token response: {exc}"
+                )
+
+                log.warning(
+                    "gateway token response invalid: %s",
+                    self.last_auth_error,
+                )
+
+                return self.static_token
+
+            if not token:
+                self.auth_failure_count += 1
+                self.last_auth_error = (
+                    "empty access_token returned"
+                )
+
+                return self.static_token
+
+            # Keep a sane minimum so malformed expires_in cannot
+            # cause a tight refresh loop.
+            expires_in = max(30.0, expires_in)
+
+            self._access_token = token
+
+            self._token_expiry_monotonic = (
+                time.monotonic() + expires_in
+            )
+
+            self.auth_success_count += 1
+
+            if force:
+                self.auth_refresh_count += 1
+
+            self.last_auth_error = None
+
+            log.info(
+                "gateway access token obtained "
+                "expires_in=%.0fs",
+                expires_in,
+            )
+
+            return token
+
+    # ------------------------------------------------------------------
+    # Transport
+    # ------------------------------------------------------------------
+
+    async def _post_once(
+        self,
+        body: bytes,
+        token: str | None,
+    ) -> TransportResponse:
+
+        headers: dict[str, str] = {
             "Content-Type": "application/json",
             "Accept": "application/json",
             "X-Gateway-ID": self.gateway_id,
         }
-        token = self.config.resolved_token()
+
         if token:
-            headers["Authorization"] = f"Bearer {token}"
-        content = json_bytes
-        if self.config.gzip_enabled:
-            content = gzip.compress(json_bytes)
-            headers["Content-Encoding"] = "gzip"
-        try:
-            response = await self.client.post(self.config.ingest_url, content=content, headers=headers)
-            retry_after = _retry_after_seconds(response.headers.get("Retry-After"))
-            text = response.text[:4000]
-            body: dict[str, Any] | None = None
-            try:
-                parsed = response.json()
-                if isinstance(parsed, dict):
-                    body = parsed
-            except Exception:
-                body = None
-            return TransportResponse(
-                status_code=response.status_code,
-                body=body,
-                text=text,
-                retry_after_sec=retry_after,
+            headers["Authorization"] = (
+                f"Bearer {token}"
             )
+
+        payload = body
+
+        if self.gzip_enabled:
+            payload = gzip.compress(body)
+            headers["Content-Encoding"] = "gzip"
+
+        try:
+            response = await self.http.post(
+                self.ingest_url,
+                content=payload,
+                headers=headers,
+            )
+
         except Exception as exc:
             return TransportResponse(
-                status_code=None,
+                status_code=0,
                 body=None,
                 text="",
-                exception=f"{type(exc).__name__}: {exc}",
+                exception=(
+                    f"{type(exc).__name__}: {exc}"
+                ),
+                retry_after_sec=None,
             )
 
+        parsed: dict[str, Any] | None = None
+
+        try:
+            obj = response.json()
+
+            if isinstance(obj, dict):
+                parsed = obj
+
+        except Exception:
+            parsed = None
+
+        retry_after = _parse_retry_after(
+            response.headers.get("Retry-After")
+        )
+
+        return TransportResponse(
+            status_code=response.status_code,
+            body=parsed,
+            text=response.text,
+            exception=None,
+            retry_after_sec=retry_after,
+        )
+
+    async def post_batch(
+        self,
+        json_bytes: bytes,
+    ) -> TransportResponse:
+
+        # Normal path:
+        # get cached token or proactively refresh before expiry.
+        token = await self._obtain_token(
+            force=False
+        )
+
+        response = await self._post_once(
+            json_bytes,
+            token,
+        )
+
+        # Production recovery path:
+        # If backend rejects an access token, obtain a fresh token
+        # and retry THIS SAME batch exactly once.
+        #
+        # Do not recurse and do not retry indefinitely.
+        if (
+            response.status_code == 401
+            and self.dynamic_auth_available
+        ):
+            log.warning(
+                "ingest returned HTTP 401; "
+                "forcing gateway token refresh"
+            )
+
+            self._access_token = None
+            self._token_expiry_monotonic = 0.0
+
+            refreshed_token = await self._obtain_token(
+                force=True
+            )
+
+            # Only retry if auth actually produced some token.
+            if refreshed_token:
+                response = await self._post_once(
+                    json_bytes,
+                    refreshed_token,
+                )
+
+        return response
+
     async def close(self) -> None:
-        await self.client.aclose()
+        await self.http.aclose()
 
 
-def _retry_after_seconds(value: str | None) -> float | None:
+def _parse_retry_after(
+    value: str | None,
+) -> float | None:
+
     if not value:
         return None
+
     try:
-        return max(0.0, float(value.strip()))
+        return max(0.0, float(value))
     except Exception:
         return None

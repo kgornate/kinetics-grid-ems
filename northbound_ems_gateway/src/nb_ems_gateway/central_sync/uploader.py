@@ -262,8 +262,11 @@ class CentralSyncUploader:
             result = self.outbox.cleanup(
                 acked_retention_hours=self.config.outbox.acked_retention_hours,
                 dead_letter_retention_days=self.config.outbox.dead_letter_retention_days,
+                transport_attempt_retention_days=(
+                    self.config.outbox.transport_attempt_retention_days
+                ),
             )
-            if result["acked_deleted"] or result["dead_deleted"]:
+            if any(result.values()):
                 log.info("central sync outbox cleanup %s", result)
         await self._write_status_if_due()
 

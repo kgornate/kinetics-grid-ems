@@ -14,6 +14,8 @@ DEFAULT_SETTINGS_PATH = os.environ.get(
 )
 
 DEFAULT_CONTROL_SETTINGS: dict[str, float] = {
+    "derate_soc_limit": 90.0,
+    "derate_power_kw": 20.0,
     "high_limit": 98.0,
     "recovery_limit": 75.0,
     "low_cutoff_limit": 10.0,
@@ -32,44 +34,47 @@ def _utc_now() -> str:
 
 
 def validate_control_settings(values: dict[str, Any]) -> dict[str, float]:
-    """Validate the four SOC thresholds without changing controller semantics.
+    """Validate SOC thresholds and the PV derating power target.
 
-    Required ordering keeps the existing state machine coherent:
-        low cutoff <= low recovery <= upper recovery < upper high <= 100
+    Existing settings files from v1.13 may contain only the four legacy thresholds.
+    Missing v1.14 keys are therefore filled from DEFAULT_CONTROL_SETTINGS so an in-field
+    upgrade does not break the controller or API.
+
+    Required ordering:
+        low cutoff <= low recovery <= recovery < derate SOC < high SOC <= 100
     """
-    missing = [key for key in SETTING_KEYS if key not in values]
-    if missing:
-        raise ControllerSettingsValidationError(
-            f"Missing controller setting(s): {', '.join(missing)}"
-        )
+    merged = dict(DEFAULT_CONTROL_SETTINGS)
+    merged.update(values or {})
 
     normalized: dict[str, float] = {}
     for key in SETTING_KEYS:
         try:
-            value = float(values[key])
+            value = float(merged[key])
         except (TypeError, ValueError) as exc:
             raise ControllerSettingsValidationError(f"{key} must be numeric") from exc
-        if not 0.0 <= value <= 100.0:
-            raise ControllerSettingsValidationError(f"{key} must be between 0 and 100")
+
+        if key == "derate_power_kw":
+            if not 0.0 < value <= 100.0:
+                raise ControllerSettingsValidationError("derate_power_kw must be > 0 and <= 100 kW for this validated site")
+        else:
+            if not 0.0 <= value <= 100.0:
+                raise ControllerSettingsValidationError(f"{key} must be between 0 and 100")
         normalized[key] = value
 
     low = normalized["low_cutoff_limit"]
     low_recovery = normalized["low_recovery_limit"]
     recovery = normalized["recovery_limit"]
+    derate = normalized["derate_soc_limit"]
     high = normalized["high_limit"]
 
     if low > low_recovery:
-        raise ControllerSettingsValidationError(
-            "low_cutoff_limit must be <= low_recovery_limit"
-        )
+        raise ControllerSettingsValidationError("low_cutoff_limit must be <= low_recovery_limit")
     if low_recovery > recovery:
-        raise ControllerSettingsValidationError(
-            "low_recovery_limit must be <= recovery_limit"
-        )
-    if recovery >= high:
-        raise ControllerSettingsValidationError(
-            "recovery_limit must be lower than high_limit"
-        )
+        raise ControllerSettingsValidationError("low_recovery_limit must be <= recovery_limit")
+    if recovery >= derate:
+        raise ControllerSettingsValidationError("recovery_limit must be lower than derate_soc_limit")
+    if derate >= high:
+        raise ControllerSettingsValidationError("derate_soc_limit must be lower than high_limit")
 
     return normalized
 
@@ -87,12 +92,10 @@ class ControllerSettingsStore:
         self.path.parent.mkdir(parents=True, exist_ok=True)
 
     def ensure(self, defaults: dict[str, Any] | None = None) -> dict[str, Any]:
-        try:
-            return self.read()
-        except FileNotFoundError:
+        if not self.path.exists():
             values = validate_control_settings(defaults or DEFAULT_CONTROL_SETTINGS)
             document = {
-                "schema_version": 1,
+                "schema_version": 2,
                 "revision": 1,
                 "updated_at_utc": _utc_now(),
                 "updated_by": "controller_bootstrap",
@@ -100,6 +103,41 @@ class ControllerSettingsStore:
             }
             self._write_document(document)
             return self._response(document)
+
+        # Backward-compatible on-disk migration from the v1.13 four-setting schema.
+        try:
+            raw = json.loads(self.path.read_text(encoding="utf-8"))
+        except Exception as exc:
+            raise ControllerSettingsValidationError(
+                f"Unable to read controller settings: {exc}"
+            ) from exc
+        if not isinstance(raw, dict):
+            raise ControllerSettingsValidationError("Controller settings file is not a JSON object")
+        values_raw = raw.get("values")
+        if not isinstance(values_raw, dict):
+            raise ControllerSettingsValidationError("Controller settings file has no values object")
+
+        base = dict(DEFAULT_CONTROL_SETTINGS)
+        if defaults:
+            base.update(defaults)
+        merged = dict(base)
+        merged.update(values_raw)  # Preserve all previously configured legacy values.
+        values = validate_control_settings(merged)
+
+        schema_version = int(raw.get("schema_version", 1))
+        missing_keys = [key for key in SETTING_KEYS if key not in values_raw]
+        if schema_version < 2 or missing_keys:
+            document = {
+                "schema_version": 2,
+                "revision": max(1, int(raw.get("revision", 1))) + 1,
+                "updated_at_utc": _utc_now(),
+                "updated_by": "controller_schema_v2_migration",
+                "values": values,
+            }
+            self._write_document(document)
+            return self._response(document)
+
+        return self.read()
 
     def read(self) -> dict[str, Any]:
         if not self.path.exists():
@@ -117,7 +155,7 @@ class ControllerSettingsStore:
             raise ControllerSettingsValidationError("Controller settings file has no values object")
         values = validate_control_settings(values_raw)
         document = {
-            "schema_version": int(raw.get("schema_version", 1)),
+            "schema_version": max(1, int(raw.get("schema_version", 1))),
             "revision": max(1, int(raw.get("revision", 1))),
             "updated_at_utc": str(raw.get("updated_at_utc") or ""),
             "updated_by": str(raw.get("updated_by") or "unknown"),
@@ -160,7 +198,7 @@ class ControllerSettingsStore:
             return response
 
         document = {
-            "schema_version": 1,
+            "schema_version": 2,
             "revision": int(current.get("revision", 1)) + 1,
             "updated_at_utc": _utc_now(),
             "updated_by": str(updated_by or "internal_admin"),

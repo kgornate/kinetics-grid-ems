@@ -58,11 +58,13 @@ def test_customer_can_read_but_cannot_write_controller_settings(tmp_path, monkey
     read = client.get('/api/controller/settings', headers=headers)
     assert read.status_code == 200
     assert read.json()['settings']['high_limit'] == 98.0
+    assert read.json()['settings']['derate_soc_limit'] == 90.0
+    assert read.json()['settings']['derate_power_kw'] == 20.0
 
     write = client.patch(
         '/api/admin/controller/settings',
         headers=headers,
-        json={'high_limit': 97.0},
+        json={'high_limit': 97.0, 'derate_soc_limit': 90.0, 'derate_power_kw': 20.0},
     )
     assert write.status_code == 403
 
@@ -76,6 +78,8 @@ def test_internal_admin_can_write_controller_settings(tmp_path, monkeypatch):
         '/api/admin/controller/settings',
         headers=headers,
         json={
+            'derate_soc_limit': 91.0,
+            'derate_power_kw': 20.0,
             'high_limit': 97.0,
             'recovery_limit': 76.0,
             'low_cutoff_limit': 11.0,
@@ -88,6 +92,8 @@ def test_internal_admin_can_write_controller_settings(tmp_path, monkeypatch):
     assert data['changed'] is True
     assert data['effective'] == 'next_controller_cycle'
     assert data['settings']['high_limit'] == 97.0
+    assert data['settings']['derate_soc_limit'] == 91.0
+    assert data['settings']['derate_power_kw'] == 20.0
     assert data['settings']['low_recovery_limit'] == 15.0
 
     read = client.get('/api/controller/settings', headers=headers)

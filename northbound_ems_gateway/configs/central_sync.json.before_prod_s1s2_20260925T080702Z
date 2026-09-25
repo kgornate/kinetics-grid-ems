@@ -1,0 +1,108 @@
+{
+  "enabled": true,
+  "identity": {
+    "site_id": "unityess-site-001",
+    "gateway_id": "unityess-gw-001",
+    "schema_version": "1.0",
+    "software_version": "central-sync-g4"
+  },
+  "backend": {
+    "base_url": "https://bess-ems-api.unityess.cloud",
+    "ingest_path": "/api/v1/ingest/batch",
+    "gateway_token": null,
+    "gateway_token_env": "CENTRAL_SYNC_GATEWAY_TOKEN",
+    "verify_tls": true,
+    "timeout_sec": 15.0,
+    "connect_timeout_sec": 5.0,
+    "source_ip": null,
+    "gzip_enabled": false,
+    "user_agent": "ornate-central-sync/1.0"
+  },
+  "outbox": {
+    "path": "/mnt/ems-logs/northbound_ems_gateway/central_sync_outbox.db",
+    "required_mount_path": "/mnt/ems-logs",
+    "fail_if_mount_missing": true,
+    "acked_retention_hours": 0,
+    "dead_letter_retention_days": 30,
+    "max_db_size_mb": 1024,
+    "min_free_space_mb": 256,
+    "cleanup_interval_sec": 3600.0
+  },
+  "uploader": {
+    "scan_interval_sec": 1.0,
+    "coalescing_window_sec": 0.0,
+    "max_messages_per_request": 1,
+    "max_request_bytes": 2097152,
+    "backoff_initial_sec": 5.0,
+    "backoff_multiplier": 2.0,
+    "backoff_max_sec": 300.0,
+    "jitter_percent": 0.2,
+    "max_retry_after_sec": 600.0,
+    "status_interval_sec": 2.0,
+    "idle_sleep_sec": 0.25
+  },
+  "status_file": "/var/lib/nb-ems-central-sync/status.json",
+  "log_level": "INFO",
+  "local_gateway_api": {
+    "base_url": "http://127.0.0.1:8000",
+    "login_path": "/api/auth/login",
+    "health_path": "/api/health",
+    "username": "internal",
+    "password": null,
+    "password_env": "CENTRAL_SYNC_LOCAL_API_PASSWORD",
+    "token": null,
+    "token_env": "CENTRAL_SYNC_LOCAL_API_TOKEN",
+    "verify_tls": false,
+    "timeout_sec": 20.0,
+    "connect_timeout_sec": 2.0,
+    "user_agent": "ornate-central-sync-local/1.0"
+  },
+  "gateway_health": {
+    "enabled": false,
+    "stream": "gateway_health",
+    "substream": "gateway",
+    "poll_interval_sec": 5.0,
+    "heartbeat_interval_sec": 30.0,
+    "startup_emit": true,
+    "heartbeat_priority": "P3",
+    "transition_priority": "P1",
+    "status_file": "/var/lib/nb-ems-central-sync/gateway_health_producer_status.json"
+  },
+  "fast_bess": {
+    "enabled": true,
+    "stream": "fast_bess_telemetry",
+    "substream": "critical_pcs_bms",
+    "sample_interval_sec": 1.0,
+    "priority": "P2",
+    "live_snapshot_path": "/run/nb-ems/fast_bess_live.json",
+    "max_snapshot_age_sec": 5.0,
+    "expected_sources": [
+      "external_ems_1",
+      "external_ems_2"
+    ],
+    "expected_bess_count": 2,
+    "expected_pcs_signal_count": 28,
+    "expected_bms_signal_count": 35,
+    "strict_shape": true,
+    "status_file": "/var/lib/nb-ems-central-sync/fast_bess_producer_status.json"
+  },
+  "general_assets": {
+    "enabled": true,
+    "stream": "general_asset_telemetry",
+    "poll_interval_sec": 1.0,
+    "priority": "P3",
+    "live_snapshot_path": "/run/nb-ems/general_asset_live.json",
+    "policy_manifest_path": "data/central_sync/canonical_signal_policy_frozen_v1_1.json",
+    "max_snapshot_age_sec": 5.0,
+    "expected_sources": [
+      "external_ems_1",
+      "external_ems_2"
+    ],
+    "expected_source_count": 2,
+    "expected_asset_record_count": 18,
+    "expected_s2_canonical_count": 1350,
+    "expected_s2_runtime_count": 2700,
+    "strict_shape": true,
+    "status_file": "/var/lib/nb-ems-central-sync/general_asset_producer_status.json"
+  }
+}

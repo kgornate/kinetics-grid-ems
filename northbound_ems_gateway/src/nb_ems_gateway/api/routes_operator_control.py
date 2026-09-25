@@ -23,6 +23,8 @@ def _settings_store() -> ControllerSettingsStore:
 
 
 class ControllerSettingsPatch(BaseModel):
+    derate_soc_limit: float | None = Field(default=None, ge=0, le=100)
+    derate_power_kw: float | None = Field(default=None, gt=0, le=100)
     high_limit: float | None = Field(default=None, ge=0, le=100)
     recovery_limit: float | None = Field(default=None, ge=0, le=100)
     low_cutoff_limit: float | None = Field(default=None, ge=0, le=100)
@@ -85,7 +87,7 @@ async def update_controller_settings(
     body: ControllerSettingsPatch,
     user: CurrentUser = Depends(require_roles('internal_admin')),
 ) -> dict:
-    """Update SOC thresholds. This API is intentionally internal-admin only."""
+    """Update SOC thresholds and solar derating target. Internal-admin only."""
     patch = body.model_dump(exclude_none=True)
     if not patch:
         raise HTTPException(status_code=400, detail='At least one threshold value is required')
@@ -99,7 +101,7 @@ async def update_controller_settings(
     audit_auth_event(
         request,
         'controller_settings_update',
-        'SOC controller thresholds updated',
+        'SOC controller thresholds/derating settings updated',
         {
             'changes': result.get('changes') or {},
             'revision': result.get('revision'),
@@ -118,7 +120,7 @@ async def update_controller_settings(
                 event_type='controller_settings_changed',
                 device='Controller',
                 result='success',
-                message='SOC control thresholds changed by internal administrator',
+                message='SOC control thresholds/derating settings changed by internal administrator',
                 controller_state=ctrl.get('state'),
                 decision=ctrl.get('decision'),
                 soc_x=(bess.get('X') or {}).get('soc_percent'),
