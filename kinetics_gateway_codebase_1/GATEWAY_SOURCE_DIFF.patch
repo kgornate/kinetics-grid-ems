@@ -1,0 +1,1382 @@
+diff -ruN '--exclude=__pycache__' '--exclude=.pytest_cache' '--exclude=data' '--exclude=*.pyc' ./MULTI_PAIR_RUNTIME_V2_6.md /mnt/data/impl_work/gateway/kinetics_gateway_v2/opt/kinetics-gateway/backend/MULTI_PAIR_RUNTIME_V2_6.md
+--- ./MULTI_PAIR_RUNTIME_V2_6.md	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/impl_work/gateway/kinetics_gateway_v2/opt/kinetics-gateway/backend/MULTI_PAIR_RUNTIME_V2_6.md	2026-07-29 15:13:36.661505275 +0000
+@@ -0,0 +1,93 @@
++# Kinetics Gateway V2.6 — Multi-pair runtime monitoring
++
++## Purpose
++
++This patch allows independent Rack/PCS pairs to remain energized while another
++pair starts, ramps, or is selected in the Flutter application.
++
++The original controller already stored sequence threads, abort events, monitor
++threads, safe-stop locks, and runtime state per pair. The defect was in live
++status scheduling: when a running pair's runtime monitor needed a live fallback
++and the single global refresh lane was occupied, `global_refresh_lane_busy` was
++handled as a generic monitor exception. The generic exception path performed a
++physical safe-stop.
++
++## Corrected safety behaviour
++
++A busy refresh lane is now classified as **verification deferred**, not as a
++hardware fault.
++
++1. The runtime monitor first consumes the background BMS/PCS polling cache.
++2. When that cache is incomplete or stale, the monitor joins a fair FIFO queue
++   for the serialized live-refresh lane and waits a bounded time.
++3. Temporary lane contention or a transient live-read failure is recorded and
++   retried.
++4. If fresh verification recovers inside the grace window, the pair continues.
++5. If the pair remains unverifiable longer than the configured limit, the
++   gateway performs a fail-safe stop.
++6. Real safety violations still stop immediately: E-stop/hard fault, open BMS
++   contactors, open PCS DC breaker, BMS direction prohibition, unavailable rack
++   current limit, or a dynamic BMS limit below the active command.
++
++Default settings:
++
++```json
++{
++  "runtime_monitor_refresh_wait_seconds": 10.0,
++  "runtime_monitor_max_unverified_seconds": 30.0
++}
++```
++
++The unverified limit must be greater than or equal to the lane wait time.
++
++## New cache-only overview API
++
++```text
++GET /api/control-sequence/status/all
++```
++
++The shared live-refresh lane is still one-at-a-time, as required for the fieldbus,
++but FIFO ordering prevents a startup sequence from repeatedly jumping ahead of
++already-waiting runtime monitors.
++
++The response contains `pairs`, `by_pair_id`, and a summary of active, starting,
++and failed pairs. It never performs a direct Modbus read, so Flutter overview
++polling cannot compete with automatic sequences or safety monitoring.
++
++## Runtime observability
++
++Runtime state and diagnostics now expose:
++
++- `monitor_state`
++- `monitor_verification_deferred`
++- `monitor_unverified_since`
++- `monitor_unverified_seconds`
++- `monitor_last_warning`
++- `monitor_last_verified_at`
++- deferred-verification and recovery counters per pair
++
++Diagnostic endpoint:
++
++```text
++GET /api/diagnostics/runtime-monitor
++```
++
++## Automatic-start response
++
++HTTP 202 now explicitly means **request accepted**. It does not mean target
++power has already been reached. Completion requires the pair runtime to show
++that the automatic sequence completed and its monitor is active.
++
++## Validation included
++
++The source package includes automated tests for:
++
++- temporary refresh contention recovering without safe-stop;
++- prolonged loss of verification causing fail-safe stop;
++- cache-only all-pair overview;
++- busy refresh lane conversion into deferred verification;
++- existing control, catalog, storage, and API behaviour.
++
++This software has passed the included backend unit tests. It still requires
++low-power validation on the actual i.MX93/BMS/PCS installation before normal
++multi-pair operation.
+diff -ruN '--exclude=__pycache__' '--exclude=.pytest_cache' '--exclude=data' '--exclude=*.pyc' ./app/api/routes.py /mnt/data/impl_work/gateway/kinetics_gateway_v2/opt/kinetics-gateway/backend/app/api/routes.py
+--- ./app/api/routes.py	2026-07-28 17:45:33.000000000 +0000
++++ /mnt/data/impl_work/gateway/kinetics_gateway_v2/opt/kinetics-gateway/backend/app/api/routes.py	2026-07-29 14:59:12.781532656 +0000
+@@ -251,6 +251,12 @@
+     def control_sequence_capabilities(user: User = Depends(current_user)) -> dict[str, Any]:
+         return service.control_sequence.capabilities()
+ 
++    @router.get("/api/control-sequence/status/all")
++    def control_sequence_all_status(
++        user: User = Depends(current_user),
++    ) -> dict[str, Any]:
++        return service.control_sequence.all_pair_status()
++
+     @router.get("/api/control-sequence/{pair_id}/status")
+     def control_sequence_status(
+         pair_id: str,
+diff -ruN '--exclude=__pycache__' '--exclude=.pytest_cache' '--exclude=data' '--exclude=*.pyc' ./app/core/config.py /mnt/data/impl_work/gateway/kinetics_gateway_v2/opt/kinetics-gateway/backend/app/core/config.py
+--- ./app/core/config.py	2026-07-28 16:20:58.000000000 +0000
++++ /mnt/data/impl_work/gateway/kinetics_gateway_v2/opt/kinetics-gateway/backend/app/core/config.py	2026-07-29 14:57:26.989536009 +0000
+@@ -195,6 +195,11 @@
+     automatic_power_ramp_interval_seconds: float = 1.0
+     runtime_monitor_enabled: bool = True
+     runtime_monitor_interval_seconds: float = 1.0
++    # A runtime monitor may need a direct live confirmation when the shared
++    # background cache is stale/incomplete.  Temporary contention for the
++    # single live-refresh lane is a scheduling condition, not a hardware fault.
++    runtime_monitor_refresh_wait_seconds: float = 10.0
++    runtime_monitor_max_unverified_seconds: float = 30.0
+     validation_dc_bus_threshold_v: float = 50.0
+     require_positive_and_negative_contactors: bool = True
+     require_precharge_success: bool = True
+@@ -227,6 +232,18 @@
+             raise ValueError("automatic_power_ramp_interval_seconds must be positive")
+         if self.runtime_monitor_interval_seconds <= 0:
+             raise ValueError("runtime_monitor_interval_seconds must be positive")
++        if self.runtime_monitor_refresh_wait_seconds <= 0:
++            raise ValueError("runtime_monitor_refresh_wait_seconds must be positive")
++        if self.runtime_monitor_max_unverified_seconds <= 0:
++            raise ValueError("runtime_monitor_max_unverified_seconds must be positive")
++        if (
++            self.runtime_monitor_max_unverified_seconds
++            < self.runtime_monitor_refresh_wait_seconds
++        ):
++            raise ValueError(
++                "runtime_monitor_max_unverified_seconds must be greater than or equal "
++                "to runtime_monitor_refresh_wait_seconds"
++            )
+         if self.validation_dc_bus_threshold_v < 0:
+             raise ValueError("validation_dc_bus_threshold_v cannot be negative")
+         pair_ids = [pair.pair_id for pair in self.pairs]
+diff -ruN '--exclude=__pycache__' '--exclude=.pytest_cache' '--exclude=data' '--exclude=*.pyc' ./app/main.py /mnt/data/impl_work/gateway/kinetics_gateway_v2/opt/kinetics-gateway/backend/app/main.py
+--- ./app/main.py	2026-07-27 07:43:33.000000000 +0000
++++ /mnt/data/impl_work/gateway/kinetics_gateway_v2/opt/kinetics-gateway/backend/app/main.py	2026-07-29 14:59:24.845532274 +0000
+@@ -109,10 +109,10 @@
+ 
+ app = FastAPI(
+     title="Kinetics Gateway V2",
+-    version="2.4.0-staged-bms-pcs-control",
++    version="2.6.0-multi-pair-control",
+     description=(
+         "FRDM i.MX93 BMS/PCS gateway with unchanged BMS Modbus TCP support, four-PCS Modbus RTU/RS485, "
+-        "manual staged BMS-to-PCS control, delta WebSockets, JWT security, compressed SQLite historian and mock/hardware modes"
++        "independent multi-pair BMS-to-PCS control with contention-safe runtime monitoring, delta WebSockets, JWT security, compressed SQLite historian and mock/hardware modes"
+     ),
+     lifespan=lifespan,
+ )
+diff -ruN '--exclude=__pycache__' '--exclude=.pytest_cache' '--exclude=data' '--exclude=*.pyc' ./app/services/bms_pcs_control.py /mnt/data/impl_work/gateway/kinetics_gateway_v2/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py
+--- ./app/services/bms_pcs_control.py	2026-07-28 19:06:17.000000000 +0000
++++ /mnt/data/impl_work/gateway/kinetics_gateway_v2/opt/kinetics-gateway/backend/app/services/bms_pcs_control.py	2026-07-29 15:13:36.121505293 +0000
+@@ -4,6 +4,7 @@
+ import threading
+ import time
+ import uuid
++from collections import deque
+ from copy import deepcopy
+ from datetime import datetime, timezone
+ from typing import Any, Callable, Literal
+@@ -21,6 +22,73 @@
+     """Raised when an engineering live refresh cannot start immediately."""
+ 
+ 
++class _FairRefreshLane:
++    """One-at-a-time FIFO lane for expensive multi-device live refreshes.
++
++    Modbus RTU traffic must remain serialized, but serialization must not allow
++    a newly starting pair to repeatedly jump ahead of monitors that are already
++    waiting. Each blocking caller receives a FIFO ticket. Non-blocking
++    engineering reads never jump the queue.
++    """
++
++    def __init__(self) -> None:
++        self._condition = threading.Condition()
++        self._queue: deque[object] = deque()
++        self._active = False
++
++    def acquire(
++        self,
++        blocking: bool = True,
++        timeout: float | None = None,
++    ) -> bool:
++        with self._condition:
++            if not blocking:
++                if self._active or self._queue:
++                    return False
++                self._active = True
++                return True
++
++            ticket = object()
++            self._queue.append(ticket)
++            deadline = (
++                None
++                if timeout is None
++                else time.monotonic() + max(0.0, float(timeout))
++            )
++
++            while self._active or self._queue[0] is not ticket:
++                if deadline is None:
++                    self._condition.wait()
++                    continue
++                remaining = deadline - time.monotonic()
++                if remaining <= 0:
++                    self._queue.remove(ticket)
++                    self._condition.notify_all()
++                    return False
++                self._condition.wait(remaining)
++
++            head = self._queue.popleft()
++            if head is not ticket:
++                raise RuntimeError("Refresh-lane FIFO corruption")
++            self._active = True
++            return True
++
++    def release(self) -> None:
++        with self._condition:
++            if not self._active:
++                raise RuntimeError("Cannot release an inactive refresh lane")
++            self._active = False
++            self._condition.notify_all()
++
++    def diagnostics(self) -> dict[str, Any]:
++        with self._condition:
++            return {
++                "policy": "fifo_single_flight",
++                "active": self._active,
++                "pending_count": len(self._queue),
++            }
++
++
+ LIVE_STATUS_WAIT_TIMEOUT_SECONDS = 120.0
+ LIVE_STATUS_STALE_AFTER_SECONDS = 30.0
+ 
+@@ -99,6 +167,12 @@
+                 "cache_samples": 0,
+                 "live_fallbacks": 0,
+                 "cache_quality_failures": 0,
++                "deferred_verifications": 0,
++                "verification_recoveries": 0,
++                "consecutive_unverified_samples": 0,
++                "unverified_since": None,
++                "last_verified_at": None,
++                "last_deferred_reason": None,
+                 "safety_stops": 0,
+                 "last_sample_at": None,
+                 "last_source": None,
+@@ -117,7 +191,7 @@
+         self._status_refresh_locks: dict[str, threading.Lock] = {
+             pair.pair_id: threading.Lock() for pair in self.config.pairs
+         }
+-        self._status_refresh_global = threading.BoundedSemaphore(value=1)
++        self._status_refresh_global = _FairRefreshLane()
+         self._last_live_status: dict[str, dict[str, Any]] = {}
+         self._status_refresh_stats: dict[str, dict[str, Any]] = {
+             pair.pair_id: {
+@@ -196,13 +270,19 @@
+ 
+     @staticmethod
+     def _acquire_refresh_gate(
+-        gate: threading.Lock | threading.BoundedSemaphore,
++        gate: Any,
+         *,
+         wait: bool,
++        timeout_seconds: float | None = None,
+     ) -> bool:
+         if not wait:
+             return gate.acquire(blocking=False)
+-        return gate.acquire(timeout=LIVE_STATUS_WAIT_TIMEOUT_SECONDS)
++        timeout = (
++            LIVE_STATUS_WAIT_TIMEOUT_SECONDS
++            if timeout_seconds is None
++            else max(0.0, float(timeout_seconds))
++        )
++        return gate.acquire(timeout=timeout)
+ 
+     def _busy_live_status(
+         self,
+@@ -261,13 +341,17 @@
+         for pair_id, values in pairs.items():
+             values["pair_gate_locked"] = self._status_refresh_locks[pair_id].locked()
+             values["has_cached_live_status"] = pair_id in cached_pairs
++        global_lane = self._status_refresh_global.diagnostics()
+         return {
+-            "mode": "single_flight",
++            "mode": "fifo_single_flight",
+             "normal_status_default": "cached_runtime",
+             "global_live_refresh_limit": 1,
++            "global_live_refresh_policy": "fifo",
+             "internal_wait_timeout_seconds": LIVE_STATUS_WAIT_TIMEOUT_SECONDS,
+             "cached_busy_stale_after_seconds": LIVE_STATUS_STALE_AFTER_SECONDS,
+-            "global_active": any(item.get("active") for item in pairs.values()),
++            "global_active": global_lane["active"],
++            "global_pending_count": global_lane["pending_count"],
++            "global_lane": global_lane,
+             "pairs": pairs,
+         }
+ 
+@@ -671,6 +755,54 @@
+         pair = self._pair(pair_id)
+         return self._read_cached_runtime_status(pair_id, pair)
+ 
++    def all_pair_status(self) -> dict[str, Any]:
++        """Return one cache-only control snapshot for every enabled pair.
++
++        This endpoint is designed for Flutter/SCADA overview polling. It never
++        performs direct hardware reads, so displaying all pair states cannot
++        compete with automatic sequences or runtime safety monitoring.
++        """
++        statuses: list[dict[str, Any]] = []
++        by_pair_id: dict[str, dict[str, Any]] = {}
++        for pair in self.config.pairs:
++            if not pair.enabled:
++                continue
++            status = self._read_cached_runtime_status(pair.pair_id, pair)
++            statuses.append(status)
++            by_pair_id[pair.pair_id] = status
++
++        active_pairs = []
++        starting_pairs = []
++        failed_pairs = []
++        for status in statuses:
++            runtime = status.get("runtime", {})
++            pair_id = status.get("pair", {}).get("pair_id")
++            run_status = runtime.get("run_status")
++            commanded = abs(float(runtime.get("commanded_power_kw") or 0.0))
++            if run_status == "running":
++                starting_pairs.append(pair_id)
++            if commanded > PCS_ZERO_SETPOINT_TOLERANCE_KW:
++                active_pairs.append(pair_id)
++            if run_status in {"failed", "aborted"}:
++                failed_pairs.append(pair_id)
++
++        return {
++            "timestamp": now_iso(),
++            "source": "background_poll_cache",
++            "count": len(statuses),
++            "pairs": statuses,
++            "by_pair_id": by_pair_id,
++            "summary": {
++                "active_pair_count": len(active_pairs),
++                "active_pairs": active_pairs,
++                "starting_pair_count": len(starting_pairs),
++                "starting_pairs": starting_pairs,
++                "failed_pair_count": len(failed_pairs),
++                "failed_pairs": failed_pairs,
++                "parallel_operation_supported": True,
++            },
++        }
++
+     def runtime_monitor_diagnostics(self) -> dict[str, Any]:
+         with self._lock:
+             stats = deepcopy(self._runtime_monitor_stats)
+@@ -684,6 +816,16 @@
+             "bms_normal_poll_seconds": self.gateway_config.bms.poll_normal_seconds,
+             "pcs_poll_seconds": self.gateway_config.pcs.poll_seconds,
+             "runtime_monitor_interval_seconds": self.config.runtime_monitor_interval_seconds,
++            "runtime_monitor_refresh_wait_seconds": (
++                self.config.runtime_monitor_refresh_wait_seconds
++            ),
++            "runtime_monitor_max_unverified_seconds": (
++                self.config.runtime_monitor_max_unverified_seconds
++            ),
++            "contention_policy": (
++                "FIFO live-refresh queue plus defer/retry until unverified timeout; "
++                "do not safe-stop on global_refresh_lane_busy alone"
++            ),
+             "safe_stop_monitor_quiesce": True,
+             "active_threads": active,
+             "pairs": stats,
+@@ -694,30 +836,102 @@
+         pair_id: str,
+         pair: ControlPairConfig,
+     ) -> dict[str, Any]:
++        """Return a safety sample without treating scheduler contention as a fault.
++
++        The background cache is preferred because it is cheap and already shared
++        with the dashboard.  When the cache is stale/incomplete, the monitor asks
++        for a bounded live confirmation and waits its turn on the global refresh
++        lane.  A busy lane or transient live-read failure is reported as deferred
++        verification; the worker applies a configurable grace window before any
++        fail-safe stop.
++        """
+         cached = self._read_cached_runtime_status(pair_id, pair)
+         if not cached.get("errors"):
++            cached["runtime_verification"] = {
++                "verified": True,
++                "deferred": False,
++                "source": "background_poll_cache",
++                "verified_at": now_iso(),
++            }
+             return cached
++
+         with self._lock:
+             self._runtime_monitor_stats[pair_id]["cache_quality_failures"] += 1
+-        # A stale or incomplete background cache is never silently trusted.
+-        # Attempt one immediate direct confirmation through the Stage 3B global
+-        # single-flight lane. Do not wait behind unrelated diagnostics: if the
+-        # lane is busy or the confirmation fails, the existing monitor exception
+-        # path performs a fail-safe stop instead of leaving the pair unverified.
+-        live = self.status(
+-            pair_id,
+-            fresh=True,
+-            wait_for_refresh=False,
+-            return_cached_if_busy=False,
+-        )
++
++        try:
++            live = self.status(
++                pair_id,
++                fresh=True,
++                wait_for_refresh=True,
++                return_cached_if_busy=False,
++                refresh_wait_timeout_seconds=(
++                    self.config.runtime_monitor_refresh_wait_seconds
++                ),
++            )
++        except ControlStatusBusyError as error:
++            cached["refresh"] = {
++                **cached.get("refresh", {}),
++                "source": "runtime_verification_deferred",
++                "busy": True,
++                "busy_reason": "global_or_pair_refresh_lane_busy",
++                "verification_deferred": True,
++            }
++            cached["runtime_verification"] = {
++                "verified": False,
++                "deferred": True,
++                "reason": "refresh_lane_busy",
++                "error": str(error),
++                "requested_at": now_iso(),
++            }
++            return cached
++        except Exception as error:
++            LOGGER.warning(
++                "Runtime live verification deferred pair=%s error=%s",
++                pair_id,
++                error,
++            )
++            cached["refresh"] = {
++                **cached.get("refresh", {}),
++                "source": "runtime_live_verification_failed",
++                "busy": False,
++                "verification_deferred": True,
++            }
++            cached["runtime_verification"] = {
++                "verified": False,
++                "deferred": True,
++                "reason": "live_refresh_failed",
++                "error": str(error),
++                "requested_at": now_iso(),
++            }
++            return cached
++
+         live["refresh"] = {
+             **live.get("refresh", {}),
+             "source": "live_hardware_fallback_for_cache_quality",
+             "cache_errors": deepcopy(cached.get("errors", [])),
+-            "cache_freshness": deepcopy(cached.get("refresh", {}).get("freshness", {})),
++            "cache_freshness": deepcopy(
++                cached.get("refresh", {}).get("freshness", {})
++            ),
+         }
+         with self._lock:
+             self._runtime_monitor_stats[pair_id]["live_fallbacks"] += 1
++
++        if live.get("errors"):
++            live["refresh"]["verification_deferred"] = True
++            live["runtime_verification"] = {
++                "verified": False,
++                "deferred": True,
++                "reason": "live_refresh_returned_read_errors",
++                "errors": deepcopy(live.get("errors", [])),
++                "requested_at": now_iso(),
++            }
++        else:
++            live["runtime_verification"] = {
++                "verified": True,
++                "deferred": False,
++                "source": "live_hardware_fallback_for_cache_quality",
++                "verified_at": now_iso(),
++            }
+         return live
+ 
+     def _workflow_from_summary(self, summary: dict[str, Any], runtime: dict[str, Any]) -> dict[str, Any]:
+@@ -813,6 +1027,7 @@
+         fresh: bool = False,
+         wait_for_refresh: bool = True,
+         return_cached_if_busy: bool = False,
++        refresh_wait_timeout_seconds: float | None = None,
+     ) -> dict[str, Any]:
+         """Return cached runtime state or a bounded engineering live refresh.
+ 
+@@ -826,7 +1041,11 @@
+             return self._runtime_snapshot(pair_id)
+ 
+         pair_gate = self._status_refresh_locks[pair_id]
+-        if not self._acquire_refresh_gate(pair_gate, wait=wait_for_refresh):
++        if not self._acquire_refresh_gate(
++            pair_gate,
++            wait=wait_for_refresh,
++            timeout_seconds=refresh_wait_timeout_seconds,
++        ):
+             return self._busy_live_status(
+                 pair_id,
+                 reason="pair_refresh_in_progress",
+@@ -839,6 +1058,7 @@
+             global_acquired = self._acquire_refresh_gate(
+                 self._status_refresh_global,
+                 wait=wait_for_refresh,
++                timeout_seconds=refresh_wait_timeout_seconds,
+             )
+             if not global_acquired:
+                 return self._busy_live_status(
+@@ -2102,11 +2322,19 @@
+         response = {
+             "ok": True,
+             "accepted": True,
++            "run_status": "accepted",
++            "stage": "automatic_sequence_started",
++            "message": (
++                "Automatic request accepted. Startup, precharge, ramp and power "
++                "tracking continue asynchronously; accepted does not mean the "
++                "target power has been reached yet."
++            ),
+             "run_id": run_id,
+             "pair_id": pair_id,
+             "direction": direction,
+             "target_power_kw": target,
+             "status_endpoint": f"/api/control-sequence/{pair_id}/status?fresh=false",
++            "all_pair_status_endpoint": "/api/control-sequence/status/all",
+         }
+         self._audit(username, pair, "automatic_start", response, response)
+         return response
+@@ -2382,6 +2610,9 @@
+     def _runtime_monitor_worker(self, username: str, pair: ControlPairConfig) -> None:
+         pair_id = pair.pair_id
+         stop_event = self._monitor_stop_events[pair_id]
++        unverified_since_monotonic: float | None = None
++        unverified_since_iso: str | None = None
++
+         try:
+             while True:
+                 if stop_event.is_set():
+@@ -2397,8 +2628,128 @@
+                 # interpreting the intentionally changing contactor/limit state.
+                 if stop_event.is_set():
+                     break
+-                summary = status["summary"]
++
+                 source = status.get("refresh", {}).get("source", "unknown")
++                freshness = status.get("refresh", {}).get("freshness", {})
++                ages = {
++                    key: value.get("age_seconds")
++                    for key, value in freshness.items()
++                    if isinstance(value, dict)
++                }
++                verification = status.get("runtime_verification", {})
++                verification_deferred = bool(verification.get("deferred"))
++
++                if verification_deferred:
++                    now_monotonic = time.monotonic()
++                    if unverified_since_monotonic is None:
++                        unverified_since_monotonic = now_monotonic
++                        unverified_since_iso = now_iso()
++                        self.store.event(
++                            "runtime_monitor",
++                            f"{pair_id} runtime verification deferred",
++                            asset_id=pair.pcs_asset_id,
++                            payload={
++                                "pair_id": pair_id,
++                                "reason": verification.get("reason"),
++                                "source": source,
++                                "policy": "retry_with_grace_window",
++                            },
++                        )
++                    unverified_seconds = max(
++                        0.0, now_monotonic - unverified_since_monotonic
++                    )
++                    reason = str(
++                        verification.get("reason")
++                        or status.get("refresh", {}).get("busy_reason")
++                        or "runtime_verification_deferred"
++                    )
++                    with self._lock:
++                        stats = self._runtime_monitor_stats[pair_id]
++                        stats["samples"] += 1
++                        stats["deferred_verifications"] += 1
++                        stats["consecutive_unverified_samples"] += 1
++                        stats["unverified_since"] = unverified_since_iso
++                        stats["last_sample_at"] = now_iso()
++                        stats["last_source"] = source
++                        stats["last_cache_ages_seconds"] = ages
++                        stats["last_errors"] = deepcopy(status.get("errors", []))
++                        stats["last_violations"] = []
++                        stats["last_deferred_reason"] = reason
++
++                    self._update_runtime(
++                        pair_id,
++                        monitor_state="verification_deferred",
++                        monitor_verification_deferred=True,
++                        monitor_unverified_since=unverified_since_iso,
++                        monitor_unverified_seconds=round(unverified_seconds, 3),
++                        monitor_last_warning=reason,
++                        monitor_last_sample_at=now_iso(),
++                    )
++
++                    if (
++                        unverified_seconds
++                        < self.config.runtime_monitor_max_unverified_seconds
++                    ):
++                        if stop_event.wait(
++                            self.config.runtime_monitor_interval_seconds
++                        ):
++                            break
++                        continue
++
++                    violations = [
++                        "runtime_status_unverified_timeout",
++                        f"unverified_seconds={round(unverified_seconds, 3)}",
++                        f"reason={reason}",
++                    ]
++                    self.store.event(
++                        "runtime_monitor",
++                        f"{pair_id} safe-stop after unverified timeout",
++                        asset_id=pair.pcs_asset_id,
++                        payload={
++                            "pair_id": pair_id,
++                            "violations": violations,
++                            "max_unverified_seconds": (
++                                self.config.runtime_monitor_max_unverified_seconds
++                            ),
++                        },
++                    )
++                    stop = self._safe_stop_internal(
++                        username,
++                        pair,
++                        open_bms=True,
++                        reason=f"runtime_monitor_violation: {violations}",
++                    )
++                    with self._lock:
++                        stats = self._runtime_monitor_stats[pair_id]
++                        stats["last_violations"] = deepcopy(violations)
++                        stats["safety_stops"] += 1
++                    self._update_runtime(
++                        pair_id,
++                        stage="runtime_safety_stop",
++                        last_action="runtime_monitor",
++                        last_error=violations,
++                        run_status="failed",
++                        completed_at=now_iso(),
++                        runtime_safety_stop=stop,
++                        monitor_state="failed_unverified_timeout",
++                    )
++                    return
++
++                recovered_from_deferred = unverified_since_monotonic is not None
++                if recovered_from_deferred:
++                    self.store.event(
++                        "runtime_monitor",
++                        f"{pair_id} runtime verification recovered",
++                        asset_id=pair.pcs_asset_id,
++                        payload={
++                            "pair_id": pair_id,
++                            "source": source,
++                            "verified_at": now_iso(),
++                        },
++                    )
++                unverified_since_monotonic = None
++                unverified_since_iso = None
++                summary = status["summary"]
+                 direction_value = runtime.get("requested_direction")
+                 direction: Direction = (
+                     direction_value
+@@ -2430,30 +2781,61 @@
+                 if not bool(summary.get("pcs_dc_breaker_feedback_closed")):
+                     violations.append("pcs_dc_breaker_open")
+                 if prohibited:
+-                    violations.append(f"{direction}_prohibited_by_selected_rack_limit_or_detailed_fault")
+-                if current_limit is None or float(current_limit) < self.config.minimum_bms_current_limit_a:
++                    violations.append(
++                        f"{direction}_prohibited_by_selected_rack_limit_or_detailed_fault"
++                    )
++                if (
++                    current_limit is None
++                    or float(current_limit)
++                    < self.config.minimum_bms_current_limit_a
++                ):
+                     violations.append("selected_rack_current_limit_unavailable")
+-                if dynamic_limit is None or abs(expected_commanded) > float(dynamic_limit) + 1e-9:
++                if (
++                    dynamic_limit is None
++                    or abs(expected_commanded) > float(dynamic_limit) + 1e-9
++                ):
+                     violations.append("bms_dynamic_power_limit_below_command")
+ 
+-                freshness = status.get("refresh", {}).get("freshness", {})
+-                ages = {
+-                    key: value.get("age_seconds")
+-                    for key, value in freshness.items()
+-                    if isinstance(value, dict)
+-                }
++                verified_at = now_iso()
+                 with self._lock:
+                     stats = self._runtime_monitor_stats[pair_id]
+                     stats["samples"] += 1
+                     if source == "background_poll_cache":
+                         stats["cache_samples"] += 1
+-                    stats["last_sample_at"] = now_iso()
++                    if recovered_from_deferred:
++                        stats["verification_recoveries"] += 1
++                    stats["consecutive_unverified_samples"] = 0
++                    stats["unverified_since"] = None
++                    stats["last_verified_at"] = verified_at
++                    stats["last_deferred_reason"] = None
++                    stats["last_sample_at"] = verified_at
+                     stats["last_source"] = source
+                     stats["last_cache_ages_seconds"] = ages
+                     stats["last_errors"] = deepcopy(status.get("errors", []))
+                     stats["last_violations"] = deepcopy(violations)
+ 
++                self._update_runtime(
++                    pair_id,
++                    monitor_state="healthy",
++                    monitor_verification_deferred=False,
++                    monitor_unverified_since=None,
++                    monitor_unverified_seconds=0.0,
++                    monitor_last_warning=None,
++                    monitor_last_verified_at=verified_at,
++                    monitor_last_sample_at=verified_at,
++                )
++
+                 if violations:
++                    self.store.event(
++                        "runtime_monitor",
++                        f"{pair_id} runtime safety violation",
++                        asset_id=pair.pcs_asset_id,
++                        payload={
++                            "pair_id": pair_id,
++                            "violations": violations,
++                            "source": source,
++                        },
++                    )
+                     stop = self._safe_stop_internal(
+                         username,
+                         pair,
+@@ -2470,11 +2852,15 @@
+                         run_status="failed",
+                         completed_at=now_iso(),
+                         runtime_safety_stop=stop,
++                        monitor_state="failed_safety_violation",
+                     )
+                     return
+                 if stop_event.wait(self.config.runtime_monitor_interval_seconds):
+                     break
+         except Exception as error:
++            # Unexpected software failures remain fail-safe. Scheduler contention
++            # and transient live-read failures are handled above as deferred
++            # verification and do not arrive here.
+             LOGGER.exception("Runtime monitor failed pair=%s", pair_id)
+             try:
+                 stop = self._safe_stop_internal(
+@@ -2498,6 +2884,7 @@
+                 run_status="failed",
+                 completed_at=now_iso(),
+                 runtime_safety_stop=stop,
++                monitor_state="failed_exception",
+             )
+         finally:
+             self._update_runtime(
+@@ -2510,7 +2897,7 @@
+     def capabilities(self) -> dict[str, Any]:
+         return {
+             "controller": "field_validated_bms_pcs_sequence_controller",
+-            "version": "2.5.1",
++            "version": "2.6.0-multi-pair",
+             "enabled": self.config.enabled,
+             "full_automatic_sequence_allowed": self.config.allow_full_automatic_sequence,
+             "pairs": [pair.model_dump() for pair in self.config.pairs],
+@@ -2519,6 +2906,10 @@
+                 "automatic_start": self.config.allow_full_automatic_sequence,
+                 "runtime_monitor": self.config.runtime_monitor_enabled,
+                 "safe_stop_monitor_quiesce": True,
++                "parallel_pair_operation": True,
++                "runtime_refresh_contention_is_deferred": True,
++                "fair_fifo_live_refresh_lane": True,
++                "all_pair_cache_overview": True,
+             },
+             "validated_sequence": [
+                 "PCS stopped, Remote/PQ/constant-power, 0 kW",
+@@ -2541,6 +2932,8 @@
+                 "automatic_power_ramp_step_kw": self.config.automatic_power_ramp_step_kw,
+                 "automatic_power_ramp_interval_seconds": self.config.automatic_power_ramp_interval_seconds,
+                 "validation_dc_bus_threshold_v": self.config.validation_dc_bus_threshold_v,
++                "runtime_monitor_refresh_wait_seconds": self.config.runtime_monitor_refresh_wait_seconds,
++                "runtime_monitor_max_unverified_seconds": self.config.runtime_monitor_max_unverified_seconds,
+             },
+             "bms_registers": {
+                 "rack_enable_control": "Not used in normal EMS runtime; vendor instructed no writes to BAU 0x3005-0x3008",
+@@ -2575,6 +2968,7 @@
+             "automatic_confirmation_phrase": self.config.automatic_confirmation_phrase,
+             "api_endpoints": {
+                 "status": "GET /api/control-sequence/{pair_id}/status?fresh=false",
++                "all_pair_status": "GET /api/control-sequence/status/all",
+                 "next_step": "POST /api/control-sequence/{pair_id}/next-step",
+                 "automatic_start": "POST /api/control-sequence/{pair_id}/automatic-start",
+                 "set_power": "POST /api/control-sequence/{pair_id}/set-power",
+diff -ruN '--exclude=__pycache__' '--exclude=.pytest_cache' '--exclude=data' '--exclude=*.pyc' ./deployment/rollback_multi_pair_runtime_v2_6_on_imx93.sh /mnt/data/impl_work/gateway/kinetics_gateway_v2/opt/kinetics-gateway/backend/deployment/rollback_multi_pair_runtime_v2_6_on_imx93.sh
+--- ./deployment/rollback_multi_pair_runtime_v2_6_on_imx93.sh	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/impl_work/gateway/kinetics_gateway_v2/opt/kinetics-gateway/backend/deployment/rollback_multi_pair_runtime_v2_6_on_imx93.sh	2026-07-29 15:16:48.661499190 +0000
+@@ -0,0 +1,68 @@
++#!/bin/sh
++set -eu
++
++BACKUP=${1:-}
++CONFIRMATION=${2:-}
++REQUIRED_CONFIRMATION="ROLLBACK_MULTI_PAIR_V2_6"
++TARGET="/opt/kinetics-gateway/backend"
++CONFIG="/etc/kinetics-gateway/config.json"
++SERVICE="kinetics-gateway.service"
++
++if [ "$(id -u)" -ne 0 ]; then
++    echo "ERROR: Run this rollback as root."
++    exit 1
++fi
++
++if [ -z "$BACKUP" ] || [ ! -d "$BACKUP" ]; then
++    echo "Usage: sh $0 /root/kinetics_multi_pair_v2_6_backup_TIMESTAMP $REQUIRED_CONFIRMATION"
++    exit 2
++fi
++
++if [ "$CONFIRMATION" != "$REQUIRED_CONFIRMATION" ]; then
++    echo "No files changed."
++    echo "Confirm all four pairs are safely stopped at 0 kW, then run:"
++    echo "  sh $0 $BACKUP $REQUIRED_CONFIRMATION"
++    exit 2
++fi
++
++for FILE in \
++    app/services/bms_pcs_control.py \
++    app/core/config.py \
++    app/api/routes.py \
++    app/main.py \
++    config.json
++ do
++    if [ ! -f "$BACKUP/$FILE" ]; then
++        echo "ERROR: Backup file missing: $BACKUP/$FILE"
++        exit 1
++    fi
++ done
++
++systemctl stop "$SERVICE"
++cp -a "$BACKUP/app/services/bms_pcs_control.py" "$TARGET/app/services/"
++cp -a "$BACKUP/app/core/config.py" "$TARGET/app/core/"
++cp -a "$BACKUP/app/api/routes.py" "$TARGET/app/api/"
++cp -a "$BACKUP/app/main.py" "$TARGET/app/"
++cp -a "$BACKUP/config.json" "$CONFIG"
++if [ -d "$BACKUP/tests" ]; then
++    mkdir -p "$TARGET/tests"
++    cp -a "$BACKUP/tests/." "$TARGET/tests/"
++fi
++
++PYTHON="$TARGET/../venv/bin/python3"
++if [ ! -x "$PYTHON" ]; then
++    PYTHON=python3
++fi
++"$PYTHON" -m py_compile \
++    "$TARGET/app/services/bms_pcs_control.py" \
++    "$TARGET/app/core/config.py" \
++    "$TARGET/app/api/routes.py" \
++    "$TARGET/app/main.py"
++
++systemctl start "$SERVICE"
++sleep 8
++systemctl is-active --quiet "$SERVICE"
++
++echo "Rollback completed from: $BACKUP"
++echo "No BMS or PCS hardware command was sent by this rollback."
++systemctl status "$SERVICE" --no-pager -l | sed -n '1,24p'
+diff -ruN '--exclude=__pycache__' '--exclude=.pytest_cache' '--exclude=data' '--exclude=*.pyc' ./deployment/update_multi_pair_runtime_v2_6_on_imx93.sh /mnt/data/impl_work/gateway/kinetics_gateway_v2/opt/kinetics-gateway/backend/deployment/update_multi_pair_runtime_v2_6_on_imx93.sh
+--- ./deployment/update_multi_pair_runtime_v2_6_on_imx93.sh	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/impl_work/gateway/kinetics_gateway_v2/opt/kinetics-gateway/backend/deployment/update_multi_pair_runtime_v2_6_on_imx93.sh	2026-07-29 15:16:48.541499194 +0000
+@@ -0,0 +1,165 @@
++#!/bin/sh
++set -eu
++
++CONFIRMATION=${1:-}
++REQUIRED_CONFIRMATION="APPLY_MULTI_PAIR_V2_6"
++TARGET="/opt/kinetics-gateway/backend"
++CONFIG="/etc/kinetics-gateway/config.json"
++SERVICE="kinetics-gateway.service"
++SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
++SOURCE=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
++STAMP=$(date +%Y%m%d_%H%M%S)
++BACKUP="/root/kinetics_multi_pair_v2_6_backup_$STAMP"
++
++if [ "$(id -u)" -ne 0 ]; then
++    echo "ERROR: Run this installer as root."
++    exit 1
++fi
++
++if [ "$CONFIRMATION" != "$REQUIRED_CONFIRMATION" ]; then
++    echo "No files changed."
++    echo "Before deployment, confirm all four pairs are safely stopped at 0 kW."
++    echo "Then run:"
++    echo "  sh $0 $REQUIRED_CONFIRMATION"
++    exit 2
++fi
++
++for FILE in \
++    app/services/bms_pcs_control.py \
++    app/core/config.py \
++    app/api/routes.py \
++    app/main.py
++ do
++    if [ ! -f "$SOURCE/$FILE" ]; then
++        echo "ERROR: Patch source missing: $SOURCE/$FILE"
++        exit 1
++    fi
++ done
++
++if [ ! -d "$TARGET" ]; then
++    echo "ERROR: Gateway target does not exist: $TARGET"
++    exit 1
++fi
++
++if [ ! -f "$CONFIG" ]; then
++    echo "ERROR: Active config does not exist: $CONFIG"
++    exit 1
++fi
++
++mkdir -p "$BACKUP/app/services" "$BACKUP/app/core" "$BACKUP/app/api" "$BACKUP/tests"
++cp -a "$TARGET/app/services/bms_pcs_control.py" "$BACKUP/app/services/"
++cp -a "$TARGET/app/core/config.py" "$BACKUP/app/core/"
++cp -a "$TARGET/app/api/routes.py" "$BACKUP/app/api/"
++cp -a "$TARGET/app/main.py" "$BACKUP/app/"
++cp -a "$CONFIG" "$BACKUP/config.json"
++if [ -d "$TARGET/tests" ]; then
++    cp -a "$TARGET/tests/." "$BACKUP/tests/"
++fi
++
++DEPLOYMENT_COMPLETE=0
++
++rollback()
++{
++    set +e
++    echo "Deployment failed; restoring backup from $BACKUP"
++    cp -a "$BACKUP/app/services/bms_pcs_control.py" "$TARGET/app/services/"
++    cp -a "$BACKUP/app/core/config.py" "$TARGET/app/core/"
++    cp -a "$BACKUP/app/api/routes.py" "$TARGET/app/api/"
++    cp -a "$BACKUP/app/main.py" "$TARGET/app/"
++    cp -a "$BACKUP/config.json" "$CONFIG"
++    if [ -d "$BACKUP/tests" ]; then
++        mkdir -p "$TARGET/tests"
++        cp -a "$BACKUP/tests/." "$TARGET/tests/"
++    fi
++    systemctl restart "$SERVICE" || true
++    set -e
++}
++
++rollback_on_exit()
++{
++    RC=$?
++    trap - EXIT INT TERM HUP
++    if [ "$DEPLOYMENT_COMPLETE" -ne 1 ]; then
++        rollback
++    fi
++    exit "$RC"
++}
++trap rollback_on_exit EXIT INT TERM HUP
++
++systemctl stop "$SERVICE"
++
++cp -a "$SOURCE/app/services/bms_pcs_control.py" "$TARGET/app/services/"
++cp -a "$SOURCE/app/core/config.py" "$TARGET/app/core/"
++cp -a "$SOURCE/app/api/routes.py" "$TARGET/app/api/"
++cp -a "$SOURCE/app/main.py" "$TARGET/app/"
++if [ -d "$SOURCE/tests" ]; then
++    mkdir -p "$TARGET/tests"
++    cp -a "$SOURCE/tests/." "$TARGET/tests/"
++fi
++
++python3 - "$CONFIG" <<'PY'
++import json
++import sys
++
++path = sys.argv[1]
++with open(path, encoding="utf-8") as file:
++    config = json.load(file)
++
++control = config.setdefault("control_sequence", {})
++control.setdefault("runtime_monitor_enabled", True)
++control.setdefault("runtime_monitor_interval_seconds", 2.0)
++control["runtime_monitor_refresh_wait_seconds"] = 10.0
++control["runtime_monitor_max_unverified_seconds"] = 30.0
++
++with open(path, "w", encoding="utf-8") as file:
++    json.dump(config, file, indent=2, ensure_ascii=False)
++    file.write("\n")
++
++print({
++    "runtime_monitor_enabled": control.get("runtime_monitor_enabled"),
++    "runtime_monitor_interval_seconds": control.get("runtime_monitor_interval_seconds"),
++    "runtime_monitor_refresh_wait_seconds": control.get("runtime_monitor_refresh_wait_seconds"),
++    "runtime_monitor_max_unverified_seconds": control.get("runtime_monitor_max_unverified_seconds"),
++})
++PY
++
++PYTHON="$TARGET/../venv/bin/python3"
++if [ ! -x "$PYTHON" ]; then
++    PYTHON=python3
++fi
++
++"$PYTHON" -m py_compile \
++    "$TARGET/app/services/bms_pcs_control.py" \
++    "$TARGET/app/core/config.py" \
++    "$TARGET/app/api/routes.py" \
++    "$TARGET/app/main.py"
++
++if "$PYTHON" -m pytest --version >/dev/null 2>&1; then
++    (cd "$TARGET" && "$PYTHON" -m pytest -q tests/test_bms_pcs_control.py)
++else
++    echo "pytest is not installed in the runtime environment; syntax validation passed."
++fi
++
++systemctl start "$SERVICE"
++sleep 8
++
++if ! systemctl is-active --quiet "$SERVICE"; then
++    echo "ERROR: Gateway service did not become active."
++    exit 1
++fi
++
++DEPLOYMENT_COMPLETE=1
++trap - EXIT INT TERM HUP
++
++echo
++echo "Kinetics Gateway V2.6 multi-pair runtime patch installed."
++echo "Backup: $BACKUP"
++echo "No BMS or PCS hardware command was sent by this installer."
++echo
++echo "Key behavior:"
++echo "- global_refresh_lane_busy is deferred and retried, not treated as a hardware fault"
++echo "- a pair safe-stops only after the configured unverified timeout or a real safety violation"
++echo "- GET /api/control-sequence/status/all provides cache-only status for all enabled pairs"
++echo
++echo "Service status:"
++systemctl status "$SERVICE" --no-pager -l | sed -n '1,24p'
+diff -ruN '--exclude=__pycache__' '--exclude=.pytest_cache' '--exclude=data' '--exclude=*.pyc' ./tests/test_bms_pcs_control.py /mnt/data/impl_work/gateway/kinetics_gateway_v2/opt/kinetics-gateway/backend/tests/test_bms_pcs_control.py
+--- ./tests/test_bms_pcs_control.py	2026-07-27 08:53:00.000000000 +0000
++++ /mnt/data/impl_work/gateway/kinetics_gateway_v2/opt/kinetics-gateway/backend/tests/test_bms_pcs_control.py	2026-07-29 15:14:06.049504344 +0000
+@@ -1,5 +1,7 @@
+ from __future__ import annotations
+ 
++import threading
++import time
+ from typing import Any
+ 
+ from app.core.config import GatewayConfig, PcsDeviceConfig
+@@ -40,6 +42,10 @@
+             "irack_dsg_limit": {"value": 200.0},
+             "pre_charge_state": {"value": 3 if self.precharge else 0},
+             "start_pre_chg_operate": {"value": self.precharge},
++            "start_insulation_sampleing": {"value": 0},
++            "ir": {"value": 20000},
++            "ir_pos": {"value": 20000},
++            "ir_neg": {"value": 20000},
+             "external_level1_alarm": {"value": 0, "raw": 0, "bitfields": {}},
+             "bcu_external_lv1_alm_sum_ii": {"value": 0, "raw": 0, "bitfields": {}},
+             "rack_fault": {"value": 0, "raw": 0, "bitfields": {}},
+@@ -84,11 +90,19 @@
+     def read_point(self, asset_id: str, key: str) -> dict[str, Any]:
+         values = {
+             "dc_bus_voltage": 1389.0,
++            "battery_voltage": 1389.0,
+             "operating_state": self.state,
++            "status_word_1": {"value": 1, "raw": 1, "bitfields": {"remote_feedback": 1}},
++            "status_word_2": {"value": 0, "raw": 0, "bitfields": {"dc_breaker_state": 0}},
++            "reg_1210": {"value": 128 if self.state != 1 else 0, "raw": 128 if self.state != 1 else 0, "bitfields": {"dc_breaker_feedback": 1 if self.state != 1 else 0}},
++            "reg_121a": {"value": 0, "raw": 0, "bitfields": {"dc_soft_start_fault": 0, "dc_soft_start_relay_fault": 0}},
+             "grid_active_power": self.values["active_power_setpoint"],
+             **self.values,
+         }
+-        return {"value": values[key], "point_key": key}
++        value = values[key]
++        if isinstance(value, dict):
++            return {**value, "point_key": key}
++        return {"value": value, "point_key": key}
+ 
+     def write_point(self, asset_id: str, key: str, value: Any) -> dict[str, Any]:
+         self.values[key] = value
+@@ -120,12 +134,13 @@
+ def test_staged_sequence_happy_path() -> None:
+     service = configured_service()
+     confirm = "EXECUTE_STAGE_WRITE"
+-    assert service.precheck("pair_1", "discharge", 10.0)["ok"] is True
++    assert service.precheck("pair_1", "discharge", 10.0)["ok"] is False
+     assert service.enable_rack("internal", "pair_1", "discharge", 10.0, confirm)["ok"] is True
+     assert service.start_precharge("internal", "pair_1", confirm)["ok"] is True
+-    assert service.verify_ready("pair_1")["ok"] is True
+     assert service.configure_pcs("internal", "pair_1", confirm)["ok"] is True
+     assert service.start_pcs("internal", "pair_1", confirm)["ok"] is True
++    assert service.verify_ready("pair_1")["ok"] is True
++    assert service.precheck("pair_1", "discharge", 10.0)["ok"] is True
+     result = service.set_power("internal", "pair_1", "discharge", 10.0, confirm)
+     assert result["commanded_signed_power_kw"] == 10.0
+     assert service.verify_power("pair_1")["setpoint"]["value"] == 10.0
+@@ -146,17 +161,217 @@
+     assert result["ok"] is True
+     assert result["fault_cleared"] is True
+     assert result["stage"] == "bms_recovered"
+-    assert [action["written_value"] for action in result["actions"]] == [1, 0]
+-    assert service.bms_driver.recovery_value == 0
++    assert [action["written_value"] for action in result["actions"]] == [1]
++    assert service.bms_driver.recovery_value == 1
+ 
+ 
+-def test_bms_recovery_is_blocked_if_rack_is_enabled() -> None:
++def test_bms_recovery_is_blocked_if_contactors_are_closed() -> None:
+     service = configured_service()
+     service.bms_driver.system_fault = True
+-    service.bms_driver.rack_enabled = 1
++    service.bms_driver.precharge = 1
+     try:
+         service.recover_bms("internal", "pair_1", "EXECUTE_STAGE_WRITE")
+     except ValueError as error:
+-        assert "rack_disabled" in str(error)
++        assert "positive_contactor_open" in str(error)
+     else:
+-        raise AssertionError("Recovery should be blocked while the rack is enabled")
++        raise AssertionError("Recovery should be blocked while contactors are closed")
++
++
++def _healthy_runtime_status() -> dict[str, Any]:
++    return {
++        "summary": {
++            "contactors_ready": True,
++            "pcs_dc_breaker_feedback_closed": True,
++            "rack_charge_current_limit_a": 200.0,
++            "rack_discharge_current_limit_a": 200.0,
++            "bms_charge_power_limit_kw": 240.0,
++            "bms_discharge_power_limit_kw": 240.0,
++            "blockers": {
++                "system_charge_prohibited": False,
++                "system_discharge_prohibited": False,
++            },
++        },
++        "workflow": {"hard_blocked": False},
++        "errors": [],
++        "refresh": {"source": "background_poll_cache", "freshness": {}},
++        "runtime_verification": {
++            "verified": True,
++            "deferred": False,
++            "source": "background_poll_cache",
++        },
++    }
++
++
++def _deferred_runtime_status() -> dict[str, Any]:
++    return {
++        "summary": {},
++        "workflow": {"hard_blocked": False},
++        "errors": [{"target": "pcs", "error": "stale"}],
++        "refresh": {
++            "source": "runtime_verification_deferred",
++            "freshness": {},
++            "busy": True,
++            "busy_reason": "global_refresh_lane_busy",
++        },
++        "runtime_verification": {
++            "verified": False,
++            "deferred": True,
++            "reason": "refresh_lane_busy",
++        },
++    }
++
++
++def test_runtime_monitor_recovers_from_temporary_refresh_contention() -> None:
++    service = configured_service()
++    service.config.runtime_monitor_interval_seconds = 0.001
++    service.config.runtime_monitor_refresh_wait_seconds = 0.001
++    service.config.runtime_monitor_max_unverified_seconds = 0.1
++    service._update_runtime(
++        "pair_1",
++        commanded_power_kw=10.0,
++        requested_power_kw=10.0,
++        requested_direction="discharge",
++        run_status="success",
++    )
++
++    samples = 0
++    safe_stops: list[str] = []
++
++    def sample(pair_id: str, pair: Any) -> dict[str, Any]:
++        nonlocal samples
++        samples += 1
++        if samples <= 3:
++            return _deferred_runtime_status()
++        service._update_runtime(pair_id, commanded_power_kw=0.0)
++        return _healthy_runtime_status()
++
++    def safe_stop(*args: Any, **kwargs: Any) -> dict[str, Any]:
++        safe_stops.append(str(kwargs.get("reason")))
++        return {"ok": True}
++
++    service._runtime_monitor_status = sample  # type: ignore[method-assign]
++    service._safe_stop_internal = safe_stop  # type: ignore[method-assign]
++    service._runtime_monitor_worker("internal", service._pair("pair_1"))
++
++    assert samples >= 4
++    assert safe_stops == []
++    stats = service.runtime_monitor_diagnostics()["pairs"]["pair_1"]
++    assert stats["deferred_verifications"] >= 3
++    assert stats["verification_recoveries"] == 1
++    assert stats["safety_stops"] == 0
++
++
++def test_runtime_monitor_safe_stops_after_unverified_timeout() -> None:
++    service = configured_service()
++    service.config.runtime_monitor_interval_seconds = 0.002
++    service.config.runtime_monitor_refresh_wait_seconds = 0.001
++    service.config.runtime_monitor_max_unverified_seconds = 0.01
++    service._update_runtime(
++        "pair_1",
++        commanded_power_kw=10.0,
++        requested_power_kw=10.0,
++        requested_direction="discharge",
++        run_status="success",
++    )
++
++    safe_stops: list[str] = []
++    service._runtime_monitor_status = (  # type: ignore[method-assign]
++        lambda pair_id, pair: _deferred_runtime_status()
++    )
++
++    def safe_stop(*args: Any, **kwargs: Any) -> dict[str, Any]:
++        safe_stops.append(str(kwargs.get("reason")))
++        return {"ok": True}
++
++    service._safe_stop_internal = safe_stop  # type: ignore[method-assign]
++    service._runtime_monitor_worker("internal", service._pair("pair_1"))
++
++    assert len(safe_stops) == 1
++    assert "runtime_status_unverified_timeout" in safe_stops[0]
++    runtime = service._runtime_snapshot("pair_1")
++    assert runtime["run_status"] == "failed"
++    assert runtime["monitor_state"] == "failed_unverified_timeout"
++
++
++def test_all_pair_status_is_cache_only_and_reports_parallel_activity() -> None:
++    service = configured_service()
++    service.config.pairs[1].enabled = True
++    service._runtime["pair_1"]["commanded_power_kw"] = 10.0
++    service._runtime["pair_1"]["run_status"] = "success"
++    service._runtime["pair_2"]["run_status"] = "running"
++
++    def cached(pair_id: str, pair: Any) -> dict[str, Any]:
++        return {
++            "pair": pair.model_dump(),
++            "runtime": service._runtime_snapshot(pair_id),
++            "summary": {},
++            "workflow": {},
++            "write_gates": {},
++            "errors": [],
++            "refresh": {"source": "background_poll_cache"},
++        }
++
++    service._read_cached_runtime_status = cached  # type: ignore[method-assign]
++    result = service.all_pair_status()
++
++    assert result["count"] == 2
++    assert result["summary"]["parallel_operation_supported"] is True
++    assert result["summary"]["active_pairs"] == ["pair_1"]
++    assert result["summary"]["starting_pairs"] == ["pair_2"]
++
++
++def test_runtime_monitor_status_converts_busy_lane_to_deferred_verification() -> None:
++    from app.services.bms_pcs_control import ControlStatusBusyError
++
++    service = configured_service()
++    cached = _deferred_runtime_status()
++    service._read_cached_runtime_status = (  # type: ignore[method-assign]
++        lambda pair_id, pair: cached
++    )
++
++    def busy_status(*args: Any, **kwargs: Any) -> dict[str, Any]:
++        raise ControlStatusBusyError("global_refresh_lane_busy")
++
++    service.status = busy_status  # type: ignore[method-assign]
++    result = service._runtime_monitor_status("pair_1", service._pair("pair_1"))
++
++    assert result["runtime_verification"]["deferred"] is True
++    assert result["runtime_verification"]["reason"] == "refresh_lane_busy"
++    assert result["refresh"]["verification_deferred"] is True
++
++
++def test_global_live_refresh_lane_is_fifo() -> None:
++    from app.services.bms_pcs_control import _FairRefreshLane
++
++    lane = _FairRefreshLane()
++    assert lane.acquire(blocking=False) is True
++
++    order: list[int] = []
++    threads: list[threading.Thread] = []
++
++    def worker(value: int) -> None:
++        assert lane.acquire(timeout=1.0) is True
++        order.append(value)
++        time.sleep(0.002)
++        lane.release()
++
++    for value in (1, 2, 3):
++        thread = threading.Thread(target=worker, args=(value,))
++        thread.start()
++        threads.append(thread)
++        deadline = time.monotonic() + 1.0
++        while lane.diagnostics()["pending_count"] < value:
++            assert time.monotonic() < deadline
++            time.sleep(0.001)
++
++    lane.release()
++    for thread in threads:
++        thread.join(timeout=1.0)
++        assert not thread.is_alive()
++
++    assert order == [1, 2, 3]
++    assert lane.diagnostics() == {
++        "policy": "fifo_single_flight",
++        "active": False,
++        "pending_count": 0,
++    }
+diff -ruN '--exclude=__pycache__' '--exclude=.pytest_cache' '--exclude=data' '--exclude=*.pyc' ./tests/test_catalogs.py /mnt/data/impl_work/gateway/kinetics_gateway_v2/opt/kinetics-gateway/backend/tests/test_catalogs.py
+--- ./tests/test_catalogs.py	2026-07-25 18:26:52.000000000 +0000
++++ /mnt/data/impl_work/gateway/kinetics_gateway_v2/opt/kinetics-gateway/backend/tests/test_catalogs.py	2026-07-29 15:02:31.269526365 +0000
+@@ -16,6 +16,6 @@
+ 
+ def test_pcs_catalog_has_all_rows():
+     catalog = ProtocolCatalog.load(project_root() / "generated_protocols/pcs_catalog.json")
+-    assert len(catalog.points) == 230
+-    assert catalog.points[0]["address"] == 1
+-    assert catalog.points[-1]["address"] == 0x00E6
++    assert len(catalog.points) == 288
++    assert catalog.points[0]["address"] == 0x1100
++    assert catalog.points[-1]["address"] == 0x1634
+diff -ruN '--exclude=__pycache__' '--exclude=.pytest_cache' '--exclude=data' '--exclude=*.pyc' ./tests/test_mock_service.py /mnt/data/impl_work/gateway/kinetics_gateway_v2/opt/kinetics-gateway/backend/tests/test_mock_service.py
+--- ./tests/test_mock_service.py	2026-07-25 18:26:52.000000000 +0000
++++ /mnt/data/impl_work/gateway/kinetics_gateway_v2/opt/kinetics-gateway/backend/tests/test_mock_service.py	2026-07-29 15:01:35.301528139 +0000
+@@ -20,7 +20,7 @@
+     assert snapshot["bank"]["asset_id"] == "bms_bank"
+     assert len(snapshot["racks"]) == 4
+     assert "hvac" in snapshot["environment"]
+-    assert len(snapshot["pcs"]["telemetry"]) == 230
++    assert len(snapshot["pcs"]["telemetry"]) == 288
+     assert len(service.assets()) >= 12
+ 
+ 
+diff -ruN '--exclude=__pycache__' '--exclude=.pytest_cache' '--exclude=data' '--exclude=*.pyc' ./tests/test_scheduler_storage.py /mnt/data/impl_work/gateway/kinetics_gateway_v2/opt/kinetics-gateway/backend/tests/test_scheduler_storage.py
+--- ./tests/test_scheduler_storage.py	2026-07-25 18:26:52.000000000 +0000
++++ /mnt/data/impl_work/gateway/kinetics_gateway_v2/opt/kinetics-gateway/backend/tests/test_scheduler_storage.py	2026-07-29 15:01:35.301528139 +0000
+@@ -21,7 +21,7 @@
+     assert len(snapshot["bank"]["telemetry"]) == 155
+     assert all(len(rack["telemetry"]) == 371 for rack in snapshot["racks"])
+     assert sum(len(asset["telemetry"]) for asset in snapshot["environment"].values()) == 131
+-    assert len(snapshot["pcs"]["telemetry"]) == 230
++    assert len(snapshot["pcs"]["telemetry"]) == 288
+     for name in ("fast", "normal", "slow", "bulk", "pcs"):
+         assert snapshot["polling"][name]["count"] >= 1
+ 

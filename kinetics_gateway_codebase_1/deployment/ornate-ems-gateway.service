@@ -1,0 +1,24 @@
+[Unit]
+Description=Ornate EMS Gateway - Elecod + Lineage Phase 4 Read-Only
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/ornate-ems-gateway/backend
+EnvironmentFile=-/etc/ornate-ems-gateway/ornate-ems-gateway.env
+Environment=ORNATE_EMS_CONFIG=/etc/ornate-ems-gateway/config.json
+ExecStart=/opt/ornate-ems-gateway/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
+Restart=always
+RestartSec=5
+TimeoutStopSec=15
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+UMask=0077
+ReadWritePaths=/mnt/ems-logs/ornate-ems-gateway /opt/ornate-ems-gateway/backend/data
+
+[Install]
+WantedBy=multi-user.target

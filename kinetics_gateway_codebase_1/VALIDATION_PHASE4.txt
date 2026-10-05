@@ -1,0 +1,7 @@
+Ornate EMS Gateway Elecod + Lineage Phase 4 v0.2
+Automated regression: 69 passed, 0 failed
+Python compileall: PASS
+Phase-4 read-only commissioning CLI --help: PASS
+Phase-4 configuration: read_only, BMS writes=false, PCS writes=false, control sequence=false
+Main app import using ORNATE_EMS_CONFIG and ORNATE_EMS_* credentials: PASS
+Hardware live reads: NOT EXECUTED in build environment; site commissioning required.

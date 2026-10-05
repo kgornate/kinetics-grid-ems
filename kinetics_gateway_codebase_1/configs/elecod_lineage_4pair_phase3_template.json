@@ -1,0 +1,109 @@
+{
+  "gateway_id": "ornate_elecod_lineage_gateway_1",
+  "mode": "read_only",
+  "api_host": "0.0.0.0",
+  "api_port": 8000,
+  "telemetry_interval_seconds": 1.0,
+  "bms_catalog_file": "generated_protocols/lineage_bms_catalog.json",
+  "pcs_catalog_file": "generated_protocols/elecod_pcs_catalog.json",
+  "bms": {
+    "enabled": true,
+    "architecture": "system_rack",
+    "host": "192.0.2.10",
+    "source_ip": null,
+    "timeout_seconds": 2.0,
+    "address_offset": 0,
+    "word_order": "big",
+    "connection_mode": "shared_port",
+    "bau": {
+      "port": 502,
+      "unit_id": 1,
+      "read_function_fallback": false
+    },
+    "racks": [
+      {"rack_id": 1, "port": 502, "unit_id": 2, "read_function_fallback": false},
+      {"rack_id": 2, "port": 502, "unit_id": 3, "read_function_fallback": false},
+      {"rack_id": 3, "port": 502, "unit_id": 4, "read_function_fallback": false},
+      {"rack_id": 4, "port": 502, "unit_id": 5, "read_function_fallback": false}
+    ],
+    "power_environment": {
+      "port": 502,
+      "unit_id": 101,
+      "read_function_fallback": false
+    },
+    "max_registers_per_request": 120,
+    "max_gap_registers": 2,
+    "poll_fast_seconds": 1.0,
+    "poll_normal_seconds": 5.0,
+    "poll_slow_seconds": 60.0,
+    "poll_bulk_seconds": 30.0,
+    "include_bulk_in_live_snapshot": true,
+    "write_enabled": false
+  },
+  "pcs": {
+    "enabled": true,
+    "transport": "tcp",
+    "host": "192.0.2.20",
+    "port": 502,
+    "unit_id": 1,
+    "devices": [
+      {"asset_id": "pcs_1", "host": "192.0.2.21", "port": 502, "unit_id": 1, "enabled": true, "label": "Elecod PCS 1"},
+      {"asset_id": "pcs_2", "host": "192.0.2.22", "port": 502, "unit_id": 1, "enabled": true, "label": "Elecod PCS 2"},
+      {"asset_id": "pcs_3", "host": "192.0.2.23", "port": 502, "unit_id": 1, "enabled": true, "label": "Elecod PCS 3"},
+      {"asset_id": "pcs_4", "host": "192.0.2.24", "port": 502, "unit_id": 1, "enabled": true, "label": "Elecod PCS 4"}
+    ],
+    "timeout_seconds": 2.0,
+    "address_offset": 0,
+    "poll_seconds": 5.0,
+    "tcp_inter_request_delay_ms": 100.0,
+    "write_enabled": false,
+    "overrides_file": "configs/pcs_overrides.json",
+    "max_registers_per_request": 120,
+    "commissioning_status": "NOT_COMMISSIONED_PHASE3_TEMPLATE_REPLACE_IPS_AND_VALIDATE_SIGN_FC_FLOAT_ORDER"
+  },
+  "storage": {
+    "preferred_root": "/mnt/ems-logs/ornate-ems-gateway",
+    "preferred_mount_point": "/mnt/ems-logs",
+    "require_preferred_mount": false,
+    "fallback_root": "data",
+    "database_name": "ornate_ems_gateway.db",
+    "log_name": "ornate_ems_gateway.log",
+    "telemetry_retention_days": 90,
+    "sample_interval_seconds": 5.0,
+    "quota_gb": 25.0,
+    "quota_high_watermark_percent": 90.0,
+    "compact_history": true,
+    "compress_history": true,
+    "store_raw_when_distinct": true
+  },
+  "security": {
+    "jwt_secret_env": "ORNATE_EMS_JWT_SECRET",
+    "jwt_algorithm": "HS256",
+    "token_expiry_minutes": 720,
+    "allow_dev_default_credentials": false
+  },
+  "network": {
+    "topology": "shared_switch",
+    "field_interface": "eth1",
+    "pc_interface": "eth0",
+    "wifi_interface": "mlan0",
+    "bms_interface": "eth1",
+    "pcs_interface": "eth1",
+    "pc_api_cidr": "192.168.10.2/24",
+    "field_primary_cidr": "192.0.2.2/24",
+    "field_secondary_cidrs": []
+  },
+  "control_sequence": {
+    "enabled": false,
+    "allow_full_automatic_sequence": false,
+    "confirmation_phrase": "EXECUTE_STAGE_WRITE",
+    "automatic_confirmation_phrase": "EXECUTE_AUTOMATIC_SEQUENCE",
+    "pairs": [
+      {"pair_id": "pair_1", "rack_id": 1, "pcs_asset_id": "pcs_1", "enabled": true},
+      {"pair_id": "pair_2", "rack_id": 2, "pcs_asset_id": "pcs_2", "enabled": true},
+      {"pair_id": "pair_3", "rack_id": 3, "pcs_asset_id": "pcs_3", "enabled": true},
+      {"pair_id": "pair_4", "rack_id": 4, "pcs_asset_id": "pcs_4", "enabled": true}
+    ],
+    "require_precharge_success": false
+  }
+}

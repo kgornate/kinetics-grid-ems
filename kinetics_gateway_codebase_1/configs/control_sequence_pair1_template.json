@@ -1,0 +1,24 @@
+{
+  "enabled": false,
+  "allow_full_automatic_sequence": false,
+  "confirmation_phrase": "EXECUTE_STAGE_WRITE",
+  "pairs": [
+    {"pair_id": "pair_1", "rack_id": 1, "pcs_asset_id": "pcs_1", "enabled": true},
+    {"pair_id": "pair_2", "rack_id": 2, "pcs_asset_id": "pcs_2", "enabled": false},
+    {"pair_id": "pair_3", "rack_id": 3, "pcs_asset_id": "pcs_3", "enabled": false},
+    {"pair_id": "pair_4", "rack_id": 4, "pcs_asset_id": "pcs_4", "enabled": false}
+  ],
+  "bms_rack_voltage_min_v": 1100.0,
+  "bms_rack_voltage_max_v": 1500.0,
+  "pcs_dc_bus_voltage_min_v": 1100.0,
+  "pcs_dc_bus_voltage_max_v": 1500.0,
+  "max_abs_power_kw": 240.0,
+  "minimum_bms_current_limit_a": 0.1,
+  "enforce_dynamic_bms_power_limit": true,
+  "valid_samples_required": 3,
+  "sample_interval_seconds": 0.5,
+  "contactor_close_timeout_seconds": 10.0,
+  "pcs_start_timeout_seconds": 10.0,
+  "require_positive_and_negative_contactors": true,
+  "require_precharge_success": true
+}

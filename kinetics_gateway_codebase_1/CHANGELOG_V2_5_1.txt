@@ -1,0 +1,15 @@
+Kinetics EMS Gateway V2.5.1 — Individual Rack BCU Runtime Control
+Date: 2026-07-28
+
+- Removed normal-runtime BAU 0x3005-0x3008 indexed rack-enable/disable writes.
+- Individual Rack 1-4 startup now uses the selected BCU 0x0402 precharge command.
+- Individual-rack readiness is derived from precharge state 3 and contactor feedback.
+- BAU 0x102A rack-enable bits remain diagnostic only.
+- Safe-stop opens the selected rack with BCU 0x0402=0 and no BAU indexed disable.
+- Automatic and next-step sequences skip the obsolete BAU rack-enable stage.
+- Pair-level direction permission now uses selected-rack current limits and detailed fault words.
+- Contradictory BAU 0x1001 system_full/system_empty bits remain exposed as diagnostics.
+- Added stricter pre-power readiness checks: precharge, contactors, Remote feedback, PCS ready state, DC breaker, DC-bus validity and voltage matching.
+- Capabilities version updated to 2.5.1.
+- Added field findings and multi-pair commissioning documentation.
+- Test suite: 38 passed.

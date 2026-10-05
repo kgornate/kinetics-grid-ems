@@ -1,0 +1,504 @@
+from __future__ import annotations
+
+import json
+import os
+from pathlib import Path
+from typing import Literal
+
+from pydantic import BaseModel, Field, model_validator
+
+
+class EndpointConfig(BaseModel):
+    port: int = 503
+    unit_id: int
+    read_function_fallback: bool = True
+
+
+class RackEndpointConfig(EndpointConfig):
+    rack_id: int
+
+
+class BmsAuxEndpointConfig(EndpointConfig):
+    """One Lineage auxiliary/environment device endpoint.
+
+    V05 states that auxiliary Modbus addresses start from 101 but does not
+    define the final per-device allocation.  Keep the unit ID and category
+    mapping in configuration so commissioning can bind Temp/Humidity, water
+    sensor, chiller and dehumidifier without changing Python code.
+    """
+
+    asset_id: str
+    category: Literal["temp_humidity", "water_sensor", "chiller", "dehumidifier"]
+    enabled: bool = True
+
+    @model_validator(mode="after")
+    def validate_aux_endpoint(self) -> "BmsAuxEndpointConfig":
+        if not self.asset_id.strip():
+            raise ValueError("BMS auxiliary asset_id cannot be empty")
+        if not 1 <= self.unit_id <= 247:
+            raise ValueError("BMS auxiliary unit_id must be between 1 and 247")
+        return self
+
+
+class BmsConfig(BaseModel):
+    enabled: bool = True
+    vendor: str = "kinetics"
+    architecture: Literal["three_level", "system_rack"] = "three_level"
+    host: str = "10.30.4.13"
+    source_ip: str | None = None
+    timeout_seconds: float = 2.0
+    address_offset: int = 0
+    # Lineage V05 uses FLOAT32 values but does not state the 32-bit word order.
+    # Keep this configurable so commissioning can select big/lsw_first without
+    # changing driver code. Existing Kinetics behavior remains big-endian.
+    word_order: Literal["big", "little", "lsw_first", "cdab"] = "big"
+    connection_mode: Literal["shared_port", "separate_ports"] = "shared_port"
+    bau: EndpointConfig = Field(default_factory=lambda: EndpointConfig(port=503, unit_id=1))
+    racks: list[RackEndpointConfig] = Field(
+        default_factory=lambda: [
+            RackEndpointConfig(rack_id=1, port=503, unit_id=2),
+            RackEndpointConfig(rack_id=2, port=503, unit_id=3),
+            RackEndpointConfig(rack_id=3, port=503, unit_id=4),
+            RackEndpointConfig(rack_id=4, port=503, unit_id=5),
+        ]
+    )
+    power_environment: EndpointConfig = Field(default_factory=lambda: EndpointConfig(port=503, unit_id=127))
+    auxiliary_devices: list[BmsAuxEndpointConfig] = Field(default_factory=list)
+    poll_environment_enabled: bool = True
+    commissioning_status: str = "not_commissioned"
+    max_registers_per_request: int = 120
+    max_gap_registers: int = 2
+    poll_fast_seconds: float = 1.0
+    poll_normal_seconds: float = 5.0
+    poll_slow_seconds: float = 60.0
+    poll_bulk_seconds: float = 30.0
+    include_bulk_in_live_snapshot: bool = True
+    write_enabled: bool = False
+
+    @model_validator(mode="after")
+    def validate_bms_topology(self) -> "BmsConfig":
+        rack_ids = [rack.rack_id for rack in self.racks]
+        if len(rack_ids) != len(set(rack_ids)):
+            raise ValueError("BMS rack_id values must be unique")
+        aux_ids = [device.asset_id for device in self.auxiliary_devices if device.enabled]
+        if len(aux_ids) != len(set(aux_ids)):
+            raise ValueError("Enabled BMS auxiliary asset_id values must be unique")
+        if not 1 <= self.max_registers_per_request <= 125:
+            raise ValueError("BMS max_registers_per_request must be between 1 and 125")
+        return self
+
+
+class PcsSerialConfig(BaseModel):
+    """Shared RS485 serial-bus parameters for all configured PCS slaves."""
+
+    device: str = "/dev/pcs_rs485"
+    baudrate: int = 38400
+    bytesize: Literal[7, 8] = 8
+    parity: Literal["N", "E", "O"] = "N"
+    stopbits: Literal[1, 2] = 1
+    inter_request_delay_ms: float = 20.0
+    retries: int = 1
+
+    @model_validator(mode="after")
+    def validate_serial_settings(self) -> "PcsSerialConfig":
+        if not self.device.strip():
+            raise ValueError("PCS serial device cannot be empty")
+        if self.baudrate <= 0:
+            raise ValueError("PCS serial baudrate must be greater than zero")
+        if self.inter_request_delay_ms < 0:
+            raise ValueError("PCS inter-request delay cannot be negative")
+        if self.retries < 0:
+            raise ValueError("PCS serial retries cannot be negative")
+        return self
+
+
+class PcsDeviceConfig(BaseModel):
+    """One externally addressable PCS device.
+
+    ``host``/``port`` are optional per-device TCP overrides. They allow the same
+    frozen gateway architecture to represent four PCS units as one shared RTU
+    bus, one TCP endpoint with multiple Unit IDs, four different IP addresses,
+    or one IP with different TCP ports. Existing Kinetics configs remain valid.
+    """
+
+    asset_id: str
+    unit_id: int
+    enabled: bool = True
+    rated_power_kw: float | None = None
+    label: str | None = None
+    host: str | None = None
+    port: int | None = None
+
+    @model_validator(mode="after")
+    def validate_device(self) -> "PcsDeviceConfig":
+        if not self.asset_id.startswith("pcs_"):
+            raise ValueError("PCS asset_id must start with 'pcs_'")
+        if not 1 <= self.unit_id <= 247:
+            raise ValueError("Modbus unit_id must be between 1 and 247")
+        if self.port is not None and not 1 <= int(self.port) <= 65535:
+            raise ValueError("PCS TCP port must be between 1 and 65535")
+        if self.rated_power_kw is not None and self.rated_power_kw <= 0:
+            raise ValueError("PCS rated_power_kw must be positive when provided")
+        return self
+
+
+class PcsConfig(BaseModel):
+    """PCS settings with backward-compatible Modbus TCP and new shared-bus RTU support."""
+
+    enabled: bool = True
+    vendor: str = "kinetics"
+    transport: Literal["tcp", "rtu"] = "tcp"
+
+    # Legacy/current TCP fields are intentionally retained so the existing
+    # working configuration keeps loading without modification.
+    host: str = "0.0.0.0"
+    source_ip: str | None = None
+    port: int = 502
+    unit_id: int = 1
+
+    serial: PcsSerialConfig = Field(default_factory=PcsSerialConfig)
+    devices: list[PcsDeviceConfig] = Field(default_factory=list)
+    timeout_seconds: float = 2.0
+    address_offset: int = 0
+    poll_seconds: float = 5.0
+    # Elecod V2.7.0 requires >=100 ms between communication frames. Default 0
+    # preserves Kinetics behavior; the Elecod config template sets 100 ms.
+    tcp_inter_request_delay_ms: float = 0.0
+    write_enabled: bool = False
+    overrides_file: str = "configs/pcs_overrides.json"
+    max_registers_per_request: int = 120
+    commissioning_status: str = "pcs1_readonly_hardware_validated_2026_07_27"
+    power_sign_validated: bool = False
+    positive_power_is_discharge: bool = True
+
+    @model_validator(mode="after")
+    def validate_and_expand_devices(self) -> "PcsConfig":
+        # Preserve the old one-PCS configuration shape. Existing configs that
+        # have only unit_id continue to expose pcs_1 exactly as before.
+        if not self.devices:
+            self.devices = [PcsDeviceConfig(asset_id="pcs_1", unit_id=self.unit_id, enabled=True)]
+
+        asset_ids = [device.asset_id for device in self.devices]
+        if len(asset_ids) != len(set(asset_ids)):
+            raise ValueError("PCS asset_id values must be unique")
+
+        enabled_devices = [device for device in self.devices if device.enabled]
+        if self.transport == "rtu":
+            # RTU devices share one serial bus, therefore slave IDs must be unique.
+            unit_ids = [device.unit_id for device in enabled_devices]
+            if len(unit_ids) != len(set(unit_ids)):
+                raise ValueError("Enabled PCS unit_id values must be unique on one shared RTU bus")
+        else:
+            # On TCP, the Modbus Unit ID is scoped to a TCP endpoint.  This
+            # permits four physical PCS units on different IPs (or ports) to
+            # all use Unit ID 1, while still rejecting duplicate routes to the
+            # same endpoint/unit tuple.
+            routes = [
+                (device.host or self.host, int(device.port or self.port), device.unit_id)
+                for device in enabled_devices
+            ]
+            if len(routes) != len(set(routes)):
+                raise ValueError("Enabled PCS TCP host/port/unit routes must be unique")
+        if not 1 <= self.max_registers_per_request <= 125:
+            raise ValueError("PCS max_registers_per_request must be between 1 and 125")
+        if self.timeout_seconds <= 0:
+            raise ValueError("PCS timeout_seconds must be greater than zero")
+        if self.poll_seconds <= 0:
+            raise ValueError("PCS poll_seconds must be greater than zero")
+        if self.tcp_inter_request_delay_ms < 0:
+            raise ValueError("PCS tcp_inter_request_delay_ms cannot be negative")
+        return self
+
+    @property
+    def primary_device(self) -> PcsDeviceConfig:
+        return self.devices[0]
+
+    @property
+    def enabled_devices(self) -> list[PcsDeviceConfig]:
+        return [device for device in self.devices if device.enabled]
+
+
+class ControlPairConfig(BaseModel):
+    pair_id: str
+    rack_id: int
+    pcs_asset_id: str
+    enabled: bool = True
+
+    @model_validator(mode="after")
+    def validate_pair(self) -> "ControlPairConfig":
+        if self.rack_id < 1:
+            raise ValueError("Control pair rack_id must be >= 1")
+        if not self.pcs_asset_id.startswith("pcs_"):
+            raise ValueError("Control pair pcs_asset_id must start with 'pcs_'")
+        return self
+
+
+class ControlSequenceConfig(BaseModel):
+    """Guarded field-validated BMS-to-PCS controller.
+
+    Hardware writes require Gateway mode ``control_enabled`` plus both BMS/PCS
+    write gates. Full automatic sequencing has a separate enable flag and a
+    separate confirmation phrase from commissioning-stage writes.
+    """
+
+    enabled: bool = False
+    allow_full_automatic_sequence: bool = False
+    confirmation_phrase: str = "EXECUTE_STAGE_WRITE"
+    automatic_confirmation_phrase: str = "EXECUTE_AUTOMATIC_SEQUENCE"
+    pairs: list[ControlPairConfig] = Field(
+        default_factory=lambda: [
+            ControlPairConfig(pair_id="pair_1", rack_id=1, pcs_asset_id="pcs_1", enabled=True),
+            ControlPairConfig(pair_id="pair_2", rack_id=2, pcs_asset_id="pcs_2", enabled=False),
+            ControlPairConfig(pair_id="pair_3", rack_id=3, pcs_asset_id="pcs_3", enabled=False),
+            ControlPairConfig(pair_id="pair_4", rack_id=4, pcs_asset_id="pcs_4", enabled=False),
+        ]
+    )
+    bms_rack_voltage_min_v: float = 1100.0
+    bms_rack_voltage_max_v: float = 1500.0
+    pcs_dc_bus_voltage_min_v: float = 1100.0
+    pcs_dc_bus_voltage_max_v: float = 1500.0
+    max_abs_power_kw: float = 240.0
+    minimum_bms_current_limit_a: float = 0.1
+    enforce_dynamic_bms_power_limit: bool = True
+    valid_samples_required: int = 3
+    sample_interval_seconds: float = 0.5
+    contactor_close_timeout_seconds: float = 10.0
+    pcs_start_timeout_seconds: float = 10.0
+    automatic_stage_timeout_seconds: float = 20.0
+    power_tracking_timeout_seconds: float = 15.0
+    safe_stop_timeout_seconds: float = 15.0
+    ready_voltage_match_tolerance_v: float = 75.0
+    power_tracking_tolerance_kw: float = 5.0
+    automatic_power_ramp_step_kw: float = 10.0
+    automatic_power_ramp_interval_seconds: float = 1.0
+    # Field-proven BAU 0x3001 command values. These remain configurable so a
+    # future BMS firmware variant can be adapted without changing Python code.
+    bau_connect_value: int = 1
+    bau_disconnect_value: int = 0
+    # Automatic requests are bounded to the configured four pair records. A
+    # single FIFO startup lane prevents simultaneous heavy precharge/PCS-start
+    # workflows from congesting the shared PCS RTU bus.
+    automatic_executor_workers: int = 4
+    runtime_monitor_enabled: bool = True
+    runtime_monitor_interval_seconds: float = 1.0
+    # A runtime monitor may need a direct live confirmation when the shared
+    # background cache is stale/incomplete.  Temporary contention for the
+    # single live-refresh lane is a scheduling condition, not a hardware fault.
+    runtime_monitor_refresh_wait_seconds: float = 5.0
+    runtime_monitor_max_unverified_seconds: float = 25.0
+    runtime_monitor_max_consecutive_unverified_samples: int = 3
+    validation_dc_bus_threshold_v: float = 50.0
+    require_positive_and_negative_contactors: bool = True
+    require_precharge_success: bool = True
+
+    @model_validator(mode="after")
+    def validate_control_sequence(self) -> "ControlSequenceConfig":
+        if self.bms_rack_voltage_min_v >= self.bms_rack_voltage_max_v:
+            raise ValueError("BMS rack voltage minimum must be below maximum")
+        if self.pcs_dc_bus_voltage_min_v >= self.pcs_dc_bus_voltage_max_v:
+            raise ValueError("PCS DC-bus voltage minimum must be below maximum")
+        if self.max_abs_power_kw <= 0:
+            raise ValueError("Maximum absolute power must be positive")
+        if self.valid_samples_required < 1:
+            raise ValueError("valid_samples_required must be >= 1")
+        if self.sample_interval_seconds <= 0:
+            raise ValueError("sample_interval_seconds must be positive")
+        if self.automatic_stage_timeout_seconds <= 0:
+            raise ValueError("automatic_stage_timeout_seconds must be positive")
+        if self.power_tracking_timeout_seconds <= 0:
+            raise ValueError("power_tracking_timeout_seconds must be positive")
+        if self.safe_stop_timeout_seconds <= 0:
+            raise ValueError("safe_stop_timeout_seconds must be positive")
+        if self.ready_voltage_match_tolerance_v <= 0:
+            raise ValueError("ready_voltage_match_tolerance_v must be positive")
+        if self.power_tracking_tolerance_kw <= 0:
+            raise ValueError("power_tracking_tolerance_kw must be positive")
+        if self.automatic_power_ramp_step_kw <= 0:
+            raise ValueError("automatic_power_ramp_step_kw must be positive")
+        if self.automatic_power_ramp_interval_seconds <= 0:
+            raise ValueError("automatic_power_ramp_interval_seconds must be positive")
+        if not 0 <= self.bau_connect_value <= 0xFFFF:
+            raise ValueError("bau_connect_value must fit one U16 register")
+        if not 0 <= self.bau_disconnect_value <= 0xFFFF:
+            raise ValueError("bau_disconnect_value must fit one U16 register")
+        if self.bau_connect_value == self.bau_disconnect_value:
+            raise ValueError("BAU connect and disconnect values must differ")
+        if self.automatic_executor_workers < 1 or self.automatic_executor_workers > 4:
+            raise ValueError("automatic_executor_workers must be between 1 and 4")
+        if self.runtime_monitor_interval_seconds <= 0:
+            raise ValueError("runtime_monitor_interval_seconds must be positive")
+        if self.runtime_monitor_refresh_wait_seconds <= 0:
+            raise ValueError("runtime_monitor_refresh_wait_seconds must be positive")
+        if self.runtime_monitor_max_unverified_seconds <= 0:
+            raise ValueError("runtime_monitor_max_unverified_seconds must be positive")
+        if self.runtime_monitor_max_consecutive_unverified_samples < 1:
+            raise ValueError(
+                "runtime_monitor_max_consecutive_unverified_samples must be >= 1"
+            )
+        if (
+            self.runtime_monitor_max_unverified_seconds
+            < self.runtime_monitor_refresh_wait_seconds
+        ):
+            raise ValueError(
+                "runtime_monitor_max_unverified_seconds must be greater than or equal "
+                "to runtime_monitor_refresh_wait_seconds"
+            )
+        if self.validation_dc_bus_threshold_v < 0:
+            raise ValueError("validation_dc_bus_threshold_v cannot be negative")
+        pair_ids = [pair.pair_id for pair in self.pairs]
+        rack_ids = [pair.rack_id for pair in self.pairs if pair.enabled]
+        pcs_ids = [pair.pcs_asset_id for pair in self.pairs if pair.enabled]
+        if len(pair_ids) != len(set(pair_ids)):
+            raise ValueError("Control pair IDs must be unique")
+        if len(rack_ids) != len(set(rack_ids)):
+            raise ValueError("Enabled control-pair rack IDs must be unique")
+        if len(pcs_ids) != len(set(pcs_ids)):
+            raise ValueError("Enabled control-pair PCS IDs must be unique")
+        return self
+
+
+class StorageConfig(BaseModel):
+    preferred_root: str = "/mnt/ems-logs/kinetics-gateway"
+    preferred_mount_point: str = "/mnt/ems-logs"
+    require_preferred_mount: bool = False
+    fallback_root: str = "data"
+    database_name: str = "kinetics_gateway.db"
+    log_name: str = "kinetics_gateway.log"
+    telemetry_retention_days: int = 90
+    sample_interval_seconds: float = 5.0
+    quota_gb: float = 25.0
+    quota_high_watermark_percent: float = 90.0
+    compact_history: bool = True
+    compress_history: bool = True
+    store_raw_when_distinct: bool = True
+
+    # Embedded-safe fallback policy used while the removable SD card is absent.
+    # These defaults deliberately protect the small root filesystem.
+    fallback_sample_interval_seconds: float = 30.0
+    fallback_telemetry_retention_days: int = 3
+    fallback_quota_gb: float = 0.5
+
+    # Runtime-memory and status-refresh bounds.
+    update_buffer_events: int = 200
+    status_refresh_seconds: float = 60.0
+    compression_level: int = 1
+
+    @model_validator(mode="after")
+    def validate_storage_settings(self) -> "StorageConfig":
+        if self.sample_interval_seconds <= 0:
+            raise ValueError("storage sample_interval_seconds must be positive")
+        if self.fallback_sample_interval_seconds <= 0:
+            raise ValueError("fallback_sample_interval_seconds must be positive")
+        if self.telemetry_retention_days <= 0 or self.fallback_telemetry_retention_days <= 0:
+            raise ValueError("telemetry retention days must be positive")
+        if self.quota_gb <= 0 or self.fallback_quota_gb <= 0:
+            raise ValueError("storage quota must be positive")
+        if not 1 <= self.quota_high_watermark_percent <= 100:
+            raise ValueError("quota_high_watermark_percent must be between 1 and 100")
+        if self.update_buffer_events < 10:
+            raise ValueError("update_buffer_events must be at least 10")
+        if self.status_refresh_seconds <= 0:
+            raise ValueError("status_refresh_seconds must be positive")
+        if not 0 <= self.compression_level <= 9:
+            raise ValueError("compression_level must be between 0 and 9")
+        return self
+
+
+class SecurityConfig(BaseModel):
+    jwt_secret_env: str = "KINETICS_JWT_SECRET"
+    jwt_algorithm: str = "HS256"
+    token_expiry_minutes: int = 720
+    allow_dev_default_credentials: bool = True
+
+
+class MockConfig(BaseModel):
+    scenario: str = "normal"
+    seed: int = 93
+    full_array_length: bool = True
+
+
+class NetworkConfig(BaseModel):
+    topology: Literal["shared_switch", "separate_interfaces"] = "shared_switch"
+    field_interface: str = "eth1"
+    pc_interface: str = "eth0"
+    wifi_interface: str = "mlan0"
+    bms_interface: str = "eth1"
+    pcs_interface: str = "eth1"
+    pc_api_cidr: str = "192.168.10.2/24"
+    field_primary_cidr: str = "10.30.4.2/24"
+    field_secondary_cidrs: list[str] = Field(default_factory=list)
+
+
+class GatewayConfig(BaseModel):
+    gateway_id: str = "kinetics_gateway_1"
+    mode: Literal["mock", "hardware", "mixed", "read_only", "control_enabled"] = "mock"
+    api_host: str = "0.0.0.0"
+    api_port: int = 8000
+    telemetry_interval_seconds: float = 1.0
+    websocket_max_clients: int = 8
+    websocket_send_timeout_seconds: float = 2.0
+    websocket_allow_full_mode: bool = False
+    http_max_concurrent_requests: int = 12
+    http_reserved_priority_requests: int = 4
+    http_admission_timeout_seconds: float = 0.10
+    bms_catalog_file: str = "generated_protocols/bms_catalog.json"
+    pcs_catalog_file: str = "generated_protocols/pcs_catalog.json"
+    bms: BmsConfig = Field(default_factory=BmsConfig)
+    pcs: PcsConfig = Field(default_factory=PcsConfig)
+    storage: StorageConfig = Field(default_factory=StorageConfig)
+    security: SecurityConfig = Field(default_factory=SecurityConfig)
+    mock: MockConfig = Field(default_factory=MockConfig)
+    network: NetworkConfig = Field(default_factory=NetworkConfig)
+    control_sequence: ControlSequenceConfig = Field(default_factory=ControlSequenceConfig)
+
+    @model_validator(mode="after")
+    def validate_write_mode(self) -> "GatewayConfig":
+        if self.websocket_max_clients < 1:
+            raise ValueError("websocket_max_clients must be at least 1")
+        if self.websocket_send_timeout_seconds <= 0:
+            raise ValueError("websocket_send_timeout_seconds must be positive")
+        if self.http_max_concurrent_requests < 2:
+            raise ValueError("http_max_concurrent_requests must be at least 2")
+        if not 1 <= self.http_reserved_priority_requests < self.http_max_concurrent_requests:
+            raise ValueError(
+                "http_reserved_priority_requests must be between 1 and "
+                "http_max_concurrent_requests - 1"
+            )
+        if self.http_admission_timeout_seconds <= 0:
+            raise ValueError("http_admission_timeout_seconds must be positive")
+        if self.mode == "read_only":
+            self.bms.write_enabled = False
+            self.pcs.write_enabled = False
+        return self
+
+    @property
+    def is_mock(self) -> bool:
+        return self.mode in {"mock", "mixed"}
+
+    @property
+    def hardware_enabled(self) -> bool:
+        return self.mode in {"hardware", "mixed", "read_only", "control_enabled"}
+
+
+def project_root() -> Path:
+    return Path(__file__).resolve().parents[2]
+
+
+def resolve_path(path: str) -> Path:
+    candidate = Path(path)
+    return candidate if candidate.is_absolute() else project_root() / candidate
+
+
+def load_config(path: str | Path | None = None) -> GatewayConfig:
+    # ORNATE_EMS_CONFIG is the platform-level name going forward.  Keep the
+    # historical KINETICS_CONFIG variable as a compatibility fallback so the
+    # deployed Kinetics service does not need to change during migration.
+    configured = (
+        path
+        or os.getenv("ORNATE_EMS_CONFIG")
+        or os.getenv("KINETICS_CONFIG")
+        or "configs/kinetics_mock.json"
+    )
+    resolved = resolve_path(str(configured))
+    payload = json.loads(resolved.read_text(encoding="utf-8"))
+    return GatewayConfig.model_validate(payload)

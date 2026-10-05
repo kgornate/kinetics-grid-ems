@@ -1,0 +1,67 @@
+{
+  "gateway_id": "kinetics_gateway_1",
+  "mode": "read_only",
+  "api_host": "0.0.0.0",
+  "api_port": 8000,
+  "telemetry_interval_seconds": 1.0,
+  "bms_catalog_file": "generated_protocols/bms_catalog.json",
+  "pcs_catalog_file": "generated_protocols/pcs_catalog.json",
+  "bms": {
+    "enabled": true,
+    "architecture": "three_level",
+    "host": "10.30.4.13",
+    "source_ip": "10.30.4.2",
+    "timeout_seconds": 2.0,
+    "address_offset": 0,
+    "connection_mode": "shared_port",
+    "bau": {"port": 503, "unit_id": 1, "read_function_fallback": true},
+    "racks": [
+      {"rack_id": 1, "port": 503, "unit_id": 2, "read_function_fallback": true},
+      {"rack_id": 2, "port": 503, "unit_id": 3, "read_function_fallback": true},
+      {"rack_id": 3, "port": 503, "unit_id": 4, "read_function_fallback": true},
+      {"rack_id": 4, "port": 503, "unit_id": 5, "read_function_fallback": true}
+    ],
+    "power_environment": {"port": 503, "unit_id": 127, "read_function_fallback": true},
+    "poll_fast_seconds": 1.0,
+    "poll_normal_seconds": 5.0,
+    "poll_slow_seconds": 60.0,
+    "poll_bulk_seconds": 30.0,
+    "include_bulk_in_live_snapshot": true,
+    "write_enabled": false
+  },
+  "pcs": {
+    "enabled": true,
+    "host": "192.168.1.200",
+    "source_ip": "192.168.1.2",
+    "port": 502,
+    "unit_id": 1,
+    "timeout_seconds": 2.0,
+    "address_offset": 0,
+    "poll_seconds": 5.0,
+    "write_enabled": false,
+    "overrides_file": "configs/pcs_overrides.json"
+  },
+  "storage": {
+    "preferred_root": "/mnt/ems-logs/kinetics-gateway",
+    "preferred_mount_point": "/mnt/ems-logs",
+    "require_preferred_mount": true,
+    "fallback_root": "data",
+    "sample_interval_seconds": 5.0,
+    "quota_gb": 25.0,
+    "compact_history": true,
+    "compress_history": true
+  },
+  "security": {"allow_dev_default_credentials": false},
+  "mock": {"scenario": "normal", "seed": 93, "full_array_length": true},
+  "network": {
+    "topology": "separate_interfaces",
+    "field_interface": "eth1",
+    "pc_interface": "usb0",
+    "wifi_interface": "mlan0",
+    "bms_interface": "eth1",
+    "pcs_interface": "eth0",
+    "pc_api_cidr": "192.168.10.2/24",
+    "field_primary_cidr": "10.30.4.2/24",
+    "field_secondary_cidrs": []
+  }
+}

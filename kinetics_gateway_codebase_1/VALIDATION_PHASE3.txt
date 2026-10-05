@@ -1,0 +1,12 @@
+Ornate EMS Gateway - Elecod + Lineage Phase 3 Validation
+=======================================================
+
+Baseline architecture: Kinetics Kanpur field gateway
+New protocol catalogs: Lineage BMS V05 + Elecod Monet-AC V2.7.0
+
+Automated tests: 63 passed, 0 failed
+- Existing Kinetics baseline tests preserved
+- 11 new Elecod/Lineage Phase 3 migration tests added
+
+Phase 3 is compilable/tested code, but is intentionally read-only/not commissioned.
+Production write/control remains disabled until Phase 5 commissioning gates are satisfied.

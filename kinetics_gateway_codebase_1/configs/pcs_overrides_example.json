@@ -1,0 +1,24 @@
+{
+  "points": {
+    "0x0001": {
+      "key": "dc_voltage",
+      "name_en": "DC Voltage",
+      "data_type": "U16",
+      "register_count": 1,
+      "scale": 0.1,
+      "unit": "V",
+      "access": "R",
+      "word_order": "big"
+    },
+    "0x0035": {
+      "key": "remote_start_stop",
+      "name_en": "Remote Start Stop",
+      "data_type": "U16",
+      "register_count": 1,
+      "scale": 1,
+      "access": "R/W",
+      "write_function": 6,
+      "enum": {"0": "Stop", "1": "Start"}
+    }
+  }
+}
