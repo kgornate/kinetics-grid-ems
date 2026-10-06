@@ -321,6 +321,26 @@ class AlarmEventProducerConfig(BaseModel):
         return int(value)
 
 
+class ConfigurationAuditProducerConfig(BaseModel):
+    enabled: bool = False
+    stream: str = "configuration_audit"
+    substream: str = "gateway"
+    poll_interval_sec: float = 1.0
+    priority: PriorityName = "P1"
+    controller_settings_path: str = "/var/lib/nb-ems-soc-solis-controller/control_settings.json"
+    controller_status_path: str = "/var/lib/nb-ems-soc-solis-controller/operator_status.json"
+    model_manifest_path: str | None = None
+    state_file: str = "/var/lib/nb-ems-central-sync/s8_configuration_audit_state.json"
+    status_file: str = "/var/lib/nb-ems-central-sync/s8_configuration_audit_producer_status.json"
+
+    @field_validator("poll_interval_sec")
+    @classmethod
+    def _positive_s8_timing(cls, value: float) -> float:
+        if value <= 0:
+            raise ValueError("S8 poll interval must be > 0")
+        return float(value)
+
+
 class OutboxConfig(BaseModel):
     path: str = "/var/lib/nb-ems-central-sync/central_sync.db"
     required_mount_path: str | None = None
@@ -459,6 +479,7 @@ class CentralSyncConfig(BaseModel):
     soc_controller: SocControllerProducerConfig = Field(default_factory=SocControllerProducerConfig)
     solis: SolisProducerConfig = Field(default_factory=SolisProducerConfig)
     edge_ai: EdgeAIProducerConfig = Field(default_factory=EdgeAIProducerConfig)
+    configuration_audit: ConfigurationAuditProducerConfig = Field(default_factory=ConfigurationAuditProducerConfig)
     outbox: OutboxConfig = Field(default_factory=OutboxConfig)
     overflow_archive: OverflowArchiveConfig = Field(default_factory=OverflowArchiveConfig)
     backlog_replay: BacklogReplayConfig = Field(default_factory=BacklogReplayConfig)

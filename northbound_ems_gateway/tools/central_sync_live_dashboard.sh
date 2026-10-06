@@ -46,6 +46,7 @@ stream_defs = [
     ("S5", "soc_controller", "SOC Controller", "soc_controller", False),
     ("S6", "solis", "Solis", "solis", False),
     ("S7", "edge_ai", "Edge AI", "edge_ai", False),
+    ("S8", "configuration_audit", "Config Audit", "configuration_audit", True),
 ]
 
 def parse_ts(v):
@@ -134,7 +135,7 @@ for sid, stream, label, cfg_key, event_driven in stream_defs:
 
 print()
 print(" ACK counters are backend-confirmed per-message ACKs since current Central Sync start.")
-print(" accepted/already_processed = ACK success; EVENT-IDLE is normal for S4 with no new event.")
+print(" accepted/already_processed = ACK success; EVENT-IDLE is normal for S4/S8 with no new event.")
 PY
 
     echo
@@ -182,7 +183,7 @@ PY
 
     echo
     echo "================================================================================"
-    echo " Healthy: S1-S6 ON | recent ACK ages | HTTP 200 | queue age low | overflow 0"
+    echo " Healthy: S1-S8 ON | recent ACK ages | HTTP 200 | queue age low | overflow delta 0"
     echo " Refresh every 5 sec                                            Ctrl+C to exit"
     echo "================================================================================"
     sleep 5
