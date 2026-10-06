@@ -258,6 +258,7 @@ class ConfigurationAuditProducer:
         fast = central_raw.get("fast_bess") if isinstance(central_raw.get("fast_bess"), dict) else {}
         general = central_raw.get("general_assets") if isinstance(central_raw.get("general_assets"), dict) else {}
         outbox = central_raw.get("outbox") if isinstance(central_raw.get("outbox"), dict) else {}
+        command_downlink = central_raw.get("command_downlink") if isinstance(central_raw.get("command_downlink"), dict) else {}
         config_revision = "sha256:" + _stable_hash({
             "enabled": central_raw.get("enabled"),
             "endpoint_url": _endpoint_url(backend),
@@ -266,6 +267,7 @@ class ConfigurationAuditProducer:
             "general_policy_revision": _policy_identity(general.get("policy_manifest_path")),
             "outbox_max_db_size_mb": outbox.get("max_db_size_mb"),
             "software_version": identity.get("software_version"),
+            "command_poll_sec": command_downlink.get("poll_interval_sec"),
         })
         central_values = {
             "central_sync.enabled": central_raw.get("enabled"),
@@ -275,6 +277,7 @@ class ConfigurationAuditProducer:
             "central_sync.general_policy_revision": _policy_identity(general.get("policy_manifest_path")),
             "central_sync.outbox_max_db_size_mb": outbox.get("max_db_size_mb"),
             "gateway.software_version": identity.get("software_version"),
+            "central_sync.command_poll_sec": command_downlink.get("poll_interval_sec"),
         }
         for path, value in central_values.items():
             if value is None:

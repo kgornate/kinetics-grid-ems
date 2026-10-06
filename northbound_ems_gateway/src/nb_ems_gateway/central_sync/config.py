@@ -341,6 +341,59 @@ class ConfigurationAuditProducerConfig(BaseModel):
         return float(value)
 
 
+class CommandDownlinkConfig(BaseModel):
+    """D1 Central -> Gateway command downlink.
+
+    Backend endpoint is deliberately configurable because the frozen v1.3 data
+    contract defines queue semantics/schema but does not freeze a production URL.
+    D1 remains disabled until the backend queue endpoint is commissioned.
+    """
+
+    enabled: bool = False
+    poll_path: str = "/api/v1/commands/poll"
+    poll_interval_sec: float = 3.0
+    max_commands_per_poll: int = 10
+    status_file: str = "/var/lib/nb-ems-central-sync/d1_command_downlink_status.json"
+    ledger_path: str = "/mnt/ems-logs/northbound_ems_gateway/d1_command_ledger.db"
+    s9_stream: str = "command_results"
+    s9_substream: str = "gateway"
+    s9_priority: PriorityName = "P0"
+    allowed_requested_role: str = "internal_admin"
+    allowed_command_types: list[str] = Field(default_factory=lambda: [
+        "source_grid_mode",
+        "site_grid_mode",
+        "source_charge",
+        "source_discharge",
+        "source_standby",
+        "site_power",
+        "site_standby",
+        "ems_register_write",
+        "ems_batch_write",
+    ])
+
+    @field_validator("poll_path")
+    @classmethod
+    def _normalize_poll_path(cls, value: str) -> str:
+        value = str(value).strip()
+        if not value:
+            raise ValueError("D1 poll_path must not be empty")
+        return value if value.startswith("/") else f"/{value}"
+
+    @field_validator("poll_interval_sec")
+    @classmethod
+    def _positive_d1_poll(cls, value: float) -> float:
+        if value <= 0:
+            raise ValueError("D1 poll interval must be > 0")
+        return float(value)
+
+    @field_validator("max_commands_per_poll")
+    @classmethod
+    def _bounded_d1_limit(cls, value: int) -> int:
+        if value < 1 or value > 100:
+            raise ValueError("D1 max_commands_per_poll must be between 1 and 100")
+        return int(value)
+
+
 class OutboxConfig(BaseModel):
     path: str = "/var/lib/nb-ems-central-sync/central_sync.db"
     required_mount_path: str | None = None
@@ -480,6 +533,7 @@ class CentralSyncConfig(BaseModel):
     solis: SolisProducerConfig = Field(default_factory=SolisProducerConfig)
     edge_ai: EdgeAIProducerConfig = Field(default_factory=EdgeAIProducerConfig)
     configuration_audit: ConfigurationAuditProducerConfig = Field(default_factory=ConfigurationAuditProducerConfig)
+    command_downlink: CommandDownlinkConfig = Field(default_factory=CommandDownlinkConfig)
     outbox: OutboxConfig = Field(default_factory=OutboxConfig)
     overflow_archive: OverflowArchiveConfig = Field(default_factory=OverflowArchiveConfig)
     backlog_replay: BacklogReplayConfig = Field(default_factory=BacklogReplayConfig)

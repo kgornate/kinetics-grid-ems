@@ -15,6 +15,7 @@ from .soc_controller_producer import SocControllerProducer
 from .solis_producer import SolisProducer
 from .edge_ai_producer import EdgeAIProducer
 from .configuration_audit_producer import ConfigurationAuditProducer
+from .command_downlink import CommandDownlinkProcessor
 from .outbox import OutboxStore
 from .overflow_archiver import OverflowArchiver
 from .uploader import CentralSyncUploader
@@ -59,8 +60,10 @@ async def amain() -> int:
     configuration_audit_producer = ConfigurationAuditProducer(
         config=config, outbox=outbox, central_sync_config_path=args.config
     )
+    command_downlink = CommandDownlinkProcessor(config=config, outbox=outbox)
 
     async def stop_all() -> None:
+        await command_downlink.stop()
         await overflow_archiver.stop()
         await configuration_audit_producer.stop()
         await edge_ai_producer.stop()
@@ -87,6 +90,7 @@ async def amain() -> int:
                         "solis_producer": solis_producer.status(),
                         "edge_ai_producer": edge_ai_producer.status(),
                         "configuration_audit_producer": configuration_audit_producer.status(),
+                        "command_downlink": command_downlink.status(),
                     },
                     indent=2,
                 )
@@ -253,6 +257,14 @@ async def amain() -> int:
                 )
             )
 
+        if config.command_downlink.enabled:
+            tasks.append(
+                asyncio.create_task(
+                    command_downlink.run_forever(),
+                    name="d1-command-downlink",
+                )
+            )
+
         # If any top-level loop exits unexpectedly, stop the others and let
         # systemd restart the process. Producer-internal poll failures are caught
         # by the producer and do not terminate the service.
@@ -266,6 +278,7 @@ async def amain() -> int:
             await asyncio.gather(*pending, return_exceptions=True)
         return 0
     finally:
+        await command_downlink.close()
         await overflow_archiver.close()
         await configuration_audit_producer.close()
         await edge_ai_producer.close()

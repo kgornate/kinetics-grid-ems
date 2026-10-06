@@ -413,6 +413,62 @@ class CentralBackendClient:
             retry_after_sec=retry_after,
         )
 
+    async def get_json(
+        self,
+        path: str,
+        *,
+        params: dict[str, Any] | None = None,
+    ) -> TransportResponse:
+        """Authenticated backend GET used by D1 command polling.
+
+        Uses the same gateway credential/token lifecycle as the proven ingest
+        client.  A 401 triggers one forced token refresh exactly like upload.
+        """
+        token = await self._obtain_token(force=False)
+        url = self.base_url + "/" + str(path).lstrip("/")
+
+        async def do_get(tok: str | None) -> TransportResponse:
+            headers: dict[str, str] = {
+                "Accept": "application/json",
+                "X-Gateway-ID": self.gateway_id,
+            }
+            if tok:
+                headers["Authorization"] = f"Bearer {tok}"
+            try:
+                response = await self.http.get(url, params=params, headers=headers)
+            except Exception as exc:
+                await self._note_transport_failure(exc)
+                return TransportResponse(
+                    status_code=0,
+                    body=None,
+                    text="",
+                    exception=f"{type(exc).__name__}: {exc}",
+                )
+            await self._note_transport_success()
+            parsed: dict[str, Any] | None = None
+            if response.content:
+                try:
+                    obj = response.json()
+                    if isinstance(obj, dict):
+                        parsed = obj
+                except Exception:
+                    parsed = None
+            return TransportResponse(
+                status_code=response.status_code,
+                body=parsed,
+                text=response.text,
+                retry_after_sec=_parse_retry_after(response.headers.get("Retry-After")),
+            )
+
+        result = await do_get(token)
+        if result.status_code == 401 and self.dynamic_auth_available:
+            self._access_token = None
+            self._token_expiry_monotonic = 0.0
+            refreshed = await self._obtain_token(force=True)
+            if refreshed:
+                result = await do_get(refreshed)
+        return result
+
     async def post_batch(
         self,
         json_bytes: bytes,
