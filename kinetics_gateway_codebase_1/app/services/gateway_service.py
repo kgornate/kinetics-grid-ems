@@ -16,7 +16,7 @@ from app.assets.pcs_driver import PcsModbusDriver
 from app.core.catalog import ProtocolCatalog, apply_pcs_overrides
 from app.core.config import GatewayConfig, resolve_path
 from app.services.alarm_engine import AlarmEngine
-from app.services.bms_pcs_control import BmsPcsControlService
+from app.services.control_factory import build_pair_control_service
 from app.protocols.planner import build_read_blocks
 from app.storage.sqlite_store import SQLiteStore
 from app.services.runtime_metrics import RuntimeMetrics
@@ -51,12 +51,13 @@ class GatewayService:
         self.mock.set_scenario(config.mock.scenario)
         self.bms_driver = BmsModbusDriver(config.bms, self.bms_catalog)
         self.pcs_driver = PcsModbusDriver(config.pcs, self.pcs_catalog)
-        self.control_sequence = BmsPcsControlService(
+        self.control_sequence = build_pair_control_service(
             config,
             self.bms_driver,
             self.pcs_driver,
             store,
             snapshot_provider=self.control_pair_snapshot,
+            mock_plant=self.mock,
         )
         self.alarm_engine = AlarmEngine()
         self._lock = threading.RLock()
@@ -270,8 +271,7 @@ class GatewayService:
                 if not self.config.pcs.enabled or not device.enabled:
                     update = self.pcs_driver.disabled_asset(device)
                 elif self.config.mode == "mock":
-                    update = deepcopy(mock_primary)
-                    update["asset_id"] = device.asset_id
+                    update = self.mock.pcs_asset_snapshot(device.asset_id)
                     update["label"] = device.label
                     update["unit_id"] = device.unit_id
                     update["transport"] = self.config.pcs.transport
@@ -831,12 +831,36 @@ class GatewayService:
 
     def execute_control(self, username: str, asset_id: str, point_key: str, value: Any) -> dict[str, Any]:
         try:
+            # New-vendor safety boundary: the generic raw-point endpoint must not
+            # bypass the pair controller's commissioning gates. Kinetics behavior
+            # is preserved; only Elecod/Lineage critical writes are redirected.
+            if self.config.pcs.vendor.lower() == "elecod" and asset_id in {device.asset_id for device in self.config.pcs.devices}:
+                protected_pcs_points = {
+                    "active_power_setpoint_percent",
+                    "reactive_power_setpoint_percent",
+                    "power_factor_setpoint",
+                    "grid_mode_command",
+                    "on_grid_control_mode",
+                    "off_grid_control_mode",
+                    "power_on_off_command",
+                    "standby_shutdown_command",
+                }
+                if point_key in protected_pcs_points:
+                    raise PermissionError(
+                        f"Elecod point {point_key} is protected; use /api/control-sequence so pair safety, BMS limits and commissioning gates are enforced"
+                    )
+            if self.config.bms.vendor.lower() == "lineage" and asset_id.startswith("bms_rack_"):
+                if point_key in {"positive_contactor_command", "negative_contactor_command"}:
+                    raise PermissionError(
+                        "Lineage forced-contactor points are protected from the generic raw-point API; "
+                        "use the pair-control safe-stop path after explicit vendor-safe disconnect commissioning"
+                    )
             if asset_id in {device.asset_id for device in self.config.pcs.devices}:
                 if self.config.mode == "mock":
                     point = self.pcs_catalog.by_key(point_key, scope="pcs")
                     if not point:
                         raise KeyError(point_key)
-                    response = self.mock.write("pcs_1", point, value)
+                    response = self.mock.write(asset_id, point, value)
                     response["asset_id"] = asset_id
                 else:
                     response = self.pcs_driver.write_point(asset_id, point_key, value)

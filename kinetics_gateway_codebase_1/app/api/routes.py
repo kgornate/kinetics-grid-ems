@@ -12,6 +12,7 @@ from app.security.auth import AuthService, User, build_user_dependencies
 from app.services.bms_pcs_control import ControlStatusBusyError
 from app.services.gateway_service import GatewayService
 from app.services.runtime_metrics import RuntimeMetrics
+from app.services.platform_readiness import platform_readiness
 
 
 async def _bounded_websocket_send(websocket: WebSocket, payload: Any, timeout: float) -> None:
@@ -197,9 +198,42 @@ def build_router(
             "count": len(pairs),
         }
 
+    @router.get("/api/normalized/safety")
+    def normalized_safety(user: User = Depends(current_user)) -> dict[str, Any]:
+        normalized = service.normalized_snapshot()
+        return {
+            "gateway_id": normalized.get("gateway_id"),
+            "timestamp": normalized.get("timestamp"),
+            "safety": normalized.get("safety", {}),
+        }
+
+    @router.get("/api/platform/readiness")
+    def platform_readiness_status(user: User = Depends(require_internal)) -> dict[str, Any]:
+        """Software-completeness and positive field-commissioning gates."""
+        return platform_readiness(service.config)
+
+    @router.get("/api/commissioning/status")
+    def commissioning_status(user: User = Depends(require_internal)) -> dict[str, Any]:
+        """Unified commissioning status; this endpoint never performs writes."""
+        result = platform_readiness(service.config)
+        normalized = service.normalized_snapshot()
+        result["live_observation"] = {
+            "battery_system_online": bool((normalized.get("battery_system") or {}).get("online")),
+            "rack_online": {
+                rack_id: bool(rack.get("online"))
+                for rack_id, rack in (normalized.get("battery_racks") or {}).items()
+            },
+            "pcs_online": {
+                asset_id: bool(pcs.get("online"))
+                for asset_id, pcs in (normalized.get("pcs") or {}).items()
+            },
+            "normalized_safety_available": bool(normalized.get("safety")),
+        }
+        return result
+
     @router.get("/api/commissioning/read-only")
     def readonly_commissioning(user: User = Depends(require_internal)) -> dict[str, Any]:
-        """Phase-4 commissioning summary. This endpoint never performs writes."""
+        """Backward-compatible Phase-4 read-only commissioning summary; never writes."""
         snapshot = service.snapshot()
         normalized = snapshot.get("normalized", {})
         return {

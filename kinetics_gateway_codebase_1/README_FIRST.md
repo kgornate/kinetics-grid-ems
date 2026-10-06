@@ -1,68 +1,44 @@
-# Ornate EMS Gateway - Elecod + Lineage Phase 4 Read-Only
+# Ornate EMS Gateway Platform - Software-Complete RC v0.9
 
-**Start here for this release.** This archive is a complete Kinetics-derived gateway source tree with the Elecod + Lineage Phase-4 live read-only integration. It is not a copy/paste patch bundle.
+**This archive is a complete gateway source tree. It is not a patch bundle and does not need to be copied into the old Kinetics folder.**
 
-Primary Phase-4 documents:
+Keep the original `kinetics_gateway_v2_kanpur_site` snapshot frozen as the field-validated reference. Use this tree as the forward Ornate EMS Gateway platform.
 
-- `docs/PHASE4_READONLY_BASELINE.md`
-- `docs/PHASE4_COMMISSIONING_RUNBOOK.md`
-- `docs/COMPLETE_CODEBASE_NOTICE.md`
-- `configs/elecod_lineage_4pair_phase4_readonly_template.json`
-- `tools/phase4_readonly_commission.py`
-- `deployment/install_phase4_readonly_on_imx93.sh`
+## Current status
 
-Writes and the automatic control sequence remain disabled in the Phase-4 template. Complete read-only commissioning must be signed off before Phase 5.
+- Kinetics architecture and legacy Kinetics driver/control implementation retained.
+- Lineage BMS V05 catalog, polling, alarms, system/rack/cell/auxiliary model integrated.
+- Elecod Monet-AC V2.7.0 catalog, polling, status/alarm and control adapter integrated.
+- Four configurable `PCS + BMS rack` pairs retained.
+- Vendor-neutral staged control and automatic charge/discharge sequence implemented.
+- Dynamic Lineage charge/discharge power limits enforced before Elecod power commands.
+- Power ramp, tracking, runtime monitor, abort, safe-stop and safe-stop-all implemented.
+- REST/WebSocket, historian, alarm lifecycle, command audit and normalized APIs retained.
+- Software-in-loop four-pair validation included.
+- **Real Lineage/Elecod hardware writes remain positively locked until explicit field-validation flags are confirmed.**
 
----
-
-## Historical Kinetics baseline notes retained below
-
-# Kinetics Gateway V2.6 multi-pair runtime patch
-
-This is a focused update for the currently deployed Kinetics Gateway backend.
-It does not contain the database, logs, Cloudflare credentials, authentication
-secrets, or an entire filesystem snapshot.
-
-## Corrected behaviour
-
-- Each BMS/PCS pair retains independent sequence and runtime-monitor state.
-- Live control refresh remains serialized, but waiting requests use FIFO order.
-- `global_refresh_lane_busy` is treated as temporary deferred verification.
-- A running pair is not stopped solely because another pair is starting.
-- A pair still safe-stops on a real safety violation or when its status cannot
-  be verified for longer than the configured grace period.
-- Flutter/SCADA can poll all pairs through the cache-only endpoint:
-  `GET /api/control-sequence/status/all`.
-
-## Deployment prerequisite
-
-Before installing, physically verify all four pairs are safely stopped:
-
-- PCS setpoint = 0 kW
-- actual power = 0 kW
-- PCS stopped
-- BMS precharge idle
-- positive and negative contactors open
-
-The installer itself sends no BMS or PCS command.
-
-## Install on i.MX93
+## Use now, before hardware arrives
 
 ```sh
-cd /root/kinetics_gateway_v2_6_multi_pair_runtime_patch
-sh deployment/update_multi_pair_runtime_v2_6_on_imx93.sh
-# The first call changes nothing and prints the required confirmation.
-sh deployment/update_multi_pair_runtime_v2_6_on_imx93.sh APPLY_MULTI_PAIR_V2_6
+cd ornate_ems_gateway
+python3 -m pytest -q
+python3 tools/run_elecod_lineage_sil.py
 ```
 
-A timestamped backup is created under `/root/` before any runtime file changes.
+Primary configurations:
 
-## Rollback
+- `configs/elecod_lineage_4pair_sil.json` - no hardware; exercises full control path.
+- `configs/elecod_lineage_4pair_phase4_readonly_template.json` - first field reads only.
+- `configs/elecod_lineage_4pair_control_ready_template.json` - complete control-capable tree but all real writes/control disabled until commissioning.
 
-```sh
-sh deployment/rollback_multi_pair_runtime_v2_6_on_imx93.sh \
-  /root/kinetics_multi_pair_v2_6_backup_TIMESTAMP \
-  ROLLBACK_MULTI_PAIR_V2_6
-```
+## Important safety rule
 
-Confirm all pairs are safely stopped before rollback.
+Do not set protocol validation flags to `true` merely to enable control. They represent observations that must be confirmed on the physical BESS: Lineage FLOAT order/addressing/current sign/automatic precharge behavior, and Elecod addressing/power sign/start-stop/status behavior.
+
+See:
+
+- `docs/ARCHITECTURE_FREEZE_V2.md`
+- `docs/PHASE5_VENDOR_NEUTRAL_CONTROL.md`
+- `docs/PHASE6_SOFTWARE_COMPLETE_RC.md`
+- `docs/FIELD_VALIDATION_GATES.md`
+- `docs/MIGRATION_ROADMAP.md`

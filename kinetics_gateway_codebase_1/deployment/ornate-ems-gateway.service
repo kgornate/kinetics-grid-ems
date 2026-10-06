@@ -1,5 +1,5 @@
 [Unit]
-Description=Ornate EMS Gateway - Elecod + Lineage Phase 4 Read-Only
+Description=Ornate EMS Gateway Platform - Kinetics / Elecod + Lineage
 After=network-online.target
 Wants=network-online.target
 

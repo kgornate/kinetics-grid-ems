@@ -66,6 +66,14 @@ class BmsConfig(BaseModel):
     auxiliary_devices: list[BmsAuxEndpointConfig] = Field(default_factory=list)
     poll_environment_enabled: bool = True
     commissioning_status: str = "not_commissioned"
+    # Explicit commissioning gates for vendor-neutral hardware control.  These
+    # do not affect the field-validated legacy Kinetics controller; the
+    # Lineage+Elecod controller requires them before real hardware writes.
+    addressing_validated: bool = False
+    float_word_order_validated: bool = False
+    current_sign_validated: bool = False
+    automatic_precharge_validated: bool = False
+    forced_disconnect_sequence_validated: bool = False
     max_registers_per_request: int = 120
     max_gap_registers: int = 2
     poll_fast_seconds: float = 1.0
@@ -168,6 +176,9 @@ class PcsConfig(BaseModel):
     overrides_file: str = "configs/pcs_overrides.json"
     max_registers_per_request: int = 120
     commissioning_status: str = "pcs1_readonly_hardware_validated_2026_07_27"
+    addressing_validated: bool = False
+    start_stop_validated: bool = False
+    ready_status_validated: bool = False
     power_sign_validated: bool = False
     positive_power_is_discharge: bool = True
 
@@ -290,6 +301,15 @@ class ControlSequenceConfig(BaseModel):
     validation_dc_bus_threshold_v: float = 50.0
     require_positive_and_negative_contactors: bool = True
     require_precharge_success: bool = True
+    # Vendor-neutral control policy. These defaults are intentionally conservative
+    # until Elecod/Lineage commissioning confirms the remaining protocol semantics.
+    allow_bms_warning_operation: bool = False
+    allow_forced_bms_disconnect: bool = False
+    battery_prepare_timeout_seconds: float = 30.0
+    require_pcs_dc_relay_for_ready: bool = True
+    require_pcs_ac_relay_for_ready: bool = False
+    require_voltage_match_for_ready: bool = True
+    require_power_sign_validation: bool = True
 
     @model_validator(mode="after")
     def validate_control_sequence(self) -> "ControlSequenceConfig":
@@ -345,6 +365,8 @@ class ControlSequenceConfig(BaseModel):
             )
         if self.validation_dc_bus_threshold_v < 0:
             raise ValueError("validation_dc_bus_threshold_v cannot be negative")
+        if self.battery_prepare_timeout_seconds <= 0:
+            raise ValueError("battery_prepare_timeout_seconds must be positive")
         pair_ids = [pair.pair_id for pair in self.pairs]
         rack_ids = [pair.rack_id for pair in self.pairs if pair.enabled]
         pcs_ids = [pair.pcs_asset_id for pair in self.pairs if pair.enabled]

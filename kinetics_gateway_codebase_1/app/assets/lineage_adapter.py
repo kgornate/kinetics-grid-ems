@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any
+from dataclasses import asdict
 
 from app.assets.bms_driver import BmsModbusDriver
 from app.assets.normalized import AssetCapabilities, BatteryRackState, PreparationResult
@@ -48,9 +49,11 @@ class LineageBmsAdapter:
         driver: BmsModbusDriver,
         *,
         allow_forced_contactor_control: bool = False,
+        allow_warning_operation: bool = False,
     ) -> None:
         self.driver = driver
         self.allow_forced_contactor_control = bool(allow_forced_contactor_control)
+        self.allow_warning_operation = bool(allow_warning_operation)
 
     @staticmethod
     def _value(point: dict[str, Any] | None) -> Any:
@@ -84,6 +87,9 @@ class LineageBmsAdapter:
 
         charge_allowed = state_int not in {None, 0x1111, 0x5555, 0xAAAA}
         discharge_allowed = state_int not in {None, 0x2222, 0x5555, 0xAAAA}
+        if state_int == 0xCCCC and not self.allow_warning_operation:
+            charge_allowed = False
+            discharge_allowed = False
         blocking: list[str] = list(errors)
         if state_int == 0x1111:
             blocking.append("bms_no_charge")
@@ -95,8 +101,13 @@ class LineageBmsAdapter:
             blocking.append("bms_fault")
         elif state_int == 0xCCCC:
             # V05 labels Warn but does not state whether power must be blocked.
-            # Preserve the warning without inventing a prohibition.
-            blocking.append("bms_warning_vendor_policy_required")
+            # The platform defaults to blocking until commissioning/vendor policy
+            # explicitly enables warning-state operation.
+            blocking.append(
+                "bms_warning_allowed_by_policy"
+                if self.allow_warning_operation
+                else "bms_warning_vendor_policy_required"
+            )
 
         def num(key: str) -> float | None:
             value = self._value(points[key])
@@ -135,21 +146,21 @@ class LineageBmsAdapter:
         state = self.rack_state(rack_id)
         contactors_ready = state.positive_contactor_closed is True and state.negative_contactor_closed is True
         if state.state_code == 0xAAAA:
-            return PreparationResult(False, False, "blocked", "Lineage rack reports Fault", {"rack": state})
+            return PreparationResult(False, False, "blocked", "Lineage rack reports Fault", {"rack": asdict(state)})
         if contactors_ready and state.voltage_v is not None:
             return PreparationResult(
                 True,
                 False,
                 "ready",
                 "Lineage BMS already reports both main contactors closed and rack voltage available.",
-                {"rack": state},
+                {"rack": asdict(state)},
             )
         return PreparationResult(
             False,
             False,
             "waiting_for_bms_automatic_precharge",
             "V05 exposes no normal EMS precharge command; wait for the vendor-approved BMS automatic startup/precharge sequence.",
-            {"rack": state},
+            {"rack": asdict(state)},
         )
 
     def disconnect(self, rack_id: int) -> PreparationResult:

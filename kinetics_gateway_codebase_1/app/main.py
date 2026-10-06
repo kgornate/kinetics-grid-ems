@@ -21,10 +21,10 @@ from app.services.runtime_metrics import RuntimeMetrics
 from app.storage.sqlite_store import SQLiteStore
 
 
-config = load_config(os.getenv("KINETICS_CONFIG"))
+config = load_config(os.getenv("ORNATE_EMS_CONFIG") or os.getenv("KINETICS_CONFIG"))
 store = SQLiteStore(config.storage)
 configure_logging(store.log_path)
-logger = logging.getLogger("kinetics.http")
+logger = logging.getLogger("ornate_ems.http")
 auth = AuthService(config)
 runtime_metrics = RuntimeMetrics()
 http_admission = HttpAdmissionController(
@@ -106,7 +106,7 @@ async def polling_supervisor() -> None:
             children.extend(
                 asyncio.create_task(
                     periodic_loop(name, interval, lambda poll=name: service.poll_bms_class(poll)),
-                    name=f"kinetics-bms-{name}",
+                    name=f"ornate-ems-bms-{name}",
                 )
                 for name, interval in (
                     ("fast", config.bms.poll_fast_seconds),
@@ -118,9 +118,9 @@ async def polling_supervisor() -> None:
         if config.pcs.enabled:
             children.append(asyncio.create_task(
                 periodic_loop("pcs", config.pcs.poll_seconds, service.poll_pcs),
-                name="kinetics-pcs",
+                name="ornate-ems-pcs",
             ))
-        children.append(asyncio.create_task(data_rate_cache_loop(), name="kinetics-data-rate-cache"))
+        children.append(asyncio.create_task(data_rate_cache_loop(), name="ornate-ems-data-rate-cache"))
         await asyncio.gather(*children)
     finally:
         for child in children:
@@ -132,9 +132,9 @@ async def polling_supervisor() -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    tasks = [asyncio.create_task(polling_supervisor(), name="kinetics-polling-supervisor")]
-    tasks.append(asyncio.create_task(maintenance_loop(), name="kinetics-maintenance"))
-    tasks.append(asyncio.create_task(event_loop_monitor(), name="kinetics-runtime-metrics"))
+    tasks = [asyncio.create_task(polling_supervisor(), name="ornate-ems-polling-supervisor")]
+    tasks.append(asyncio.create_task(maintenance_loop(), name="ornate-ems-maintenance"))
+    tasks.append(asyncio.create_task(event_loop_monitor(), name="ornate-ems-runtime-metrics"))
     store.event(
         "gateway",
         "Gateway application started",
@@ -163,10 +163,11 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Ornate EMS Gateway",
-    version="4.0.0-phase4-readonly",
+    version="0.9.0-software-complete-rc",
     description=(
-        "Frozen Kinetics-derived EMS gateway architecture with Phase-4 read-only Lineage BMS and Elecod PCS live polling, "
-        "normalized pair telemetry, alarms, WebSockets, historian, diagnostics and commissioning safety gates."
+        "Kinetics-derived Ornate EMS Gateway platform with retained Kinetics support and complete "
+        "Lineage BMS + Elecod PCS telemetry/control implementation. Hardware control remains positively "
+        "locked behind explicit commissioning gates until field validation is completed."
     ),
     lifespan=lifespan,
 )

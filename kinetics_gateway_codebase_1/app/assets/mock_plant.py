@@ -56,11 +56,155 @@ class MockPlant:
         self.scenario = "normal"
         self.started = time.monotonic()
         self.overrides: dict[tuple[str, str], Any] = {}
+        self.lineage_mode = self.bms_catalog.by_key("rack_state", scope="rack") is not None
+        self.elecod_mode = self.pcs_catalog.by_key("status_word", scope="pcs") is not None
+        self._elecod_states: dict[str, dict[str, Any]] = {}
 
     def set_scenario(self, scenario: str) -> None:
         if scenario not in SCENARIOS:
             raise ValueError(f"Unknown mock scenario: {scenario}")
         self.scenario = scenario
+
+    def _elecod_state(self, asset_id: str) -> dict[str, Any]:
+        return self._elecod_states.setdefault(
+            asset_id,
+            {
+                "running": False,
+                "faulted": False,
+                "standby": False,
+                "shutdown": False,
+                "off_grid": False,
+                "active_power_percent": 0.0,
+                "reactive_power_percent": 0.0,
+                "power_factor": 1.0,
+                "reactive_mode": 2,
+                "on_grid_control_mode": 0,
+                "off_grid_control_mode": 1,
+                "rated_power_kw": 215.0,
+            },
+        )
+
+    def _lineage_special_value(self, point: dict[str, Any], asset_id: str, asset_index: int) -> Any | None:
+        if not self.lineage_mode:
+            return None
+        key = str(point.get("key") or "")
+        scope = str(point.get("scope") or "")
+        # System/BAMS summary values.
+        if scope == "bank":
+            values = {
+                "battery_system_state": 0xBBBB,
+                "installed_rack_count": self.rack_count,
+                "operating_rack_count": self.rack_count,
+                "operating_rack_bitmap": (1 << self.rack_count) - 1,
+                "system_voltage": 1300.0,
+                "system_current": 0.0,
+                "system_soc": 55.0,
+                "system_soh": 98.0,
+                "system_max_charge_power": 150.0 * self.rack_count,
+                "system_max_discharge_power": 160.0 * self.rack_count,
+                "system_max_charge_current": 120.0 * self.rack_count,
+                "system_max_discharge_current": 125.0 * self.rack_count,
+            }
+            if key in values:
+                return values[key]
+        if scope == "rack":
+            if key == "rack_state":
+                return 0xAAAA if self.scenario == "rack_communication_fault" and asset_id == "bms_rack_2" else 0xBBBB
+            if key == "rack_operating_state":
+                return 3 if self.scenario == "charging" else 4 if self.scenario == "discharging" else 2
+            values = {
+                "rack_voltage": 1300.0 + asset_index,
+                "rack_current": -40.0 if self.scenario == "charging" else 40.0 if self.scenario == "discharging" else 0.0,
+                "rack_soc": 55.0 + asset_index * 0.2,
+                "rack_soh": 98.0,
+                "rack_max_charge_power": 150.0,
+                "rack_max_discharge_power": 160.0,
+                "rack_max_charge_current": 120.0,
+                "rack_max_discharge_current": 125.0,
+                "positive_contactor_feedback": 1,
+                "negative_contactor_feedback": 1,
+                "positive_insulation_resistance": 5.0,
+                "negative_insulation_resistance": 5.0,
+                "rack_max_cell_voltage": 3.35,
+                "rack_min_cell_voltage": 3.30,
+                "rack_max_cell_temperature": 29.0,
+                "rack_min_cell_temperature": 25.0,
+            }
+            if key in values:
+                return values[key]
+            # Individual cell/pack arrays in the Lineage sheet are scalar rows.
+            if "cell_voltage" in key:
+                return 3.30 + ((asset_index * 7 + int(point.get("address") or 0)) % 20) / 1000.0
+            if "cell_soc" in key:
+                return 55.0
+            if "cell_temp" in key or "cell_temperature" in key:
+                return 27.0
+            if "balance" in key:
+                return 0
+            if "pack_voltage" in key:
+                return 169.0
+            if "pack" in key and "temperature" in key:
+                return 28.0
+        return None
+
+    def _elecod_value(self, point: dict[str, Any], asset_id: str) -> Any:
+        state = self._elecod_state(asset_id)
+        key = str(point.get("key") or "")
+        rated = float(state["rated_power_kw"])
+        if key == "status_word":
+            raw = 0
+            if state["running"]:
+                raw |= 1 << 6
+                raw |= 1 << 2
+                raw |= 1 << 3
+            if float(state["active_power_percent"]) < 0:
+                raw |= 1 << 5
+            if state["faulted"] or self.scenario == "pcs_fault":
+                raw |= 1 << 7
+            if state["standby"]:
+                raw |= 1 << 10
+            if state["shutdown"]:
+                raw |= 1 << 11
+            if state["off_grid"]:
+                raw |= 1 << 4
+            return raw
+        if key == "total_active_power":
+            return float(state["active_power_percent"]) * rated / 100.0 if state["running"] else 0.0
+        if key == "total_reactive_power":
+            return float(state["reactive_power_percent"]) * rated / 100.0 if state["running"] else 0.0
+        if key == "total_power_factor":
+            return float(state["power_factor"])
+        if key == "dc_voltage":
+            return 1300.0
+        if key == "dc_current":
+            p = float(state["active_power_percent"]) * rated / 100.0 if state["running"] else 0.0
+            return p * 1000.0 / 1300.0 if 1300.0 else 0.0
+        if key == "dc_power":
+            return float(state["active_power_percent"]) * rated / 100.0 if state["running"] else 0.0
+        if key == "dc_bus_voltage":
+            return 1300.0 if state["running"] else 1300.0
+        if key in {"grid_voltage_ab", "grid_voltage_bc", "grid_voltage_ca"}:
+            return 690.0
+        if key.startswith("grid_frequency"):
+            return 50.0
+        if key == "active_power_setpoint_percent":
+            return float(state["active_power_percent"])
+        if key == "reactive_power_setpoint_percent":
+            return float(state["reactive_power_percent"])
+        if key == "power_factor_setpoint":
+            return float(state["power_factor"])
+        if key == "grid_mode_command":
+            return 1 if state["off_grid"] else 0
+        if key == "on_grid_control_mode":
+            return int(state["on_grid_control_mode"])
+        if key == "off_grid_control_mode":
+            return int(state["off_grid_control_mode"])
+        if key == "reactive_mode":
+            return int(state["reactive_mode"])
+        text = f"{key} {point.get('name_en', '')}".lower()
+        if any(token in text for token in ["fault", "alarm", "failure", "malfunction"]):
+            return 0
+        return self._base_numeric(point)
 
     def _base_numeric(self, point: dict[str, Any], asset_index: int = 0) -> float | int:
         key = str(point.get("key", "")).lower()
@@ -108,6 +252,9 @@ class MockPlant:
         override_key = (asset_id, str(point.get("key")))
         if override_key in self.overrides:
             return self.overrides[override_key]
+        special = self._lineage_special_value(point, asset_id, asset_index)
+        if special is not None:
+            return special
         count = int(point.get("element_count") or 1)
         base = self._base_numeric(point, asset_index)
         if count == 1:
@@ -242,32 +389,7 @@ class MockPlant:
             }
             for key, values in env_groups.items()
         }
-        pcs_telemetry: dict[str, Any] = {}
-        for point in self.pcs_catalog.points:
-            address = int(point["address"])
-            point_text = f"{point.get('key', '')} {point.get('name_cn', '')} {point.get('name_en', '')}".lower()
-            is_fault_point = any(token in point_text for token in ["fault", "alarm", "emergency", "trip", "故障", "告警", "报警", "急停"])
-            value = 0 if is_fault_point else int(1000 + address + math.sin(time.monotonic() / 5) * 3)
-            if self.scenario == "pcs_fault" and is_fault_point and 0x0026 <= address <= 0x003B:
-                value = 1
-            pcs_telemetry[str(point["key"])] = {
-                "key": point["key"],
-                "name_cn": point.get("name_cn"),
-                "address": point.get("address_hex"),
-                "raw": value,
-                "value": value,
-                "unit": point.get("unit"),
-                "quality": "good",
-                "decoding_status": "raw_only" if point.get("data_type") == "UNKNOWN" else "decoded",
-            }
-        pcs = {
-            "asset_id": "pcs_1",
-            "asset_type": "pcs",
-            "online": True,
-            "timestamp": timestamp,
-            "telemetry": pcs_telemetry,
-            "protocol_status": "raw_map_until_vendor_details_are_added",
-        }
+        pcs = self.pcs_asset_snapshot("pcs_1")
         return {
             "gateway_id": "kinetics_gateway_1",
             "mode": "mock",
@@ -278,6 +400,43 @@ class MockPlant:
             "environment": environment,
             "pcs": pcs,
         }
+
+    def pcs_asset_snapshot(self, asset_id: str) -> dict[str, Any]:
+        telemetry: dict[str, Any] = {}
+        for point in self.pcs_catalog.points:
+            if self.elecod_mode and (
+                point.get("reserved")
+                or not point.get("poll_enabled", True)
+                or point.get("poll_class") == "disabled"
+            ):
+                continue
+            if self.elecod_mode:
+                value = self._elecod_value(point, asset_id)
+            else:
+                address = int(point["address"])
+                text = f"{point.get('key', '')} {point.get('name_cn', '')} {point.get('name_en', '')}".lower()
+                is_fault = any(token in text for token in ["fault", "alarm", "emergency", "trip", "故障", "告警", "报警", "急停"])
+                value = 0 if is_fault else int(1000 + address + math.sin(time.monotonic() / 5) * 3)
+                if self.scenario == "pcs_fault" and is_fault and 0x0026 <= address <= 0x003B:
+                    value = 1
+            telemetry[str(point["key"])] = point_payload(point, value)
+        return {
+            "asset_id": asset_id,
+            "asset_type": "pcs",
+            "online": True,
+            "timestamp": now_iso(),
+            "telemetry": telemetry,
+            "protocol_status": "mock_decoded",
+        }
+
+    def read_point(self, asset_id: str, point: dict[str, Any], *, asset_index: int = 0) -> dict[str, Any]:
+        if point.get("scope") == "pcs" and self.elecod_mode:
+            value = self._elecod_value(point, asset_id)
+        else:
+            value = self._value_for_point(point, asset_id, asset_index)
+            value, quality = self._apply_scenario(asset_id, point, value)
+            return point_payload(point, value, quality=quality)
+        return point_payload(point, value)
 
     def rack_details(self, rack_id: int) -> dict[str, Any]:
         asset_id = f"bms_rack_{rack_id}"
@@ -291,7 +450,31 @@ class MockPlant:
         }
 
     def write(self, asset_id: str, point: dict[str, Any], value: Any) -> dict[str, Any]:
-        self.overrides[(asset_id, str(point["key"]))] = deepcopy(value)
+        key = str(point["key"])
+        if self.elecod_mode and point.get("scope") == "pcs":
+            state = self._elecod_state(asset_id)
+            if key == "active_power_setpoint_percent":
+                state["active_power_percent"] = float(value)
+            elif key == "reactive_power_setpoint_percent":
+                state["reactive_power_percent"] = float(value)
+            elif key in {"power_factor_setpoint", "total_power_factor"}:
+                state["power_factor"] = float(value)
+            elif key == "reactive_mode":
+                state["reactive_mode"] = int(value)
+            elif key == "grid_mode_command":
+                state["off_grid"] = bool(int(value))
+            elif key == "on_grid_control_mode":
+                state["on_grid_control_mode"] = int(value)
+            elif key == "off_grid_control_mode":
+                state["off_grid_control_mode"] = int(value)
+            elif key == "power_on_off_command":
+                state["running"] = int(value) == 0xFF00
+                if not state["running"]:
+                    state["active_power_percent"] = 0.0
+            elif key == "standby_shutdown_command":
+                state["standby"] = int(value) == 0xFF00
+                state["shutdown"] = int(value) == 0x0000
+        self.overrides[(asset_id, key)] = deepcopy(value)
         return {
             "ok": True,
             "mock": True,

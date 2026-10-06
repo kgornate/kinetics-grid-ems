@@ -100,11 +100,52 @@ def lineage_system_view(bank: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def lineage_rack_view(rack: dict[str, Any]) -> dict[str, Any]:
+def lineage_safety_view(bank: dict[str, Any]) -> dict[str, Any]:
+    """Normalize Lineage system-level dry contacts / FSS summary signals.
+
+    These are signals surfaced *through the BMS/BAMS protocol*, not a full
+    standalone fire-controller or UPS protocol.  Keeping that provenance in the
+    normalized model avoids overstating what the protocol provides.
+    """
+
+    def flag(*keys: str) -> bool | None:
+        for key in keys:
+            value = _bool(bank, key)
+            if value is not None:
+                return value
+        return None
+
+    return {
+        "fire_safety": {
+            "source": "lineage_bams_summary_io",
+            "full_fire_controller_protocol": False,
+            "warning": flag("fss_warning_input"),
+            "alarm": flag("fss_alarm_input"),
+            "fault": flag("fss_fault_input", "fire_fault"),
+            "fire_start": flag("fire_start"),
+            "combustible_gas_alarm": flag("combustible_gas_alarm"),
+            "gas_detector_fault": flag("gas_detector_fault_input"),
+            "aerosol_spray_feedback": flag("aerosol_spray_feedback", "digital_input_13_aerosol_spray_feedback"),
+            "water_alarm": flag("water_alarm"),
+        },
+        "container_io": {
+            "container_door": flag("container_door_input"),
+            "container_door_alarm": flag("container_door_alarm"),
+            "busbar_cabinet_door": flag("busbar_cabinet_door_input", "digital_input_3_busbar_cabinet_door"),
+            "ups_fault": flag("ups_fault_input", "digital_input_7_ups_fault_dry_contact"),
+            "fan_fault": flag("fan_fault_input", "digital_input_11_fan_malfunction"),
+            "aux_220v_switch_feedback": flag("aux_220v_switch_feedback", "digital_input_4_220v_switch_feedback"),
+            "aux_220v_switch_alarm": flag("aux_220v_switch_alarm", "digital_input_5_220v_switch_alarm"),
+        },
+    }
+
+
+def lineage_rack_view(rack: dict[str, Any], *, allow_warning_operation: bool = False) -> dict[str, Any]:
     state_code = _int(rack, "rack_state")
     operating_code = _int(rack, "rack_operating_state")
-    charge_allowed = state_code not in {None, 0x1111, 0x5555, 0xAAAA}
-    discharge_allowed = state_code not in {None, 0x2222, 0x5555, 0xAAAA}
+    warning_blocked = state_code == 0xCCCC and not allow_warning_operation
+    charge_allowed = state_code not in {None, 0x1111, 0x5555, 0xAAAA} and not warning_blocked
+    discharge_allowed = state_code not in {None, 0x2222, 0x5555, 0xAAAA} and not warning_blocked
     blockers: list[str] = []
     if not rack.get("online", False):
         blockers.append("communication_offline")
@@ -116,7 +157,7 @@ def lineage_rack_view(rack: dict[str, Any]) -> dict[str, Any]:
         blockers.append("bms_standby")
     elif state_code == 0xAAAA:
         blockers.append("bms_fault")
-    elif state_code == 0xCCCC:
+    elif state_code == 0xCCCC and warning_blocked:
         blockers.append("bms_warning_vendor_policy_required")
     return {
         "asset_id": rack.get("asset_id"),
@@ -164,6 +205,7 @@ def elecod_pcs_view(pcs: dict[str, Any]) -> dict[str, Any]:
         "faulted": faulted,
         "standby": _status_bit(pcs, 10, "standby"),
         "shutdown": _status_bit(pcs, 11, "shutdown"),
+        "epo": _status_bit(pcs, 12, "epo"),
         "off_grid": _status_bit(pcs, 4, "off_grid"),
         "dc_precharge_connected": _status_bit(pcs, 0, "dcpre_charge", "dc_precharge_connected"),
         "dc_relay_connected": _status_bit(pcs, 2, "dcrelay", "dc_relay_connected"),
@@ -179,6 +221,7 @@ def elecod_pcs_view(pcs: dict[str, Any]) -> dict[str, Any]:
         "grid_voltage_ab_v": _number(pcs, "grid_voltage_ab"),
         "grid_voltage_bc_v": _number(pcs, "grid_voltage_bc"),
         "grid_voltage_ca_v": _number(pcs, "grid_voltage_ca"),
+        "raw_status": (_point(pcs, "status_word") or {}).get("raw"),
     }
 
 
@@ -207,7 +250,7 @@ def build_normalized_snapshot(snapshot: dict[str, Any], config: GatewayConfig) -
 
     racks: dict[str, Any] = {}
     for rack_id, asset in rack_assets.items():
-        view = lineage_rack_view(asset) if config.bms.vendor.lower() == "lineage" else {
+        view = lineage_rack_view(asset, allow_warning_operation=config.control_sequence.allow_bms_warning_operation) if config.bms.vendor.lower() == "lineage" else {
             "asset_id": asset.get("asset_id"),
             "rack_id": rack_id,
             "online": bool(asset.get("online", False)),
@@ -261,6 +304,7 @@ def build_normalized_snapshot(snapshot: dict[str, Any], config: GatewayConfig) -
         "sequence": snapshot.get("sequence"),
         "vendors": {"bms": config.bms.vendor, "pcs": config.pcs.vendor},
         "battery_system": battery_system,
+        "safety": lineage_safety_view(bank) if config.bms.vendor.lower() == "lineage" else {},
         "battery_racks": racks,
         "pcs": pcs,
         "pairs": pairs,

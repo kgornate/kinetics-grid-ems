@@ -37,7 +37,7 @@ def login(base_url: str, username: str, password: str) -> str:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Kinetics staged BMS/PCS control API client")
+    parser = argparse.ArgumentParser(description="Ornate EMS staged BMS/PCS pair-control API client")
     parser.add_argument("command", choices=[
         "capabilities", "status", "precheck", "enable-rack", "start-insulation",
         "verify-insulation", "start-precharge", "recover-bms", "verify-ready",

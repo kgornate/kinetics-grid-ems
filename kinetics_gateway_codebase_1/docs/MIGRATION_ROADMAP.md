@@ -1,14 +1,16 @@
 # Kinetics -> Elecod + Lineage Migration Roadmap
 
-| Phase | Deliverable | Hardware status |
+| Phase | Deliverable | Status |
 |---|---|---|
-| 1 | Kinetics codebase/feature/architecture study | No new runtime code |
-| 2 | Register dependency + feature-parity matrix | No new runtime code |
-| 3 | **Actual migrated codebase begins**: catalogs, protocol support, normalized adapters, config scaffolding, tests | Safe/read-only template; not site-commissioned |
-| 4 | **DONE in v0.2** - Lineage + Elecod live polling integrated end-to-end into existing APIs/history/alarms + normalized cached views + read-only commissioning tooling | Hardware read-only commissioning |
-| 5 | Four-pair start/stop/charge/discharge controller on normalized adapters | Guarded writes + low-power commissioning |
-| 6 | Full feature parity, automatic four-pair operation, safe-stop, deployment, field validation | Production release / architecture freeze |
+| 1 | Study and freeze the actual Kinetics architecture/feature baseline | DONE |
+| 2 | Kinetics -> Elecod/Lineage feature and register dependency matrix | DONE |
+| 3 | Full source-tree migration foundation: catalogs, protocol support, adapters, config scaffolding | DONE |
+| 4 | Lineage + Elecod live read path into cache, alarms, history, APIs and normalized pair views | DONE in software; field reads pending hardware |
+| 5 | Vendor-neutral four-pair start/stop/charge/discharge, dynamic limits, ramp, runtime monitor, safe-stop | DONE in software/SIL |
+| 6 | Full feature-parity RC, deployment gates, architecture freeze candidate, field-validation plan | SOFTWARE-COMPLETE RC; physical BESS validation pending |
+| 7 | Read-only + staged low-power + fault/safe-stop field validation | Pending BESS availability |
+| 8 | Production v1.0 field-validated freeze | Pending Phase 7 |
 
-## Rule
+## Development rule
 
-A Kinetics feature remains part of the target unless the new hardware protocol makes it genuinely unavailable. Hardware differences change adapter implementation, not the gateway architecture.
+The gateway is now one platform source tree. Future vendor changes should add or modify drivers/adapters/configuration, not create a separate gateway architecture.
