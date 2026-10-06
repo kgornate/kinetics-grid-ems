@@ -1,0 +1,11 @@
+fast_bess_telemetry|critical_pcs_bms|33276
+gateway_health|gateway|714
+general_asset_telemetry|bms_extended|11410
+general_asset_telemetry|dehumidifier|2192
+general_asset_telemetry|ems_system|4758
+general_asset_telemetry|fire_protection|1700
+general_asset_telemetry|io_module|935
+general_asset_telemetry|liquid_cooling|5720
+general_asset_telemetry|pcs_extended|14278
+general_asset_telemetry|remote_control|1586
+general_asset_telemetry|utility_meter|7055

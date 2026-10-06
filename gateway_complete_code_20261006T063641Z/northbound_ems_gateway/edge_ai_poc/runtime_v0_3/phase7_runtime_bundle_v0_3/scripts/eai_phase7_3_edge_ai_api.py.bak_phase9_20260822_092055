@@ -1,0 +1,137 @@
+#!/usr/bin/env python3
+
+import argparse
+import json
+import time
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+from urllib.parse import urlparse
+
+
+class EdgeAIHandler(BaseHTTPRequestHandler):
+    latest_json_path = None
+    jsonl_path = None
+    started_at = time.time()
+
+    def _send_json(self, status, payload):
+        body = json.dumps(payload, indent=2, sort_keys=True).encode("utf-8")
+
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _load_latest(self):
+        p = Path(self.latest_json_path)
+
+        if not p.exists():
+            return None
+
+        return json.loads(p.read_text(encoding="utf-8"))
+
+    def do_GET(self):
+        parsed = urlparse(self.path)
+        path = parsed.path
+
+        try:
+            if path == "/api/edge-ai/health":
+                latest_exists = Path(self.latest_json_path).exists()
+                payload = {
+                    "ok": True,
+                    "service": "edge-ai-api",
+                    "phase": "7.3",
+                    "uptime_sec": round(time.time() - self.started_at, 2),
+                    "latest_json_exists": latest_exists,
+                    "latest_json_path": str(self.latest_json_path),
+                    "jsonl_path": str(self.jsonl_path),
+                }
+                return self._send_json(200, payload)
+
+            if path == "/api/edge-ai/latest":
+                latest = self._load_latest()
+                if latest is None:
+                    return self._send_json(503, {
+                        "ok": False,
+                        "error": "latest_ml_health_json_not_found",
+                        "path": str(self.latest_json_path),
+                    })
+                return self._send_json(200, latest)
+
+            if path.startswith("/api/edge-ai/source/"):
+                source_id = path.split("/api/edge-ai/source/", 1)[1].strip("/")
+                latest = self._load_latest()
+
+                if latest is None:
+                    return self._send_json(503, {
+                        "ok": False,
+                        "error": "latest_ml_health_json_not_found",
+                    })
+
+                source_payload = latest.get("sources", {}).get(source_id)
+
+                if source_payload is None:
+                    return self._send_json(404, {
+                        "ok": False,
+                        "error": "source_not_found",
+                        "source_id": source_id,
+                        "available_sources": sorted(list(latest.get("sources", {}).keys())),
+                    })
+
+                return self._send_json(200, source_payload)
+
+            return self._send_json(404, {
+                "ok": False,
+                "error": "not_found",
+                "path": path,
+                "available_endpoints": [
+                    "/api/edge-ai/health",
+                    "/api/edge-ai/latest",
+                    "/api/edge-ai/source/external_ems_1",
+                    "/api/edge-ai/source/external_ems_2",
+                ],
+            })
+
+        except Exception as e:
+            return self._send_json(500, {
+                "ok": False,
+                "error": repr(e),
+            })
+
+    def log_message(self, fmt, *args):
+        print("%s - %s" % (self.address_string(), fmt % args))
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--host", default="127.0.0.1")
+    ap.add_argument("--port", type=int, default=8011)
+    ap.add_argument("--latest-json", default="/mnt/ems-logs/northbound_ems_gateway/edge_ai_poc/live_inference_v0_3/latest_ml_health_v0_3.json")
+    ap.add_argument("--jsonl", default="/mnt/ems-logs/northbound_ems_gateway/edge_ai_poc/live_inference_v0_3/phase7_2_live_inference_v0_3.jsonl")
+    args = ap.parse_args()
+
+    EdgeAIHandler.latest_json_path = args.latest_json
+    EdgeAIHandler.jsonl_path = args.jsonl
+
+    server = ThreadingHTTPServer((args.host, args.port), EdgeAIHandler)
+
+    print("==============================================================")
+    print(" PHASE 7.3 EDGE AI LOCAL API")
+    print("==============================================================")
+    print("HOST        =", args.host)
+    print("PORT        =", args.port)
+    print("LATEST_JSON =", args.latest_json)
+    print("JSONL       =", args.jsonl)
+    print("ENDPOINTS   =")
+    print("  GET /api/edge-ai/health")
+    print("  GET /api/edge-ai/latest")
+    print("  GET /api/edge-ai/source/external_ems_1")
+    print("  GET /api/edge-ai/source/external_ems_2")
+    print("==============================================================")
+
+    server.serve_forever()
+
+
+if __name__ == "__main__":
+    main()
