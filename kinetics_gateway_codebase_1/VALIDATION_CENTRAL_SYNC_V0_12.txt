@@ -1,0 +1,66 @@
+Ornate EMS Gateway - Kalpa Central Sync RC v0.12 validation
+===========================================================
+
+Source basis
+------------
+Kalpa baseline SHA256:
+84a771d229219eb357448e21b70ebacb978d6a8b8d9b4d25a9362da01c8ecbf7
+
+Northbound Central Sync reference SHA256:
+e11a324157e68117ebd91ba1eb973675e7d5e3c0165db96e8d62207ed0ca0b4a
+
+Frozen Northbound v1.3 workbook SHA256:
+d14ded3f75a380510b41d0f3911cc2b4fec52e40a72ba8776912ae38698e6cd2
+
+Automated tests
+---------------
+Full pytest suite: 94 passed, 0 failed
+Frozen Central Sync contract tests: 11 passed, 0 failed
+
+Local Kalpa SIL gateway integration
+-----------------------------------
+S1 fast_bess_telemetry: emitted, 4 records
+S2 general_asset_telemetry: emitted using frozen nine-substream taxonomy
+  ems_system: 45 records
+  pcs_extended: 344 records
+  bms_extended: 9020 records
+  io_module: 17 records
+  liquid_cooling: 26 records
+  fire_protection: 7 records
+  dehumidifier: 9 records
+  remote_control: 26 records
+  utility_meter: no records; no independent site/PCC meter in current protocol set
+S3 gateway_health: emitted
+S4 alarms_events: first-start baseline established; 276 old alarm-history rows not dumped
+S8 configuration_audit: first-start baseline established; no fabricated change history
+S10 battery_charge_discharge_control: emitted, 4 pair records
+
+Every emitted logical message contained the frozen v1.3 fields:
+schema_version, message_id, gateway_id, site_id, organization_id,
+stream, substream, sequence, created_at_utc, record_count, records,
+compression, gateway_software_version.
+The additive Northbound transport priority field is retained.
+
+Fake backend transport test
+---------------------------
+POST /api/v1/ingest/batch
+Content-Encoding: gzip
+Messages submitted: 3
+Messages accepted/ACKed: 3
+Pending after ACK: 0
+Retry after ACK: 0
+Dead-letter after ACK: 0
+
+Safety status
+-------------
+No physical Lineage/Elecod field validation is claimed by this report.
+No commissioning flag was changed merely to make control run.
+No cloud raw-Modbus bypass exists.
+
+Full SIL -> fake backend batch validation
+----------------------------------------
+Gateway producer sweep generated 11 logical messages and all 11 were accepted/ACKed by the fake backend in 2 gzip HTTP requests.
+Request 1: S1, S10, S3 and applicable S2 substreams (10 messages).
+Request 2: S2 bms_extended (9,020 detailed BMS records).
+Final outbox: pending=0, retry=0, inflight=0, dead=0, acked=11.
+Uploader: request_success_count=2, request_failure_count=0, accepted_count=11.

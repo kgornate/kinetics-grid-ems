@@ -1,9 +1,10 @@
 {
   "product": "Ornate EMS Gateway Platform",
-  "release": "0.9.0-software-complete-rc",
+  "release": "0.12.0-kalpa-central-sync-rc",
   "source_tree": "complete",
   "patch_bundle": false,
-  "architecture_baseline": "Kinetics field-validated gateway",
+  "architecture_baseline": "Kinetics field-validated gateway + Kalpa Lineage/Elecod vendor-neutral platform",
+  "central_sync_reference": "latest supplied Northbound EMS Gateway + frozen Central Sync v1.3 workbook",
   "legacy_kinetics_support_retained": true,
   "new_assets": [
     "Lineage BMS",
@@ -11,24 +12,42 @@
   ],
   "pair_count_target": 4,
   "software_complete": true,
+  "central_sync_s1_s9_backend_compatible": true,
+  "central_sync_s10_additive": true,
   "new_hardware_field_validated": false,
   "production_freeze": false,
-  "next_milestone": "physical BESS read-only and staged low-power validation, then v1.0 production freeze",
+  "next_milestone": "physical Kalpa read-only commissioning, low-power staged charge/discharge validation, then production freeze",
   "validation": {
-    "pytest": "83 passed, 0 failed",
-    "sil_automatic_cycles": 8,
-    "sil_pairs": 4,
-    "sil_directions": [
-      "charge",
-      "discharge"
-    ],
-    "physical_new_bess": "pending"
+    "pytest": "94 passed, 0 failed",
+    "central_sync_contract_tests": "11 passed, 0 failed",
+    "local_gateway_sil_central_sync": "passed",
+    "fake_backend_gzip_ack": "3 of 3 accepted; pending=0 retry=0 dead=0",
+    "physical_new_bess": "pending",
+    "full_sil_fake_backend": "11 of 11 logical messages accepted in 2 gzip requests; pending=0 retry=0 dead=0"
+  },
+  "central_sync_streams": {
+    "S1": "fast_bess_telemetry",
+    "S2": "general_asset_telemetry",
+    "S3": "gateway_health",
+    "S4": "alarms_events",
+    "S5": "soc_controller",
+    "S6": "solis",
+    "S7": "edge_ai",
+    "S8": "configuration_audit",
+    "S9": "command_results",
+    "S10": "battery_charge_discharge_control",
+    "D1": "command_requests"
   },
   "catalog_points": {
     "legacy_kinetics_bms": 724,
     "legacy_kinetics_pcs": 288,
     "lineage_bms": 3527,
     "elecod_pcs": 391
+  },
+  "reference_sha256": {
+    "kalpa_baseline_zip": "84a771d229219eb357448e21b70ebacb978d6a8b8d9b4d25a9362da01c8ecbf7",
+    "northbound_reference_zip": "e11a324157e68117ebd91ba1eb973675e7d5e3c0165db96e8d62207ed0ca0b4a",
+    "frozen_v1_3_contract_xlsx": "d14ded3f75a380510b41d0f3911cc2b4fec52e40a72ba8776912ae38698e6cd2"
   },
   "protocol_sources_included": true
 }

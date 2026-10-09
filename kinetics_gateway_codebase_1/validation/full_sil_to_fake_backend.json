@@ -1,0 +1,124 @@
+{
+  "loops": 2,
+  "requests": [
+    {
+      "message_count": 10,
+      "wire_bytes": 18840,
+      "json_bytes": 466055,
+      "streams": [
+        [
+          "fast_bess_telemetry",
+          "bess_fast",
+          4
+        ],
+        [
+          "battery_charge_discharge_control",
+          "pair_controller",
+          4
+        ],
+        [
+          "gateway_health",
+          "gateway",
+          1
+        ],
+        [
+          "general_asset_telemetry",
+          "fire_protection",
+          7
+        ],
+        [
+          "general_asset_telemetry",
+          "ems_system",
+          45
+        ],
+        [
+          "general_asset_telemetry",
+          "pcs_extended",
+          344
+        ],
+        [
+          "general_asset_telemetry",
+          "dehumidifier",
+          9
+        ],
+        [
+          "general_asset_telemetry",
+          "remote_control",
+          26
+        ],
+        [
+          "general_asset_telemetry",
+          "liquid_cooling",
+          26
+        ],
+        [
+          "general_asset_telemetry",
+          "io_module",
+          17
+        ]
+      ]
+    },
+    {
+      "message_count": 1,
+      "wire_bytes": 174449,
+      "json_bytes": 8226890,
+      "streams": [
+        [
+          "general_asset_telemetry",
+          "bms_extended",
+          9020
+        ]
+      ]
+    }
+  ],
+  "final": {
+    "path": "/tmp/cs-int-vdhvivin/outbox.db",
+    "db_size_bytes": 35257888,
+    "logical_used_bytes": 8765440,
+    "reusable_page_bytes": 8232960,
+    "wal_bytes": 18193952,
+    "sendable_count": 0,
+    "unacked_count": 0,
+    "pending_count": 0,
+    "retry_count": 0,
+    "inflight_count": 0,
+    "acked_count": 11,
+    "dead_count": 0,
+    "sendable_bytes": 0,
+    "oldest_sendable_age_sec": null,
+    "by_priority": {},
+    "capacity": {
+      "can_accept": true,
+      "reasons": [],
+      "db_size_bytes": 35257888,
+      "logical_used_bytes": 8765440,
+      "reusable_page_bytes": 8232960,
+      "wal_bytes": 18193952,
+      "max_db_size_bytes": null,
+      "filesystem_free_mb": 29765,
+      "min_free_space_mb": 0
+    }
+  },
+  "uploader": {
+    "request_count": 2,
+    "request_success_count": 2,
+    "request_failure_count": 0,
+    "accepted_count": 11,
+    "already_processed_count": 0,
+    "retryable_rejected_count": 0,
+    "permanent_rejected_count": 0,
+    "missing_ack_count": 0,
+    "bytes_sent_uncompressed": 8692945,
+    "last_attempt_utc": "2026-10-09T17:05:32.685606Z",
+    "last_success_utc": "2026-10-09T17:05:32.851169Z",
+    "last_http_status": 200,
+    "last_error": null,
+    "last_request_id": "d28fd7dd-a992-4181-b2df-dfa7ef421662",
+    "worker_count": 1,
+    "active_request_count": 0,
+    "peak_active_request_count": 1,
+    "paused": false,
+    "pause_cycle_count": 0,
+    "last_pause_utc": null
+  }
+}

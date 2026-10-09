@@ -1,0 +1,16 @@
+[Unit]
+Description=Ornate EMS Central Sync (Northbound frozen v1.3 compatible)
+After=network-online.target ornate-ems-gateway.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/root/ornate-ems-gateway
+Environment=PYTHONUNBUFFERED=1
+EnvironmentFile=-/etc/default/ornate-central-sync
+ExecStart=/usr/bin/python3 -m app.central_sync.service --config configs/central_sync_frozen_v1_3_kalpa.json
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
