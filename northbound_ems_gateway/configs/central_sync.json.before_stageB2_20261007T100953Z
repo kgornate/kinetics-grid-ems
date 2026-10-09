@@ -234,7 +234,7 @@
     "marker_suffix": ".replayed.json",
     "scan_interval_sec": 5.0,
     "request_pause_sec": 3.0,
-    "max_messages_per_request": 50,
+    "max_messages_per_request": 100,
     "max_request_bytes": 1048576,
     "live_pause_sendable_count": 100,
     "live_pause_oldest_age_sec": 75.0,

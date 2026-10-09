@@ -14,10 +14,8 @@ from .general_asset_producer import GeneralAssetProducer
 from .soc_controller_producer import SocControllerProducer
 from .solis_producer import SolisProducer
 from .edge_ai_producer import EdgeAIProducer
-from .configuration_audit_producer import ConfigurationAuditProducer
 from .outbox import OutboxStore
 from .overflow_archiver import OverflowArchiver
-from .overflow_recovery import OverflowRecoveryService
 from .uploader import CentralSyncUploader
 
 
@@ -28,7 +26,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--status", action="store_true", help="Print current outbox/service status then exit")
     parser.add_argument(
         "--produce-once",
-        choices=["gateway_health", "fast_bess", "general_assets", "alarms_events", "soc_controller", "solis", "edge_ai", "configuration_audit"],
+        choices=["gateway_health", "fast_bess", "general_assets", "alarms_events", "soc_controller", "solis", "edge_ai"],
         help="Run one producer collection/enqueue cycle then exit without uploading",
     )
     return parser.parse_args()
@@ -48,14 +46,8 @@ async def amain() -> int:
         required_mount_path=config.outbox.required_mount_path,
         fail_if_mount_missing=config.outbox.fail_if_mount_missing,
     )
-    transport_lock = asyncio.Lock()
-    uploader = CentralSyncUploader(
-        config=config, outbox=outbox, transport_lock=transport_lock
-    )
+    uploader = CentralSyncUploader(config=config, outbox=outbox)
     overflow_archiver = OverflowArchiver(config=config, outbox=outbox)
-    overflow_recovery = OverflowRecoveryService(
-        config, transport_lock=transport_lock, client=uploader.client
-    )
     health_producer = GatewayHealthProducer(config=config, outbox=outbox)
     fast_bess_producer = FastBESSProducer(config=config, outbox=outbox)
     general_asset_producer = GeneralAssetProducer(config=config, outbox=outbox)
@@ -63,14 +55,9 @@ async def amain() -> int:
     soc_controller_producer = SocControllerProducer(config=config, outbox=outbox)
     solis_producer = SolisProducer(config=config, outbox=outbox)
     edge_ai_producer = EdgeAIProducer(config=config, outbox=outbox)
-    configuration_audit_producer = ConfigurationAuditProducer(
-        config=config, outbox=outbox, central_sync_config_path=args.config
-    )
 
     async def stop_all() -> None:
-        await overflow_recovery.stop()
         await overflow_archiver.stop()
-        await configuration_audit_producer.stop()
         await edge_ai_producer.stop()
         await solis_producer.stop()
         await soc_controller_producer.stop()
@@ -87,7 +74,6 @@ async def amain() -> int:
                     {
                         "central_sync": uploader.status(),
                         "overflow_archiver": overflow_archiver.status(),
-                        "overflow_recovery": overflow_recovery.status(),
                         "gateway_health_producer": health_producer.status(),
                         "fast_bess_producer": fast_bess_producer.status(),
                         "general_asset_producer": general_asset_producer.status(),
@@ -95,7 +81,6 @@ async def amain() -> int:
                         "soc_controller_producer": soc_controller_producer.status(),
                         "solis_producer": solis_producer.status(),
                         "edge_ai_producer": edge_ai_producer.status(),
-                        "configuration_audit_producer": configuration_audit_producer.status(),
                     },
                     indent=2,
                 )
@@ -169,14 +154,6 @@ async def amain() -> int:
             print(json.dumps(result, indent=2))
             return 0
 
-        if args.produce_once == "configuration_audit":
-            if not config.configuration_audit.enabled:
-                print("configuration_audit producer disabled by config")
-                return 2
-            result = await configuration_audit_producer.collect_once()
-            print(json.dumps(result, indent=2))
-            return 0
-
         if args.once:
             await uploader.run_once()
             print(json.dumps(uploader.status(), indent=2))
@@ -190,13 +167,6 @@ async def amain() -> int:
                 pass
 
         tasks = [asyncio.create_task(uploader.run_forever(), name="central-sync-uploader")]
-        if config.overflow_recovery.enabled:
-            tasks.append(
-                asyncio.create_task(
-                    overflow_recovery.run_forever(),
-                    name="central-sync-overflow-recovery",
-                )
-            )
         if config.overflow_archive.enabled:
             tasks.append(
                 asyncio.create_task(
@@ -261,14 +231,6 @@ async def amain() -> int:
                 )
             )
 
-        if config.configuration_audit.enabled:
-            tasks.append(
-                asyncio.create_task(
-                    configuration_audit_producer.run_forever(),
-                    name="configuration-audit-producer",
-                )
-            )
-
         # If any top-level loop exits unexpectedly, stop the others and let
         # systemd restart the process. Producer-internal poll failures are caught
         # by the producer and do not terminate the service.
@@ -282,9 +244,7 @@ async def amain() -> int:
             await asyncio.gather(*pending, return_exceptions=True)
         return 0
     finally:
-        await overflow_recovery.close()
         await overflow_archiver.close()
-        await configuration_audit_producer.close()
         await edge_ai_producer.close()
         await solis_producer.close()
         await soc_controller_producer.close()

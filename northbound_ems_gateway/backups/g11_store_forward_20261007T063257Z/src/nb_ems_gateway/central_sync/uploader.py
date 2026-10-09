@@ -19,7 +19,6 @@ from .client import CentralBackendClient, TransportResponse
 from .config import CentralSyncConfig
 from .outbox import OutboxItem, OutboxStore
 from .status import safe_write_json, utc_now_iso
-from .transport_control import TransportPauseController
 
 log = logging.getLogger(__name__)
 
@@ -43,9 +42,6 @@ class UploaderCounters:
     worker_count: int = 1
     active_request_count: int = 0
     peak_active_request_count: int = 0
-    paused: bool = False
-    pause_cycle_count: int = 0
-    last_pause_utc: str | None = None
 
 
 class CentralSyncUploader:
@@ -55,13 +51,10 @@ class CentralSyncUploader:
         config: CentralSyncConfig,
         outbox: OutboxStore,
         client: CentralBackendClient | Any | None = None,
-        transport_lock: asyncio.Lock | None = None,
     ) -> None:
         self.config = config
         self.outbox = outbox
         self.client = client or CentralBackendClient(config.backend, config.identity.gateway_id)
-        self.transport_lock = transport_lock or asyncio.Lock()
-        self.pause_control = TransportPauseController(config.uploader.pause_file)
         self.batcher = OutboxBatcher(
             outbox,
             gateway_id=config.identity.gateway_id,
@@ -133,20 +126,12 @@ class CentralSyncUploader:
         log.info("central sync live upload worker started worker=%d", worker_id)
         try:
             while not self._stop.is_set():
-                if self.pause_control.is_paused():
-                    self.counters.paused = True
-                    self.counters.pause_cycle_count += 1
-                    self.counters.last_pause_utc = utc_now_iso()
-                    sent = False
-                    sleep_for = float(self.config.uploader.pause_poll_sec)
-                else:
-                    self.counters.paused = False
-                    sent = await self._run_transport_once()
-                    sleep_for = (
-                        self.config.uploader.idle_sleep_sec
-                        if sent
-                        else self.config.uploader.scan_interval_sec
-                    )
+                sent = await self._run_transport_once()
+                sleep_for = (
+                    self.config.uploader.idle_sleep_sec
+                    if sent
+                    else self.config.uploader.scan_interval_sec
+                )
                 try:
                     await asyncio.wait_for(
                         self._stop.wait(),
@@ -188,15 +173,6 @@ class CentralSyncUploader:
         return sent
 
     async def _run_transport_once(self) -> bool:
-        # Pause is checked before batch preparation so rows are never claimed
-        # inflight while transport is intentionally disabled. Producers and
-        # overflow archival continue in the parent service.
-        if self.pause_control.is_paused():
-            self.counters.paused = True
-            self.counters.pause_cycle_count += 1
-            self.counters.last_pause_utc = utc_now_iso()
-            return False
-        self.counters.paused = False
         prepared = await asyncio.to_thread(self.batcher.prepare)
         if not prepared:
             return False
@@ -214,10 +190,7 @@ class CentralSyncUploader:
             self.counters.active_request_count,
         )
         try:
-            # Shared lock serializes live and overflow-recovery HTTP requests,
-            # preserving the validated single-request transport architecture.
-            async with self.transport_lock:
-                response = await self.client.post_batch(prepared.json_bytes)
+            response = await self.client.post_batch(prepared.json_bytes)
         finally:
             self.counters.active_request_count = max(
                 0, self.counters.active_request_count - 1
@@ -555,7 +528,6 @@ class CentralSyncUploader:
                 "http_client_recreate_count": int(getattr(self.client, "http_client_recreate_count", 0)),
                 "consecutive_transport_failures": int(getattr(self.client, "_consecutive_transport_failures", 0)),
             },
-            "transport_control": self.pause_control.status(),
             "outbox": self.outbox.stats(max_age_sec=30.0),
             "uploader": self.counters.__dict__.copy(),
             "stream_backend_ack": {

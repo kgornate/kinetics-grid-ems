@@ -85,10 +85,9 @@ class FastBESSLogger:
     async def start(self) -> None:
         if not self.config.enabled:
             return
-        # G12: live Fast-BESS publication is independent of the legacy
-        # SQLite historian. The sampling thread must continue running when
-        # storage is disabled because Central Sync S1/S4 consume the
-        # /run/nb-ems/fast_bess_live.json RAM snapshot.
+        if not self.container.storage:
+            self.last_error = 'storage disabled; fast BESS logger cannot start'
+            return
         self.load_profile()
         self._running = True
         self._stop_event.clear()

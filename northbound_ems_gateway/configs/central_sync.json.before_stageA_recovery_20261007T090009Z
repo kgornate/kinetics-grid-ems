@@ -233,12 +233,12 @@
     "uploader_status_file": "/var/lib/nb-ems-central-sync/overflow_recovery_uploader_status.json",
     "marker_suffix": ".replayed.json",
     "scan_interval_sec": 5.0,
-    "request_pause_sec": 3.0,
-    "max_messages_per_request": 50,
-    "max_request_bytes": 1048576,
-    "live_pause_sendable_count": 100,
-    "live_pause_oldest_age_sec": 75.0,
+    "request_pause_sec": 10.0,
+    "max_messages_per_request": 25,
+    "max_request_bytes": 131072,
+    "live_pause_sendable_count": 25,
+    "live_pause_oldest_age_sec": 3.0,
     "min_available_memory_mb": 500,
-    "max_load1": 4.5
+    "max_load1": 2.0
   }
 }

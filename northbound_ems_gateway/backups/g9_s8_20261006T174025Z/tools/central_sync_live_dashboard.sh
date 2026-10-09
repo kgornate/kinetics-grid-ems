@@ -5,7 +5,6 @@ TARGET="${1:-/root/kinetics-grid-ems/northbound_ems_gateway}"
 DB="/mnt/ems-logs/northbound_ems_gateway/central_sync_outbox.db"
 STATUS="/var/lib/nb-ems-central-sync/status.json"
 OVERFLOW="/var/lib/nb-ems-central-sync/overflow_archiver_status.json"
-RECOVERY="/var/lib/nb-ems-central-sync/overflow_recovery_status.json"
 
 cd "$TARGET" || exit 1
 
@@ -19,16 +18,7 @@ while true; do
 
     LIVE="$(systemctl is-active central-sync.service 2>/dev/null || true)"
     REPLAY="$(systemctl is-active central-sync-backlog-replay.service 2>/dev/null || true)"
-    printf " Central Sync   : %-10s    Legacy Replay  : %-10s\n" "$LIVE" "$REPLAY"
-    python3 - "$STATUS" <<'PY'
-import json,sys
-try:
-    d=json.load(open(sys.argv[1]))
-    t=d.get("transport_control") or {}
-    print(" Transport      : %s" % ("PAUSED (producers still logging)" if t.get("paused") else "RUNNING"))
-except Exception:
-    print(" Transport      : status unavailable")
-PY
+    printf " Central Sync   : %-10s    Backlog Replay : %-10s\n" "$LIVE" "$REPLAY"
 
     PID="$(systemctl show central-sync.service -p MainPID --value 2>/dev/null || true)"
     if [ -n "$PID" ] && [ "$PID" != "0" ]; then
@@ -56,7 +46,6 @@ stream_defs = [
     ("S5", "soc_controller", "SOC Controller", "soc_controller", False),
     ("S6", "solis", "Solis", "solis", False),
     ("S7", "edge_ai", "Edge AI", "edge_ai", False),
-    ("S8", "configuration_audit", "Config Audit", "configuration_audit", True),
 ]
 
 def parse_ts(v):
@@ -145,7 +134,7 @@ for sid, stream, label, cfg_key, event_driven in stream_defs:
 
 print()
 print(" ACK counters are backend-confirmed per-message ACKs since current Central Sync start.")
-print(" accepted/already_processed = ACK success; EVENT-IDLE is normal for S4/S8 with no new event.")
+print(" accepted/already_processed = ACK success; EVENT-IDLE is normal for S4 with no new event.")
 PY
 
     echo
@@ -192,25 +181,8 @@ except Exception:
 PY
 
     echo
-    echo "---------------- OVERFLOW RECOVERY --------------------------------------------"
-    python3 - "$RECOVERY" <<'PY'
-import json, sys
-from pathlib import Path
-try:
-    d=json.loads(Path(sys.argv[1]).read_text())
-    c=d.get("counters",{})
-    gate=d.get("resource_gate",{}) or {}
-    print(" Running=%s  Archive=%s  ReplayReq=%s  Drained=%s  Paused=%s  Failures=%s" % (
-        d.get("running"), c.get("last_archive_path") or "--",
-        c.get("request_cycle_count",0), c.get("archive_drained_count",0),
-        c.get("last_pause_reason") or "--", c.get("failure_count",0)))
-except Exception:
-    print(" Overflow recovery status unavailable")
-PY
-
-    echo
     echo "================================================================================"
-    echo " Healthy: S1-S8 ON | transport RUNNING or intentionally PAUSED | HTTP 200 when online"
+    echo " Healthy: S1-S6 ON | recent ACK ages | HTTP 200 | queue age low | overflow 0"
     echo " Refresh every 5 sec                                            Ctrl+C to exit"
     echo "================================================================================"
     sleep 5

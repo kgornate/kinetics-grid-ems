@@ -48,39 +48,6 @@ class LocalGatewayApiClient:
     async def solis_history(self, **params: Any) -> dict[str, Any]:
         return await self._get_json(self.config.solis_history_path, params=params)
 
-    async def post_json(self, path: str, body: dict[str, Any]) -> dict[str, Any]:
-        """Execute an existing authenticated local Gateway API command.
-
-        D1 never writes Modbus directly; all execution passes through the same
-        internal_admin-protected API/control service already used by operators.
-        """
-        token = await self._ensure_token()
-        url = self.config.base_url.rstrip("/") + (path if path.startswith("/") else f"/{path}")
-        response = await self.client.post(
-            url,
-            json=body,
-            headers={"Authorization": f"Bearer {token}"},
-        )
-        if response.status_code == 401:
-            self._token = None
-            token = await self._ensure_token(force_login=True)
-            response = await self.client.post(
-                url,
-                json=body,
-                headers={"Authorization": f"Bearer {token}"},
-            )
-        if response.status_code < 200 or response.status_code >= 300:
-            raise LocalGatewayApiError(
-                f"POST {path} returned HTTP {response.status_code}: {response.text[:500]}"
-            )
-        try:
-            data = response.json()
-        except Exception as exc:
-            raise LocalGatewayApiError(f"gateway API {path} response is not valid JSON: {exc}") from exc
-        if not isinstance(data, dict):
-            raise LocalGatewayApiError(f"gateway API {path} response must be a JSON object")
-        return data
-
     async def _get_json(self, path: str, *, params: dict[str, Any] | None = None) -> dict[str, Any]:
         token = await self._ensure_token()
         url = self.config.base_url.rstrip("/") + (path if path.startswith("/") else f"/{path}")

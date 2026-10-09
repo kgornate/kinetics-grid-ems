@@ -4,7 +4,7 @@
     "site_id": "unityess-site-001",
     "gateway_id": "unityess-gw-001",
     "schema_version": "1.0",
-    "software_version": "central-sync-g11-store-forward-recovery"
+    "software_version": "central-sync-g9-s8-config-audit"
   },
   "backend": {
     "base_url": "https://bess-ems-api.unityess.cloud",
@@ -44,9 +44,7 @@
     "worker_count": 1,
     "fair_batching_enabled": true,
     "priority_bias_sec": 2.0,
-    "candidate_scan_limit": 512,
-    "pause_file": "/var/lib/nb-ems-central-sync/uploader.pause",
-    "pause_poll_sec": 1.0
+    "candidate_scan_limit": 512
   },
   "status_file": "/var/lib/nb-ems-central-sync/status.json",
   "log_level": "INFO",
@@ -224,21 +222,5 @@
     "model_manifest_path": "/root/kinetics-grid-ems/northbound_ems_gateway/edge_ai_poc/runtime_v0_3/phase7_runtime_bundle_v0_3/model/ml_model_manifest_v0_3.json",
     "state_file": "/var/lib/nb-ems-central-sync/s8_configuration_audit_state.json",
     "status_file": "/var/lib/nb-ems-central-sync/s8_configuration_audit_producer_status.json"
-  },
-  "overflow_recovery": {
-    "enabled": true,
-    "archive_dir": "/mnt/ems-logs/northbound_ems_gateway/backlog_archives",
-    "archive_glob": "central_sync_overflow_*.db",
-    "status_file": "/var/lib/nb-ems-central-sync/overflow_recovery_status.json",
-    "uploader_status_file": "/var/lib/nb-ems-central-sync/overflow_recovery_uploader_status.json",
-    "marker_suffix": ".replayed.json",
-    "scan_interval_sec": 5.0,
-    "request_pause_sec": 3.0,
-    "max_messages_per_request": 50,
-    "max_request_bytes": 1048576,
-    "live_pause_sendable_count": 100,
-    "live_pause_oldest_age_sec": 75.0,
-    "min_available_memory_mb": 500,
-    "max_load1": 4.5
   }
 }

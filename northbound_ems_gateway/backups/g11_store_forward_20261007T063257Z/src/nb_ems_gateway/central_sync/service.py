@@ -17,7 +17,6 @@ from .edge_ai_producer import EdgeAIProducer
 from .configuration_audit_producer import ConfigurationAuditProducer
 from .outbox import OutboxStore
 from .overflow_archiver import OverflowArchiver
-from .overflow_recovery import OverflowRecoveryService
 from .uploader import CentralSyncUploader
 
 
@@ -48,14 +47,8 @@ async def amain() -> int:
         required_mount_path=config.outbox.required_mount_path,
         fail_if_mount_missing=config.outbox.fail_if_mount_missing,
     )
-    transport_lock = asyncio.Lock()
-    uploader = CentralSyncUploader(
-        config=config, outbox=outbox, transport_lock=transport_lock
-    )
+    uploader = CentralSyncUploader(config=config, outbox=outbox)
     overflow_archiver = OverflowArchiver(config=config, outbox=outbox)
-    overflow_recovery = OverflowRecoveryService(
-        config, transport_lock=transport_lock, client=uploader.client
-    )
     health_producer = GatewayHealthProducer(config=config, outbox=outbox)
     fast_bess_producer = FastBESSProducer(config=config, outbox=outbox)
     general_asset_producer = GeneralAssetProducer(config=config, outbox=outbox)
@@ -68,7 +61,6 @@ async def amain() -> int:
     )
 
     async def stop_all() -> None:
-        await overflow_recovery.stop()
         await overflow_archiver.stop()
         await configuration_audit_producer.stop()
         await edge_ai_producer.stop()
@@ -87,7 +79,6 @@ async def amain() -> int:
                     {
                         "central_sync": uploader.status(),
                         "overflow_archiver": overflow_archiver.status(),
-                        "overflow_recovery": overflow_recovery.status(),
                         "gateway_health_producer": health_producer.status(),
                         "fast_bess_producer": fast_bess_producer.status(),
                         "general_asset_producer": general_asset_producer.status(),
@@ -190,13 +181,6 @@ async def amain() -> int:
                 pass
 
         tasks = [asyncio.create_task(uploader.run_forever(), name="central-sync-uploader")]
-        if config.overflow_recovery.enabled:
-            tasks.append(
-                asyncio.create_task(
-                    overflow_recovery.run_forever(),
-                    name="central-sync-overflow-recovery",
-                )
-            )
         if config.overflow_archive.enabled:
             tasks.append(
                 asyncio.create_task(
@@ -282,7 +266,6 @@ async def amain() -> int:
             await asyncio.gather(*pending, return_exceptions=True)
         return 0
     finally:
-        await overflow_recovery.close()
         await overflow_archiver.close()
         await configuration_audit_producer.close()
         await edge_ai_producer.close()

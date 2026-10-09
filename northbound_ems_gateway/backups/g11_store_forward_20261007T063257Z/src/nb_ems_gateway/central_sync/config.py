@@ -421,50 +421,6 @@ class BacklogReplayConfig(BaseModel):
         return int(value)
 
 
-class OverflowRecoveryConfig(BaseModel):
-    """Automatic replay of overflow DB segments after transport recovery.
-
-    This is intentionally separate from ``backlog_replay`` so the legacy
-    historical backlog archive is never started or drained automatically.
-    """
-
-    enabled: bool = True
-    archive_dir: str = "/mnt/ems-logs/northbound_ems_gateway/backlog_archives"
-    archive_glob: str = "central_sync_overflow_*.db"
-    status_file: str = "/var/lib/nb-ems-central-sync/overflow_recovery_status.json"
-    uploader_status_file: str = "/var/lib/nb-ems-central-sync/overflow_recovery_uploader_status.json"
-    marker_suffix: str = ".replayed.json"
-    scan_interval_sec: float = 5.0
-    request_pause_sec: float = 10.0
-    max_messages_per_request: int = 25
-    max_request_bytes: int = 128 * 1024
-    live_pause_sendable_count: int = 25
-    live_pause_oldest_age_sec: float = 3.0
-    min_available_memory_mb: int = 500
-    max_load1: float = 2.0
-
-    @field_validator("scan_interval_sec", "request_pause_sec", "live_pause_oldest_age_sec", "max_load1")
-    @classmethod
-    def _positive_recovery_timing(cls, value: float) -> float:
-        if value <= 0:
-            raise ValueError("overflow recovery timing/load values must be > 0")
-        return float(value)
-
-    @field_validator("max_messages_per_request", "max_request_bytes", "min_available_memory_mb")
-    @classmethod
-    def _positive_recovery_limits(cls, value: int) -> int:
-        if value < 1:
-            raise ValueError("overflow recovery limits must be >= 1")
-        return int(value)
-
-    @field_validator("live_pause_sendable_count")
-    @classmethod
-    def _nonnegative_recovery_live_count(cls, value: int) -> int:
-        if value < 0:
-            raise ValueError("overflow recovery live_pause_sendable_count must be >= 0")
-        return int(value)
-
-
 class UploaderConfig(BaseModel):
     scan_interval_sec: float = 1.0
     coalescing_window_sec: float = 1.0
@@ -481,15 +437,6 @@ class UploaderConfig(BaseModel):
     max_retry_after_sec: float = 600.0
     status_interval_sec: float = 2.0
     idle_sleep_sec: float = 0.25
-    pause_file: str = "/var/lib/nb-ems-central-sync/uploader.pause"
-    pause_poll_sec: float = 1.0
-
-    @field_validator("pause_poll_sec")
-    @classmethod
-    def _pause_poll_positive(cls, value: float) -> float:
-        if value <= 0:
-            raise ValueError("pause_poll_sec must be > 0")
-        return float(value)
 
     @field_validator("max_messages_per_request")
     @classmethod
@@ -535,7 +482,6 @@ class CentralSyncConfig(BaseModel):
     configuration_audit: ConfigurationAuditProducerConfig = Field(default_factory=ConfigurationAuditProducerConfig)
     outbox: OutboxConfig = Field(default_factory=OutboxConfig)
     overflow_archive: OverflowArchiveConfig = Field(default_factory=OverflowArchiveConfig)
-    overflow_recovery: OverflowRecoveryConfig = Field(default_factory=OverflowRecoveryConfig)
     backlog_replay: BacklogReplayConfig = Field(default_factory=BacklogReplayConfig)
     uploader: UploaderConfig = Field(default_factory=UploaderConfig)
     status_file: str = "/var/lib/nb-ems-central-sync/status.json"
