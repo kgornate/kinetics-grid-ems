@@ -1,0 +1,10 @@
+[Unit]
+Description=Run EMS Wi-Fi boot stabilizer after boot and periodically
+
+[Timer]
+OnBootSec=90
+OnUnitActiveSec=60
+AccuracySec=10
+
+[Install]
+WantedBy=timers.target

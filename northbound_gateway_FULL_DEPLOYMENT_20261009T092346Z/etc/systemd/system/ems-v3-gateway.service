@@ -1,0 +1,18 @@
+[Unit]
+Description=EMS V3 Full Gateway
+After=ems-v3-eth1.service ems-v3-wifi.service cloudflared.service ems-v3-solis-link.service
+Wants=ems-v3-eth1.service ems-v3-wifi.service cloudflared.service ems-v3-solis-link.service
+
+[Service]
+Type=simple
+User=root
+EnvironmentFile=-/etc/nb_ems_gateway.conf
+ExecStart=/root/kinetics-grid-ems/ems_network_bootup/nb_ems_gateway_start.sh
+WorkingDirectory=/root/kinetics-grid-ems/ems_network_bootup
+Restart=always
+RestartSec=5
+StandardOutput=journal+console
+StandardError=journal+console
+
+[Install]
+WantedBy=multi-user.target

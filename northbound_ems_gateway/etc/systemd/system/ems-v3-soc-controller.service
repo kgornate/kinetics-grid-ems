@@ -1,0 +1,17 @@
+[Unit]
+Description=EMS V3 SOC + Solis automatic controller
+After=ems-v3-eth1.service ems-v3-wifi.service ems-v3-solis-link.service cloudflared.service
+Wants=ems-v3-eth1.service ems-v3-wifi.service ems-v3-solis-link.service cloudflared.service
+
+[Service]
+Type=simple
+WorkingDirectory=/root/kinetics-grid-ems/northbound_ems_gateway
+ExecStart=/bin/sh -lc 'exec /usr/bin/python3 tools/soc_only_controller.py --config configs/soc_solis_field_rtu.json --live'
+Restart=always
+RestartSec=5
+KillMode=process
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

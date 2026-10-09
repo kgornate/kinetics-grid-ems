@@ -1,0 +1,384 @@
+Binary files /mnt/data/full_fast_v2_src/northbound_ems_gateway/src/nb_ems_gateway/storage/__pycache__/fast_bess_logger.cpython-313.pyc and /mnt/data/fast_bess_v21_work/northbound_ems_gateway/src/nb_ems_gateway/storage/__pycache__/fast_bess_logger.cpython-313.pyc differ
+Binary files /mnt/data/full_fast_v2_src/northbound_ems_gateway/src/nb_ems_gateway/storage/__pycache__/sqlite_store.cpython-313.pyc and /mnt/data/fast_bess_v21_work/northbound_ems_gateway/src/nb_ems_gateway/storage/__pycache__/sqlite_store.cpython-313.pyc differ
+diff -ru /mnt/data/full_fast_v2_src/northbound_ems_gateway/src/nb_ems_gateway/storage/fast_bess_logger.py /mnt/data/fast_bess_v21_work/northbound_ems_gateway/src/nb_ems_gateway/storage/fast_bess_logger.py
+--- /mnt/data/full_fast_v2_src/northbound_ems_gateway/src/nb_ems_gateway/storage/fast_bess_logger.py	2026-08-10 12:52:43.109172194 +0000
++++ /mnt/data/fast_bess_v21_work/northbound_ems_gateway/src/nb_ems_gateway/storage/fast_bess_logger.py	2026-08-10 13:16:53.873951356 +0000
+@@ -2,6 +2,7 @@
+ 
+ import asyncio
+ import json
++import threading
+ import time
+ from datetime import datetime, timezone
+ from pathlib import Path
+@@ -22,11 +23,16 @@
+ class FastBESSLogger:
+     """One-second logger for critical PCS/BMS values.
+ 
+-    V2 keeps the logger independent from the normal historian and supports two
+-    write modes:
++    V2.1 keeps the compact V2 storage format but changes the logger execution
++    model from an asyncio task to a dedicated daemon thread.
+ 
+-    * compact_json: legacy v1 format. Each signal is stored as a verbose object.
+-    * value_only: V2 90-day format. Each signal is stored as a scalar value only.
++    Why this matters:
++    the main Modbus polling loop is synchronous/blocking while it reads all
++    register points. An asyncio logger task can only run between polling cycles,
++    so a configured 1-second logger can effectively become 5-7 seconds. A
++    dedicated thread can sample the latest AssetManager values every second
++    without issuing extra Modbus reads and without waiting for the full poll
++    cycle to finish.
+ 
+     The logger samples the latest values already present in AssetManager. It does
+     not issue extra Modbus reads, so it does not disturb gateway polling or the
+@@ -36,7 +42,8 @@
+     def __init__(self, config: FastBESSLoggerConfig, container: Any) -> None:
+         self.config = config
+         self.container = container
+-        self._task: asyncio.Task | None = None
++        self._thread: threading.Thread | None = None
++        self._stop_event = threading.Event()
+         self._running = False
+         self._profile: dict[str, list[str]] = {}
+         self._profile_error: str | None = None
+@@ -47,6 +54,7 @@
+         self.last_sample_utc: str | None = None
+         self.last_cleanup_ts = 0.0
+         self.last_cleanup_result: dict[str, Any] | None = None
++        self.execution_mode = 'threaded'
+ 
+     def load_profile(self) -> None:
+         path = Path(self.config.profile_path)
+@@ -78,7 +86,13 @@
+             return
+         self.load_profile()
+         self._running = True
+-        self._task = asyncio.create_task(self._loop())
++        self._stop_event.clear()
++        self._thread = threading.Thread(
++            target=self._thread_loop,
++            name='fast-bess-logger',
++            daemon=True,
++        )
++        self._thread.start()
+         if self.config.log_start_stop_events:
+             self.container.event_logger.info(
+                 'fast_bess_logger_started',
+@@ -89,9 +103,9 @@
+ 
+     async def stop(self) -> None:
+         self._running = False
+-        if self._task:
+-            self._task.cancel()
+-            await asyncio.gather(self._task, return_exceptions=True)
++        self._stop_event.set()
++        if self._thread and self._thread.is_alive():
++            await asyncio.to_thread(self._thread.join, 5.0)
+         if self.config.enabled and self.config.log_start_stop_events:
+             self.container.event_logger.info(
+                 'fast_bess_logger_stopped',
+@@ -100,22 +114,39 @@
+                 source='fast_bess_logger',
+             )
+ 
+-    async def _loop(self) -> None:
+-        while self._running:
+-            start = time.time()
++    def _thread_loop(self) -> None:
++        interval = max(0.1, float(self.config.interval_sec or 1.0))
++        next_tick = time.monotonic()
++        while not self._stop_event.is_set():
++            start = time.monotonic()
+             try:
+                 self.sample_once()
+             except Exception as exc:
+                 self.last_error = str(exc)
+                 self.skipped_count += 1
+-                self.container.event_logger.error(
+-                    'fast_bess_logger_error',
+-                    f'Fast BESS logger sample failed: {exc}',
+-                    {'error': str(exc)},
+-                    source='fast_bess_logger',
+-                )
+-            elapsed = time.time() - start
+-            await asyncio.sleep(max(0.05, self.config.interval_sec - elapsed))
++                try:
++                    self.container.event_logger.error(
++                        'fast_bess_logger_error',
++                        f'Fast BESS logger sample failed: {exc}',
++                        {'error': str(exc)},
++                        source='fast_bess_logger',
++                    )
++                except Exception:
++                    pass
++
++            # Stable periodic timing: schedule the next tick from the intended
++            # cadence rather than from the end time. If the system is delayed by
++            # more than one interval, reset to avoid a catch-up burst.
++            next_tick += interval
++            delay = next_tick - time.monotonic()
++            if delay < -interval:
++                next_tick = time.monotonic() + interval
++                delay = interval
++            self._stop_event.wait(max(0.0, delay))
++
++            # If one sample itself takes longer than the interval, do not spin.
++            if time.monotonic() - start > interval and not self._stop_event.is_set():
++                time.sleep(0.01)
+ 
+     def _source_asset_ids(self, source_id: str) -> dict[str, str]:
+         mapped = self.config.source_asset_map.get(source_id) or {}
+@@ -153,12 +184,8 @@
+                 bad += 1
+ 
+             if value_only:
+-                # V2 compact storage: keep only scalar values. Unit, display name,
+-                # category and per-signal timestamps remain available from the
+-                # live register map/API and are not repeated every second.
+                 out[signal_name] = sig.get('value')
+             else:
+-                # Legacy v1 storage shape retained for fallback/debug only.
+                 out[signal_name] = {
+                     'value': sig.get('value'),
+                     'unit': sig.get('unit'),
+@@ -240,13 +267,6 @@
+         self.last_cleanup_result = self.container.storage.cleanup_fast_bess_samples(self.config.retention_days)
+ 
+     def expand_item(self, item: dict[str, Any]) -> dict[str, Any]:
+-        """Return API-friendly item.
+-
+-        V2 database rows store scalar values only. This method keeps the API
+-        stable enough for Flutter/server consumers by returning the same keys and
+-        adding profile/write-mode context. The value itself is directly available
+-        at item['pcs_values'][signal_name] and item['bms_values'][signal_name].
+-        """
+         item.setdefault('profile_name', self.config.profile_name)
+         item.setdefault('write_mode', self.config.write_mode)
+         item.setdefault('schema_version', 2 if self.config.write_mode == 'value_only' else 1)
+@@ -267,6 +287,8 @@
+         return {
+             'enabled': self.config.enabled,
+             'running': self._running,
++            'execution_mode': self.execution_mode,
++            'thread_alive': bool(self._thread and self._thread.is_alive()),
+             'interval_sec': self.config.interval_sec,
+             'retention_days': self.config.retention_days,
+             'write_mode': self.config.write_mode,
+diff -ru /mnt/data/full_fast_v2_src/northbound_ems_gateway/src/nb_ems_gateway/storage/sqlite_store.py /mnt/data/fast_bess_v21_work/northbound_ems_gateway/src/nb_ems_gateway/storage/sqlite_store.py
+--- /mnt/data/full_fast_v2_src/northbound_ems_gateway/src/nb_ems_gateway/storage/sqlite_store.py	2026-08-10 12:53:34.373600051 +0000
++++ /mnt/data/fast_bess_v21_work/northbound_ems_gateway/src/nb_ems_gateway/storage/sqlite_store.py	2026-08-10 13:17:54.370162130 +0000
+@@ -1,5 +1,5 @@
+ from __future__ import annotations
+-import csv, io, json, os, shutil, sqlite3, time
++import csv, io, json, os, shutil, sqlite3, threading, time
+ from datetime import datetime, timezone, timedelta
+ from pathlib import Path
+ from typing import Any
+@@ -12,12 +12,19 @@
+         self.skipped_write_count=0
+         self.last_skip_reason: str | None=None
+         self.last_snapshot_write_ts=0.0
++        self._lock=threading.RLock()
+         h=self.health()
+         if not h['can_write'] and config.fail_if_mount_missing:
+             raise RuntimeError('Storage is not writable: ' + '; '.join(h['reasons']))
+         self.path.parent.mkdir(parents=True, exist_ok=True)
+-        self.conn=sqlite3.connect(self.path, check_same_thread=False)
++        self.conn=sqlite3.connect(self.path, timeout=30.0, check_same_thread=False)
+         self.conn.row_factory=sqlite3.Row
++        self.conn.execute('PRAGMA busy_timeout=30000')
++        try:
++            self.conn.execute('PRAGMA journal_mode=WAL')
++            self.conn.execute('PRAGMA synchronous=NORMAL')
++        except Exception:
++            pass
+         self._init_schema()
+         if config.cleanup_on_startup:
+             self.cleanup(retention_days=config.retention_days, vacuum=False)
+@@ -93,13 +100,14 @@
+     def status(self) -> dict[str,Any]:
+         h=self.health(); tables={}; table_errors={}
+         if hasattr(self,'conn'):
+-            for t in ['telemetry_snapshots','telemetry_points','gateway_events','fast_bess_samples']:
+-                try:
+-                    row=self.conn.execute(f'SELECT COUNT(*) FROM {t}').fetchone()
+-                    tables[t]=int(row[0]) if row and row[0] is not None else 0
+-                except Exception as exc:
+-                    tables[t]=None
+-                    table_errors[t]=str(exc)
++            with self._lock:
++                for t in ['telemetry_snapshots','telemetry_points','gateway_events','fast_bess_samples']:
++                    try:
++                        row=self.conn.execute(f'SELECT COUNT(*) FROM {t}').fetchone()
++                        tables[t]=int(row[0]) if row and row[0] is not None else 0
++                    except Exception as exc:
++                        tables[t]=None
++                        table_errors[t]=str(exc)
+         h['tables']=tables
+         if table_errors:
+             h['table_errors']=table_errors
+@@ -154,83 +162,86 @@
+             raise
+ 
+     def insert_fast_bess_sample(self, sample: dict[str,Any]) -> int | None:
+-        if not self._can_write():
+-            return None
+-        ts = sample.get('timestamp_utc') or datetime.now(timezone.utc).isoformat()
+-        epoch_ms = int(sample.get('timestamp_epoch_ms') or int(time.time() * 1000))
+-        write_mode = sample.get('write_mode') or 'compact_json'
+-        schema_version = int(sample.get('schema_version') or (2 if write_mode == 'value_only' else 1))
+-
+-        # V2 compact mode intentionally does not repeat payload_json, units,
+-        # display names, categories or per-signal update timestamps every second.
+-        # Those static/diagnostic details remain available from the live API and
+-        # profile/register map, while the DB keeps the time-series values.
+-        payload_json = None if write_mode == 'value_only' else json.dumps(sample, separators=(',',':'))
+-
+-        cur = self.conn.execute(
+-            '''INSERT INTO fast_bess_samples(
+-                timestamp_utc,timestamp_epoch_ms,source_id,bess_id,pcs_asset_id,bms_asset_id,
+-                pcs_values_json,bms_values_json,selected_signal_count,good_signal_count,
+-                bad_signal_count,max_data_age_ms,quality,payload_json,
+-                schema_version,profile_name,write_mode
+-            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',
+-            (
+-                ts,
+-                epoch_ms,
+-                sample.get('source_id'),
+-                sample.get('bess_id'),
+-                sample.get('pcs_asset_id'),
+-                sample.get('bms_asset_id'),
+-                json.dumps(sample.get('pcs_values') or {}, separators=(',',':')),
+-                json.dumps(sample.get('bms_values') or {}, separators=(',',':')),
+-                int(sample.get('selected_signal_count') or 0),
+-                int(sample.get('good_signal_count') or 0),
+-                int(sample.get('bad_signal_count') or 0),
+-                sample.get('max_data_age_ms'),
+-                sample.get('quality'),
+-                payload_json,
+-                schema_version,
+-                sample.get('profile_name'),
+-                write_mode,
+-            ),
+-        )
+-        self.conn.commit()
+-        return int(cur.lastrowid)
++        with self._lock:
++            if not self._can_write():
++                return None
++            ts = sample.get('timestamp_utc') or datetime.now(timezone.utc).isoformat()
++            epoch_ms = int(sample.get('timestamp_epoch_ms') or int(time.time() * 1000))
++            write_mode = sample.get('write_mode') or 'compact_json'
++            schema_version = int(sample.get('schema_version') or (2 if write_mode == 'value_only' else 1))
++
++            # V2 compact mode intentionally does not repeat payload_json, units,
++            # display names, categories or per-signal update timestamps every second.
++            payload_json = None if write_mode == 'value_only' else json.dumps(sample, separators=(',',':'))
++
++            cur = self.conn.execute(
++                '''INSERT INTO fast_bess_samples(
++                    timestamp_utc,timestamp_epoch_ms,source_id,bess_id,pcs_asset_id,bms_asset_id,
++                    pcs_values_json,bms_values_json,selected_signal_count,good_signal_count,
++                    bad_signal_count,max_data_age_ms,quality,payload_json,
++                    schema_version,profile_name,write_mode
++                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',
++                (
++                    ts,
++                    epoch_ms,
++                    sample.get('source_id'),
++                    sample.get('bess_id'),
++                    sample.get('pcs_asset_id'),
++                    sample.get('bms_asset_id'),
++                    json.dumps(sample.get('pcs_values') or {}, separators=(',',':')),
++                    json.dumps(sample.get('bms_values') or {}, separators=(',',':')),
++                    int(sample.get('selected_signal_count') or 0),
++                    int(sample.get('good_signal_count') or 0),
++                    int(sample.get('bad_signal_count') or 0),
++                    sample.get('max_data_age_ms'),
++                    sample.get('quality'),
++                    payload_json,
++                    schema_version,
++                    sample.get('profile_name'),
++                    write_mode,
++                ),
++            )
++            self.conn.commit()
++            return int(cur.lastrowid)
+ 
+     def cleanup_fast_bess_samples(self, retention_days: int) -> dict[str,Any]:
+-        if not self._can_write():
+-            return {'ok':False,'reason':self.last_skip_reason}
+-        cutoff_dt = datetime.now(timezone.utc) - timedelta(days=retention_days)
+-        cutoff_ms = int(cutoff_dt.timestamp() * 1000)
+-        cur = self.conn.execute('DELETE FROM fast_bess_samples WHERE timestamp_epoch_ms < ?', (cutoff_ms,))
+-        self.conn.commit()
+-        return {'ok':True,'retention_days':retention_days,'cutoff_epoch_ms':cutoff_ms,'deleted':int(cur.rowcount)}
++        with self._lock:
++            if not self._can_write():
++                return {'ok':False,'reason':self.last_skip_reason}
++            cutoff_dt = datetime.now(timezone.utc) - timedelta(days=retention_days)
++            cutoff_ms = int(cutoff_dt.timestamp() * 1000)
++            cur = self.conn.execute('DELETE FROM fast_bess_samples WHERE timestamp_epoch_ms < ?', (cutoff_ms,))
++            self.conn.commit()
++            return {'ok':True,'retention_days':retention_days,'cutoff_epoch_ms':cutoff_ms,'deleted':int(cur.rowcount)}
+ 
+     def query_fast_bess_samples(self, source_id: str|None=None, limit: int=100, from_epoch_ms: int|None=None, to_epoch_ms: int|None=None, order: str='desc') -> dict[str,Any]:
+-        where=[]; args=[]
+-        if source_id:
+-            where.append('source_id=?'); args.append(source_id)
+-        if from_epoch_ms is not None:
+-            where.append('timestamp_epoch_ms>=?'); args.append(int(from_epoch_ms))
+-        if to_epoch_ms is not None:
+-            where.append('timestamp_epoch_ms<=?'); args.append(int(to_epoch_ms))
+-        clause=' WHERE '+' AND '.join(where) if where else ''
+-        direction='ASC' if str(order).lower()=='asc' else 'DESC'
+-        rows=self.conn.execute(f'SELECT * FROM fast_bess_samples{clause} ORDER BY timestamp_epoch_ms {direction} LIMIT ?', args+[min(int(limit),5000)]).fetchall()
+-        return {'items':[self._fast_bess_sample(r) for r in rows]}
++        with self._lock:
++            where=[]; args=[]
++            if source_id:
++                where.append('source_id=?'); args.append(source_id)
++            if from_epoch_ms is not None:
++                where.append('timestamp_epoch_ms>=?'); args.append(int(from_epoch_ms))
++            if to_epoch_ms is not None:
++                where.append('timestamp_epoch_ms<=?'); args.append(int(to_epoch_ms))
++            clause=' WHERE '+' AND '.join(where) if where else ''
++            direction='ASC' if str(order).lower()=='asc' else 'DESC'
++            rows=self.conn.execute(f'SELECT * FROM fast_bess_samples{clause} ORDER BY timestamp_epoch_ms {direction} LIMIT ?', args+[min(int(limit),5000)]).fetchall()
++            return {'items':[self._fast_bess_sample(r) for r in rows]}
+ 
+     def latest_fast_bess_samples(self) -> dict[str,Any]:
+-        rows=self.conn.execute('''SELECT f.* FROM fast_bess_samples f
+-            JOIN (SELECT source_id, MAX(timestamp_epoch_ms) AS max_ts FROM fast_bess_samples GROUP BY source_id) m
+-            ON f.source_id=m.source_id AND f.timestamp_epoch_ms=m.max_ts
+-            ORDER BY f.source_id''').fetchall()
+-        return {'items':[self._fast_bess_sample(r) for r in rows]}
++        with self._lock:
++            rows=self.conn.execute('''SELECT f.* FROM fast_bess_samples f
++                JOIN (SELECT source_id, MAX(timestamp_epoch_ms) AS max_ts FROM fast_bess_samples GROUP BY source_id) m
++                ON f.source_id=m.source_id AND f.timestamp_epoch_ms=m.max_ts
++                ORDER BY f.source_id''').fetchall()
++            return {'items':[self._fast_bess_sample(r) for r in rows]}
+ 
+     def insert_event(self,severity:str,event_type:str,message:str,payload:dict[str,Any]|None=None,*,source:str|None=None,asset_id:str|None=None) -> int | None:
+-        if not self._can_write(): return None
+-        ts=datetime.now(timezone.utc).isoformat()
+-        cur=self.conn.execute('INSERT INTO gateway_events(timestamp_utc,severity,event_type,source,asset_id,message,payload_json) VALUES (?,?,?,?,?,?,?)',(ts,severity.lower(),event_type,source,asset_id,message,json.dumps(payload or {},separators=(',',':'))))
+-        self.conn.commit(); return int(cur.lastrowid)
++        with self._lock:
++            if not self._can_write(): return None
++            ts=datetime.now(timezone.utc).isoformat()
++            cur=self.conn.execute('INSERT INTO gateway_events(timestamp_utc,severity,event_type,source,asset_id,message,payload_json) VALUES (?,?,?,?,?,?,?)',(ts,severity.lower(),event_type,source,asset_id,message,json.dumps(payload or {},separators=(',',':'))))
++            self.conn.commit(); return int(cur.lastrowid)
+ 
+     def cleanup(self, retention_days: int | None=None, vacuum: bool | None=None) -> dict[str,Any]:
+         if not self._can_write(): return {'ok':False,'reason':self.last_skip_reason}
+@@ -326,4 +337,6 @@
+         try: payload=json.loads(row['payload_json'] or '{}')
+         except Exception: payload={'raw':row['payload_json']}
+         return {'id':row['id'],'timestamp_utc':row['timestamp_utc'],'severity':row['severity'],'event_type':row['event_type'],'source':row['source'],'asset_id':row['asset_id'],'message':row['message'],'payload':payload}
+-    def close(self)->None: self.conn.close()
++    def close(self)->None:
++        with self._lock:
++            self.conn.close()

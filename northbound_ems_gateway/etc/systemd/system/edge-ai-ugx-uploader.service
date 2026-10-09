@@ -1,0 +1,16 @@
+[Unit]
+Description=Edge AI UGX Cloud Uploader - ML health telemetry
+After=edge-ai-live-infer.service ems-v3-gateway.service network-online.target
+Wants=edge-ai-live-infer.service network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/root/kinetics-grid-ems/northbound_ems_gateway
+Environment=PYTHONPATH=/root/kinetics-grid-ems/northbound_ems_gateway/src
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/usr/bin/python3 -m nb_ems_gateway.ugx_uploader.edge_ai_uploader --config configs/ugx_cloud_uploader.json --interval-sec 60 --live
+Restart=always
+RestartSec=15
+
+[Install]
+WantedBy=multi-user.target

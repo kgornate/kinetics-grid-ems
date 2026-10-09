@@ -1,0 +1,540 @@
+from __future__ import annotations
+
+import logging
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from math import sqrt
+from typing import Any
+
+LOG = logging.getLogger(__name__)
+
+UGX_EXPECTED_1S_KEYS: tuple[str, ...] = (
+    "time", "ts",
+    "stack_volt", "stack_curr", "stack_power", "stack_soc",
+    "meter_ua", "meter_ub", "meter_uc", "meter_uab", "meter_ubc", "meter_uca",
+    "meter_ia", "meter_ib", "meter_ic", "meter_in",
+    "meter_pa", "meter_pb", "meter_pc", "meter_pt", "meter_freq",
+    "rack_volt_r1", "rack_curr_r1", "rack_power_r1", "rack_soc_r1", "pcs_pcs_total_active_power_kw_r1",
+    "rack_volt_r2", "rack_curr_r2", "rack_power_r2", "rack_soc_r2", "pcs_pcs_total_active_power_kw_r2",
+    "rack_volt_r3", "rack_curr_r3", "rack_power_r3", "rack_soc_r3", "pcs_pcs_total_active_power_kw_r3",
+    "rack_volt_r4", "rack_curr_r4", "rack_power_r4", "rack_soc_r4", "pcs_pcs_total_active_power_kw_r4",
+)
+
+
+@dataclass
+class UGXKeyMappingConfig:
+    enabled: bool = False
+    profile: str = "uniqgrid_v1_1s"
+    emit_unmapped_keys: bool = False
+    include_null_expected_keys: bool = True
+    include_time_fields: bool = True
+    fabricate_cell_soc_soh: bool = True
+    # The field site currently has two Chinese EMS/BESS units. UGX names them as rack 1 and rack 2.
+    rack_sources: dict[str, list[str]] = field(default_factory=lambda: {
+        "r1": ["bess_1", "external_ems_1"],
+        "r2": ["bess_2", "external_ems_2"],
+        "r3": [],
+        "r4": [],
+    })
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "UGXKeyMappingConfig":
+        allowed = cls.__dataclass_fields__
+        return cls(**{k: v for k, v in (data or {}).items() if k in allowed})
+
+
+def _safe_value(value: Any) -> Any:
+    if isinstance(value, (int, float, str, bool)) or value is None:
+        return value
+    return str(value)
+
+
+def _num(value: Any) -> float | None:
+    if value is None or isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    try:
+        return float(str(value))
+    except (TypeError, ValueError):
+        return None
+
+
+def _avg(values: list[Any]) -> float | None:
+    nums = [_num(v) for v in values]
+    nums = [v for v in nums if v is not None]
+    if not nums:
+        return None
+    return sum(nums) / len(nums)
+
+
+def _sum(values: list[Any]) -> float | None:
+    nums = [_num(v) for v in values]
+    nums = [v for v in nums if v is not None]
+    if not nums:
+        return None
+    return sum(nums)
+
+
+def _min(values: list[Any]) -> float | None:
+    nums = [_num(v) for v in values]
+    nums = [v for v in nums if v is not None]
+    return min(nums) if nums else None
+
+
+def _max(values: list[Any]) -> float | None:
+    nums = [_num(v) for v in values]
+    nums = [v for v in nums if v is not None]
+    return max(nums) if nums else None
+
+
+def _fmt_time(ts_ms: int) -> str:
+    return datetime.fromtimestamp(int(ts_ms) / 1000.0, tz=timezone.utc).strftime("%Y-%m-%d_%H:%M:%S")
+
+
+def _index_of(values: list[Any], target: Any) -> int | None:
+    t = _num(target)
+    if t is None:
+        return None
+    for idx, value in enumerate(values, start=1):
+        v = _num(value)
+        if v is not None and abs(v - t) < 1e-9:
+            return idx
+    return None
+
+
+class UGXKeyMapper:
+    """Translate internal gateway flat keys into UGX/Uniqgrid expected flat keys.
+
+    U1 posted correctly to the API, but used gateway-oriented key names. U1.1
+    mapped the 1-second compact profile. U1.2 extends the same mapper to build
+    frequency-specific UGX records for the 60s, 900s, 3600s, and 86400s key
+    groups from a full PCS+BMS snapshot.
+    """
+
+    def __init__(self, config: UGXKeyMappingConfig) -> None:
+        self.config = config
+
+    def map_records(self, records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        if not self.config.enabled:
+            return records
+        if self.config.profile not in {"uniqgrid_v1_1s", "uniqgrid_v1", "uniqgrid_frequency_v1_2"}:
+            LOG.warning("unknown UGX key mapping profile=%s; sending records unchanged", self.config.profile)
+            return records
+        return [self.map_record(record) for record in records]
+
+    def map_record(self, record: dict[str, Any]) -> dict[str, Any]:
+        """Map one timestamped record according to the selected UGX profile.
+
+        Root-level profile separation:
+        - ``uniqgrid_v1_1s`` / ``uniqgrid_v1`` use the compact fast mapper only.
+          That path never builds or emits full PCS/BMS, rack-health, or cell-level
+          keys. The output contract is the fixed 41-key fast payload.
+        - ``uniqgrid_frequency_v1_2`` uses the full frequency mapper for snapshot
+          and key-plan based records.
+        """
+        if self.config.profile in {"uniqgrid_v1_1s", "uniqgrid_v1"}:
+            return self.map_fast_1s_record(record)
+
+        ts = int(record.get("ts") or 0)
+        raw_values = dict(record.get("values") or {})
+        values = self.build_frequency_values(ts, raw_values)
+        if self.config.include_null_expected_keys:
+            for key in UGX_EXPECTED_1S_KEYS:
+                values.setdefault(key, None)
+        if self.config.emit_unmapped_keys:
+            for key, value in raw_values.items():
+                values.setdefault(f"internal_{key}", _safe_value(value))
+        return {"ts": ts, "values": values}
+
+    def map_fast_1s_record(self, record: dict[str, Any]) -> dict[str, Any]:
+        """Map one fast BESS row to the strict 41-key UGX compact profile.
+
+        This method is intentionally separate from the frequency/full snapshot
+        path. It does not call ``build_frequency_values`` and it never adds
+        ``cel_*``, SOH/capacity, precharge, or other slow profile keys.
+        """
+        ts = int(record.get("ts") or 0)
+        raw_values = dict(record.get("values") or {})
+        all_values = self.build_fast_1s_values(ts, raw_values)
+        values: dict[str, Any] = {}
+        for key in UGX_EXPECTED_1S_KEYS:
+            val = all_values.get(key)
+            if val is not None or self.config.include_null_expected_keys:
+                values[key] = _safe_value(val)
+        return {"ts": ts, "values": values}
+
+    def map_record_for_keys(
+        self,
+        record: dict[str, Any],
+        expected_keys: list[str],
+        *,
+        include_null_keys: bool = False,
+        always_include_time_fields: bool = True,
+    ) -> dict[str, Any]:
+        ts = int(record.get("ts") or 0)
+        raw_values = dict(record.get("values") or {})
+        all_values = self.build_frequency_values(ts, raw_values)
+        wanted = list(dict.fromkeys(str(k) for k in expected_keys))
+        values: dict[str, Any] = {}
+        if always_include_time_fields:
+            values["time"] = _fmt_time(ts) if ts else None
+            values["ts"] = ts or None
+        for key in wanted:
+            if key in {"time", "ts"}:
+                values[key] = all_values.get(key)
+                continue
+            if key in all_values:
+                val = all_values.get(key)
+                if val is not None or include_null_keys:
+                    values[key] = _safe_value(val)
+            elif include_null_keys:
+                values[key] = None
+        return {"ts": ts, "values": values}
+
+    def build_fast_1s_values(self, ts: int, raw_values: dict[str, Any]) -> dict[str, Any]:
+        """Build only the values needed by the 41-key fast BESS profile."""
+        values: dict[str, Any] = {}
+        if self.config.include_time_fields:
+            values["time"] = _fmt_time(ts) if ts else None
+            values["ts"] = ts or None
+
+        rack_data: dict[str, dict[str, Any]] = {}
+        for rack_id in ("r1", "r2", "r3", "r4"):
+            sources = self.config.rack_sources.get(rack_id) or []
+            rack_values = self._fast_rack_values(raw_values, sources)
+            rack_data[rack_id] = rack_values
+            for key in ("rack_volt", "rack_curr", "rack_power", "rack_soc", "pcs_pcs_total_active_power_kw"):
+                values[f"{key}_{rack_id}"] = _safe_value(rack_values.get(key))
+
+        self._add_stack_values(values, rack_data)
+        self._add_meter_values(values, raw_values)
+        return values
+
+    def build_frequency_values(self, ts: int, raw_values: dict[str, Any]) -> dict[str, Any]:
+        """Build the full derived value dictionary for 60s/900s/3600s profiles."""
+        values: dict[str, Any] = {}
+        if self.config.include_time_fields:
+            values["time"] = _fmt_time(ts) if ts else None
+            values["ts"] = ts or None
+
+        rack_data: dict[str, dict[str, Any]] = {}
+        for rack_id in ("r1", "r2", "r3", "r4"):
+            sources = self.config.rack_sources.get(rack_id) or []
+            rack_values = self._rack_values(raw_values, sources)
+            if sources:
+                try:
+                    rack_values["cluno"] = int(rack_id.replace("r", ""))
+                except ValueError:
+                    pass
+            rack_data[rack_id] = rack_values
+            for key, value in rack_values.items():
+                values[f"{key}_{rack_id}"] = _safe_value(value)
+            self._add_cell_values(values, raw_values, sources, rack_id, rack_values)
+
+        self._add_stack_values(values, rack_data)
+        self._add_stack_health_values(values, rack_data)
+        self._add_meter_values(values, raw_values)
+        return values
+
+    def build_values(self, ts: int, raw_values: dict[str, Any]) -> dict[str, Any]:
+        """Backward-compatible alias for the full frequency value builder."""
+        return self.build_frequency_values(ts, raw_values)
+
+    def _get(self, values: dict[str, Any], sources: list[str], asset: str, signal_names: list[str]) -> Any:
+        for source in sources:
+            for profile in ("fast", "full"):
+                for signal in signal_names:
+                    key = f"{source}_{profile}_{asset}_{signal}"
+                    if key in values:
+                        return values[key]
+        return None
+
+    def _series(self, values: dict[str, Any], sources: list[str], asset: str, pattern: str, count: int) -> list[Any]:
+        return [self._get(values, sources, asset, [pattern.format(i=i)]) for i in range(1, count + 1)]
+
+    def _fast_rack_values(self, values: dict[str, Any], sources: list[str]) -> dict[str, Any]:
+        if not sources:
+            return {
+                "rack_volt": None,
+                "rack_curr": None,
+                "rack_power": None,
+                "rack_soc": None,
+                "pcs_pcs_total_active_power_kw": None,
+            }
+
+        rack_volt = self._get(values, sources, "bms", ["cluster_total_voltage_collected", "k_total_voltage", "pre_charge_total_voltage"])
+        if rack_volt is None:
+            rack_volt = self._get(values, sources, "pcs", ["dc_voltage", "pcs_total_dc_voltage", "bms_total_voltage"])
+
+        rack_curr = self._get(values, sources, "bms", ["cluster_total_current", "can_hall_sampling_current", "shunt_sampling_current"])
+        if rack_curr is None:
+            rack_curr = self._get(values, sources, "pcs", ["dc_current"])
+
+        rack_power = self._get(values, sources, "pcs", ["total_active_power", "charge_discharge_power", "charge_power", "discharge_power", "dc_power"])
+        if rack_power is None:
+            v = _num(rack_volt)
+            i = _num(rack_curr)
+            if v is not None and i is not None:
+                rack_power = (v * i) / 1000.0
+
+        rack_soc = self._get(values, sources, "bms", ["display_soc", "cluster_internal_soc"])
+        if rack_soc is None:
+            rack_soc = self._get(values, sources, "pcs", ["soc"])
+
+        return {
+            "rack_volt": rack_volt,
+            "rack_curr": rack_curr,
+            "rack_power": rack_power,
+            "rack_soc": rack_soc,
+            "pcs_pcs_total_active_power_kw": rack_power,
+        }
+
+    def _rack_values(self, values: dict[str, Any], sources: list[str]) -> dict[str, Any]:
+        if not sources:
+            return self._empty_rack_values()
+
+        cell_voltages = self._series(values, sources, "bms", "cell_voltage_{i}", 512)
+        cell_temps = self._series(values, sources, "bms", "battery_temperature_{i}", 512)
+
+        rack_volt = self._get(values, sources, "bms", ["cluster_total_voltage_collected", "k_total_voltage", "pre_charge_total_voltage"])
+        if rack_volt is None:
+            rack_volt = self._get(values, sources, "pcs", ["dc_voltage", "pcs_total_dc_voltage", "bms_total_voltage"])
+
+        rack_curr = self._get(values, sources, "bms", ["cluster_total_current", "can_hall_sampling_current", "shunt_sampling_current"])
+        if rack_curr is None:
+            rack_curr = self._get(values, sources, "pcs", ["dc_current"])
+
+        rack_power = self._get(values, sources, "pcs", ["total_active_power", "charge_discharge_power", "charge_power", "discharge_power", "dc_power"])
+        if rack_power is None:
+            v = _num(rack_volt)
+            i = _num(rack_curr)
+            if v is not None and i is not None:
+                rack_power = (v * i) / 1000.0
+
+        rack_soc = self._get(values, sources, "bms", ["display_soc", "cluster_internal_soc"])
+        if rack_soc is None:
+            rack_soc = self._get(values, sources, "pcs", ["soc"])
+
+        rack_soh = self._get(values, sources, "bms", ["soh"])
+        pos_res = self._get(values, sources, "bms", ["positive_end_insulation_resistance", "insulation_resistance"])
+        neg_res = self._get(values, sources, "bms", ["negative_end_insulation_resistance", "insulation_resistance"])
+        prechg_volt = self._get(values, sources, "bms", ["pre_charge_total_voltage"])
+
+        ave_volt = self._get(values, sources, "bms", ["cell_average_voltage"])
+        if ave_volt is None:
+            ave_volt = _avg(cell_voltages)
+        max_volt = self._get(values, sources, "bms", ["cell_max_voltage"])
+        if max_volt is None:
+            max_volt = _max(cell_voltages)
+        min_volt = self._get(values, sources, "bms", ["cell_min_voltage"])
+        if min_volt is None:
+            min_volt = _min(cell_voltages)
+        max_volt_id = self._get(values, sources, "bms", ["cell_max_voltage_id", "max_cell_id_in_module"])
+        if max_volt_id is None:
+            max_volt_id = _index_of(cell_voltages, max_volt)
+        min_volt_id = self._get(values, sources, "bms", ["cell_min_voltage_id", "min_cell_id_in_module"])
+        if min_volt_id is None:
+            min_volt_id = _index_of(cell_voltages, min_volt)
+
+        ave_temp = self._get(values, sources, "bms", ["average_temperature"])
+        if ave_temp is None:
+            ave_temp = _avg(cell_temps)
+        max_temp = self._get(values, sources, "bms", ["battery_max_temperature"])
+        if max_temp is None:
+            max_temp = _max(cell_temps)
+        min_temp = self._get(values, sources, "bms", ["battery_min_temperature"])
+        if min_temp is None:
+            min_temp = _min(cell_temps)
+        max_temp_id = self._get(values, sources, "bms", ["battery_max_temperature_id", "max_temp_id_in_module"])
+        if max_temp_id is None:
+            max_temp_id = _index_of(cell_temps, max_temp)
+        min_temp_id = self._get(values, sources, "bms", ["battery_min_temperature_id", "min_temp_id_in_module"])
+        if min_temp_id is None:
+            min_temp_id = _index_of(cell_temps, min_temp)
+
+        total_charge_cap = self._get(values, sources, "bms", ["total_cumulative_charge_capacity"])
+        total_dis_cap = self._get(values, sources, "bms", ["total_cumulative_discharge_capacity"])
+        total_charge_energy = self._get(values, sources, "pcs", ["ac_cumulative_charge_energy", "dc_cumulative_charge_energy"])
+        total_discharge_energy = self._get(values, sources, "pcs", ["ac_cumulative_discharge_energy", "dc_cumulative_discharge_energy"])
+
+        return {
+            "arrno": 1 if sources else None,
+            "cluno": None,
+            "rack_volt": rack_volt,
+            "rack_curr": rack_curr,
+            "rack_power": rack_power,
+            "rack_soc": rack_soc,
+            "rack_soh": rack_soh,
+            "clusoe": rack_soc,
+            "cluposres": pos_res,
+            "clunegres": neg_res,
+            "cluprechgvol": prechg_volt,
+            "ave_volt": ave_volt,
+            "rack_max_volt": max_volt,
+            "rack_max_volt_no": max_volt_id,
+            "rack_min_volt": min_volt,
+            "rack_min_volt_no": min_volt_id,
+            "rack_ave_temp": ave_temp,
+            "rack_max_temp": max_temp,
+            "max_temp_no_1": max_temp_id,
+            "rack_min_temp": min_temp,
+            "rack_min_temp_no": min_temp_id,
+            "rack_ave_soh": rack_soh,
+            "rack_max_soh": rack_soh,
+            "min_soh": rack_soh,
+            "ave_soc": rack_soc,
+            "daily_cha_cap": None,
+            "daily_dis_cap": None,
+            "total_cha_cap": total_charge_cap,
+            "total_dis_cap": total_dis_cap,
+            "pcs_time": None,
+            "pcs_pcs_total_active_power_kw": rack_power,
+            "pcs_pcs_total_charge_energy_kwh": total_charge_energy,
+            "pcs_pcs_total_discharge_energy_kwh": total_discharge_energy,
+        }
+
+    def _empty_rack_values(self) -> dict[str, Any]:
+        keys = [
+            "arrno", "cluno", "rack_volt", "rack_curr", "rack_power", "rack_soc", "rack_soh", "clusoe",
+            "cluposres", "clunegres", "cluprechgvol", "ave_volt", "rack_max_volt", "rack_max_volt_no",
+            "rack_min_volt", "rack_min_volt_no", "rack_ave_temp", "rack_max_temp", "max_temp_no_1",
+            "rack_min_temp", "rack_min_temp_no", "rack_ave_soh", "rack_max_soh", "min_soh", "ave_soc",
+            "daily_cha_cap", "daily_dis_cap", "total_cha_cap", "total_dis_cap", "pcs_time",
+            "pcs_pcs_total_active_power_kw", "pcs_pcs_total_charge_energy_kwh", "pcs_pcs_total_discharge_energy_kwh",
+        ]
+        return {k: None for k in keys}
+
+    def _add_stack_values(self, values: dict[str, Any], rack_data: dict[str, dict[str, Any]]) -> None:
+        racks = list(rack_data.values())
+        values["stack_volt"] = _avg([r.get("rack_volt") for r in racks])
+        values["stack_curr"] = _sum([r.get("rack_curr") for r in racks])
+        values["stack_power"] = _sum([r.get("rack_power") for r in racks])
+        values["stack_soc"] = _avg([r.get("rack_soc") for r in racks])
+
+    def _add_stack_health_values(self, values: dict[str, Any], rack_data: dict[str, dict[str, Any]]) -> None:
+        racks = list(rack_data.values())
+        values["stack_soh"] = _avg([r.get("rack_soh") for r in racks])
+        values["arrsoe"] = values.get("stack_soc")
+        values["stack_ave_volt"] = _avg([r.get("ave_volt") for r in racks])
+        min_volts = [r.get("rack_min_volt") for r in racks]
+        max_volts = [r.get("rack_max_volt") for r in racks]
+        min_temps = [r.get("rack_min_temp") for r in racks]
+        max_temps = [r.get("rack_max_temp") for r in racks]
+        values["stack_min_volt"] = _min(min_volts)
+        values["stack_max_volt"] = _max(max_volts)
+        values["stack_ave_temp"] = _avg([r.get("rack_ave_temp") for r in racks])
+        values["stack_min_temp"] = _min(min_temps)
+        values["stack_max_temp"] = _max(max_temps)
+        values["min_volt_rack_no"] = self._rack_index_for(rack_data, "rack_min_volt", values["stack_min_volt"])
+        values["max_volt_rack_no"] = self._rack_index_for(rack_data, "rack_max_volt", values["stack_max_volt"])
+        values["min_temp_rack_no"] = self._rack_index_for(rack_data, "rack_min_temp", values["stack_min_temp"])
+        values["max_temp_rack_no"] = self._rack_index_for(rack_data, "rack_max_temp", values["stack_max_temp"])
+        min_rack = f"r{values['min_volt_rack_no']}" if values.get("min_volt_rack_no") else None
+        max_rack = f"r{values['max_volt_rack_no']}" if values.get("max_volt_rack_no") else None
+        min_temp_rack = f"r{values['min_temp_rack_no']}" if values.get("min_temp_rack_no") else None
+        max_temp_rack = f"r{values['max_temp_rack_no']}" if values.get("max_temp_rack_no") else None
+        values["mix_volt_no"] = rack_data.get(min_rack, {}).get("rack_min_volt_no") if min_rack else None
+        values["max_volt_no"] = rack_data.get(max_rack, {}).get("rack_max_volt_no") if max_rack else None
+        values["min_temp_no"] = rack_data.get(min_temp_rack, {}).get("rack_min_temp_no") if min_temp_rack else None
+        values["max_temp_no"] = rack_data.get(max_temp_rack, {}).get("max_temp_no_1") if max_temp_rack else None
+
+    def _rack_index_for(self, rack_data: dict[str, dict[str, Any]], field_name: str, target: Any) -> int | None:
+        t = _num(target)
+        if t is None:
+            return None
+        for rack_id, values in rack_data.items():
+            v = _num(values.get(field_name))
+            if v is not None and abs(v - t) < 1e-9:
+                try:
+                    return int(rack_id.replace("r", ""))
+                except ValueError:
+                    return None
+        return None
+
+    def _add_meter_values(self, values: dict[str, Any], raw_values: dict[str, Any]) -> None:
+        all_sources: list[str] = []
+        for sources in self.config.rack_sources.values():
+            all_sources.extend(sources or [])
+        all_sources = list(dict.fromkeys(all_sources))
+
+        va = [self._get(raw_values, [src], "pcs", ["phase_a_voltage"]) for src in all_sources]
+        vb = [self._get(raw_values, [src], "pcs", ["phase_b_voltage"]) for src in all_sources]
+        vc = [self._get(raw_values, [src], "pcs", ["phase_c_voltage"]) for src in all_sources]
+        ia = [self._get(raw_values, [src], "pcs", ["phase_a_current"]) for src in all_sources]
+        ib = [self._get(raw_values, [src], "pcs", ["phase_b_current"]) for src in all_sources]
+        ic = [self._get(raw_values, [src], "pcs", ["phase_c_current"]) for src in all_sources]
+        freq = [self._get(raw_values, [src], "pcs", ["grid_frequency"]) for src in all_sources]
+        pa = [self._get(raw_values, [src], "pcs", ["phase_a_active_power"]) for src in all_sources]
+        pb = [self._get(raw_values, [src], "pcs", ["phase_b_active_power"]) for src in all_sources]
+        pc = [self._get(raw_values, [src], "pcs", ["phase_c_active_power"]) for src in all_sources]
+        ptotal = [self._get(raw_values, [src], "pcs", ["total_active_power", "charge_discharge_power"]) for src in all_sources]
+        qa = [self._get(raw_values, [src], "pcs", ["phase_a_reactive_power"]) for src in all_sources]
+        qb = [self._get(raw_values, [src], "pcs", ["phase_b_reactive_power"]) for src in all_sources]
+        qc = [self._get(raw_values, [src], "pcs", ["phase_c_reactive_power"]) for src in all_sources]
+        qt = [self._get(raw_values, [src], "pcs", ["total_reactive_power"]) for src in all_sources]
+        sa = [self._get(raw_values, [src], "pcs", ["phase_a_apparent_power"]) for src in all_sources]
+        sb = [self._get(raw_values, [src], "pcs", ["phase_b_apparent_power"]) for src in all_sources]
+        sc = [self._get(raw_values, [src], "pcs", ["phase_c_apparent_power"]) for src in all_sources]
+        st = [self._get(raw_values, [src], "pcs", ["total_apparent_power"]) for src in all_sources]
+        pfa = [self._get(raw_values, [src], "pcs", ["phase_a_power_factor"]) for src in all_sources]
+        pfb = [self._get(raw_values, [src], "pcs", ["phase_b_power_factor"]) for src in all_sources]
+        pfc = [self._get(raw_values, [src], "pcs", ["phase_c_power_factor"]) for src in all_sources]
+        pft = [self._get(raw_values, [src], "pcs", ["total_power_factor"]) for src in all_sources]
+
+        values["meter_ua"] = _avg(va)
+        values["meter_ub"] = _avg(vb)
+        values["meter_uc"] = _avg(vc)
+        values["meter_ia"] = _sum(ia)
+        values["meter_ib"] = _sum(ib)
+        values["meter_ic"] = _sum(ic)
+        values["meter_in"] = 0.0 if any(_num(v) is not None for v in ia + ib + ic) else None
+        values["meter_freq"] = _avg(freq)
+        ln_avg = _avg([values.get("meter_ua"), values.get("meter_ub"), values.get("meter_uc")])
+        ll_avg = (sqrt(3.0) * ln_avg) if ln_avg is not None else None
+        values["meter_uab"] = ll_avg
+        values["meter_ubc"] = ll_avg
+        values["meter_uca"] = ll_avg
+        values["meter_pa"] = _sum(pa) if any(_num(v) is not None for v in pa) else None
+        values["meter_pb"] = _sum(pb) if any(_num(v) is not None for v in pb) else None
+        values["meter_pc"] = _sum(pc) if any(_num(v) is not None for v in pc) else None
+        values["meter_pt"] = _sum(ptotal)
+        if values["meter_pa"] is None and values["meter_pt"] is not None:
+            values["meter_pa"] = values["meter_pt"] / 3.0
+            values["meter_pb"] = values["meter_pt"] / 3.0
+            values["meter_pc"] = values["meter_pt"] / 3.0
+        values["meter_qa"] = _sum(qa)
+        values["meter_qb"] = _sum(qb)
+        values["meter_qc"] = _sum(qc)
+        values["meter_qt"] = _sum(qt)
+        values["meter_sa"] = _sum(sa)
+        values["meter_sb"] = _sum(sb)
+        values["meter_sc"] = _sum(sc)
+        values["meter_st"] = _sum(st)
+        values["meter_pfa"] = _avg(pfa)
+        values["meter_pfb"] = _avg(pfb)
+        values["meter_pfc"] = _avg(pfc)
+        values["meter_pf"] = _avg(pft)
+        values["meter_un_avg"] = _avg([values.get("meter_ua"), values.get("meter_ub"), values.get("meter_uc")])
+        values["meter_ul_avg"] = _avg([values.get("meter_uab"), values.get("meter_ubc"), values.get("meter_uca")])
+        values["meter_i_avg"] = _avg([values.get("meter_ia"), values.get("meter_ib"), values.get("meter_ic")])
+        values["meter_comm_fault"] = None
+
+    def _add_cell_values(self, values: dict[str, Any], raw_values: dict[str, Any], sources: list[str], rack_id: str, rack_values: dict[str, Any]) -> None:
+        if not sources:
+            return
+        for i in range(1, 513):
+            volt = self._get(raw_values, sources, "bms", [f"cell_voltage_{i}"])
+            temp = self._get(raw_values, sources, "bms", [f"battery_temperature_{i}"])
+            if volt is not None:
+                values[f"cel_volt_{i}_{rack_id}"] = _safe_value(volt)
+            if temp is not None:
+                values[f"cel_temp_{i}_{rack_id}"] = _safe_value(temp)
+            if self.config.fabricate_cell_soc_soh:
+                if rack_values.get("rack_soc") is not None:
+                    values[f"cel_soc_{i}_{rack_id}"] = _safe_value(rack_values.get("rack_soc"))
+                if rack_values.get("rack_soh") is not None:
+                    values[f"cel_soh_{i}_{rack_id}"] = _safe_value(rack_values.get("rack_soh"))
+        max_pole = self._get(raw_values, sources, "bms", ["max_pole_temperature"])
+        if max_pole is not None:
+            values[f"pole_temp_1_{rack_id}"] = _safe_value(max_pole)

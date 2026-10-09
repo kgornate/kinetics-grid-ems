@@ -1,0 +1,12 @@
+[Unit]
+Description=EMS V3 boot summary on console
+After=ems-v3-eth1.service ems-v3-wifi.service cloudflared.service
+Wants=ems-v3-eth1.service ems-v3-wifi.service cloudflared.service
+
+[Service]
+Type=oneshot
+ExecStart=/root/kinetics-grid-ems/ems_boot_v3/scripts/ems_v3_boot_summary.sh
+TimeoutStartSec=90
+
+[Install]
+WantedBy=multi-user.target

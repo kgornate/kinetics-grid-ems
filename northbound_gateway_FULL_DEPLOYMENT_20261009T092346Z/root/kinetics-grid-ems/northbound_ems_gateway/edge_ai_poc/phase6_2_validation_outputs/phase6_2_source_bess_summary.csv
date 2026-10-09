@@ -1,0 +1,4 @@
+source_id,bess_id,health_state,total_rows,ml_detected_rows,ml_detected_percent,score_avg,score_max
+external_ems_1,bess_1,abnormal,7,7,100.0,0.6608849218553668,0.6608849218553668
+external_ems_1,bess_1,warning,1273,531,41.71249018067557,0.5506657774929742,0.7402521454858569
+external_ems_2,bess_2,warning,4499,2204,48.98866414758835,0.5665331055364322,0.6879617273353257

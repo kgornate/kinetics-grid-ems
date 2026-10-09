@@ -1,0 +1,18 @@
+[Unit]
+Description=Northbound EMS UGX Cloud Telemetry Uploader
+After=ems-v3-gateway.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/root/kinetics-grid-ems/northbound_ems_gateway
+Environment=PYTHONPATH=/root/kinetics-grid-ems/northbound_ems_gateway/src
+Environment=PYTHONUNBUFFERED=1
+EnvironmentFile=-/etc/nb_ems_gateway.conf
+EnvironmentFile=-/etc/nb_ems_ugx_uploader.conf
+ExecStart=/usr/bin/python3 -m nb_ems_gateway.ugx_uploader.main --config configs/ugx_cloud_uploader.json
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

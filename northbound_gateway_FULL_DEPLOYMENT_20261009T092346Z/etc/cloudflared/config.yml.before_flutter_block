@@ -1,0 +1,16 @@
+tunnel: 6bf7b93d-1005-40d3-aabf-bf1348085c6d
+credentials-file: /etc/cloudflared/credentials.json
+no-autoupdate: true
+protocol: http2
+
+ingress:
+  - hostname: ems-api.unityess.cloud
+    service: http://127.0.0.1:8000
+
+  - hostname: ems-logs.unityess.cloud
+    service: http://127.0.0.1:7000
+
+  - hostname: ems-ssh.unityess.cloud
+    service: ssh://127.0.0.1:22
+
+  - service: http_status:404

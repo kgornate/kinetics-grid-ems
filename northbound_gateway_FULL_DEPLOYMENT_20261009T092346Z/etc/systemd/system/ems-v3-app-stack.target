@@ -1,0 +1,8 @@
+[Unit]
+Description=EMS V3 Application Stack
+After=ems-v3-eth1.service ems-v3-wifi.service cloudflared.service ems-v3-solis-link.service
+Wants=ems-v3-eth1.service ems-v3-wifi.service cloudflared.service ems-v3-solis-link.service
+Wants=ems-v3-gateway.service ems-v3-soc-controller.service
+
+[Install]
+WantedBy=multi-user.target
