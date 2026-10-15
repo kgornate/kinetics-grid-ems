@@ -11,6 +11,8 @@ from .contracts import utc_now_iso
 from .local_gateway_api import LocalGatewayApiClient
 from .outbox import OutboxCapacityError, OutboxStore
 from .producer_common import ProducerCounters, ProducerLoopMixin, emit_message, fingerprint
+from .s2_policy import S2PolicyManifest
+from .s2_chunks import split_s2_records
 
 S2_SUBSTREAMS = (
     "ems_system", "pcs_extended", "bms_extended", "io_module", "liquid_cooling",
@@ -147,6 +149,17 @@ class GeneralAssetProducer(ProducerLoopMixin):
         self._stop = asyncio.Event()
         self._last_emit: dict[str, float] = {}
         self._last_fingerprint: dict[str, str] = {}
+        # Explicit opt-in prevents any new behavior in an unchanged installation.
+        if self.producer_config.s2_policy_manifest_path and not self.producer_config.s2_policy_expected_sha256:
+            raise ValueError("optimized S2 requires an approved s2_policy_expected_sha256 in config")
+        self.s2_policy = (
+            S2PolicyManifest(self.producer_config.s2_policy_manifest_path,
+                             expected_sha256=self.producer_config.s2_policy_expected_sha256)
+            if self.producer_config.s2_policy_manifest_path else None
+        )
+        self._s2_checkpoints: dict[str, tuple[float, str, str]] = (
+            outbox.s2_load_checkpoints(self.producer_config.stream) if self.s2_policy else {}
+        )
 
     async def close(self) -> None:
         if self._owns_api:
@@ -154,6 +167,7 @@ class GeneralAssetProducer(ProducerLoopMixin):
 
     async def collect_once(self) -> dict[str, Any]:
         now_mono = time.monotonic()
+        now_epoch = time.time()
         self.counters.poll_count += 1
         self.counters.last_poll_utc = utc_now_iso()
         snapshot = await self.local_api.telemetry_snapshot()
@@ -162,6 +176,7 @@ class GeneralAssetProducer(ProducerLoopMixin):
         sampled_utc = str(snapshot.get("timestamp") or utc_now_iso())
 
         due: dict[str, list[dict[str, Any]]] = {s: [] for s in S2_SUBSTREAMS}
+        pending_checkpoints: dict[str, dict[str, tuple[float, str, str]]] = {s: {} for s in S2_SUBSTREAMS}
         for asset in self._assets(snapshot):
             vendor = _vendor_tag(asset, vendors or {})
             scope = _scope(asset)
@@ -181,16 +196,36 @@ class GeneralAssetProducer(ProducerLoopMixin):
                 policy, record_sec, upload_sec, signal_priority, retention, mode = policy_for(point)
                 runtime_signal_id = f"{source_id}.{runtime_asset_id}.{key}"
                 fp = fingerprint([raw_point.get("value"), raw_point.get("quality")])
-                last_t = self._last_emit.get(runtime_signal_id)
-                last_fp = self._last_fingerprint.get(runtime_signal_id)
-                if last_t is None:
-                    reason = "startup"
-                elif mode == "change_or_heartbeat" and fp != last_fp:
-                    reason = "change"
-                elif now_mono - last_t >= record_sec:
-                    reason = "heartbeat" if mode == "change_or_heartbeat" else "periodic"
+                if self.s2_policy:
+                    frozen = self.s2_policy.resolve(vendor, scope, str(key), substream, point)
+                    policy, record_sec = frozen.mode, frozen.interval_sec
+                    mode = "change_or_heartbeat" if policy == "ON_CHANGE_HEARTBEAT" else "periodic"
+                    previous = self._s2_checkpoints.get(runtime_signal_id)
+                    if previous is None:
+                        reason = "startup"
+                    elif previous[2] != frozen.revision:
+                        reason = "policy_change"
+                    elif now_epoch < previous[0]:
+                        reason = "clock_reset"
+                    elif mode == "change_or_heartbeat" and fp != previous[1]:
+                        reason = "change"
+                    elif now_epoch - previous[0] >= record_sec:
+                        reason = "heartbeat" if mode == "change_or_heartbeat" else "periodic"
+                    else:
+                        continue
+                    pending_checkpoints[substream][runtime_signal_id] = (now_epoch, fp, frozen.revision)
                 else:
-                    continue
+                    # Legacy behavior is left intact until the frozen manifest is opted in.
+                    last_t = self._last_emit.get(runtime_signal_id)
+                    last_fp = self._last_fingerprint.get(runtime_signal_id)
+                    if last_t is None:
+                        reason = "startup"
+                    elif mode == "change_or_heartbeat" and fp != last_fp:
+                        reason = "change"
+                    elif now_mono - last_t >= record_sec:
+                        reason = "heartbeat" if mode == "change_or_heartbeat" else "periodic"
+                    else:
+                        continue
 
                 point_id = str((point or {}).get("id") or f"{vendor}.{scope}.{key}")
                 display_name = (point or {}).get("name_en") or raw_point.get("name") or str(key).replace("_", " ").title()
@@ -227,14 +262,15 @@ class GeneralAssetProducer(ProducerLoopMixin):
                     "trigger_reason": reason,
                     # Additive dimensions; backend may ignore them.
                     "vendor": vendor,
-                    "address_dec": (point or {}).get("address_dec"),
+                    "address_dec": (point or {}).get("address_dec") if not self.s2_policy else (point or {}).get("address_dec", (point or {}).get("address")),
                     "address_hex": (point or {}).get("address_hex") or (point or {}).get("address"),
-                    "read_fc": (point or {}).get("read_fc"),
-                    "datatype": (point or {}).get("datatype"),
+                    "read_fc": (point or {}).get("read_fc") if not self.s2_policy else (point or {}).get("read_fc", (point or {}).get("read_function")),
+                    "datatype": (point or {}).get("datatype") if not self.s2_policy else (point or {}).get("datatype", (point or {}).get("data_type")),
                 }
                 due[substream].append(record)
-                self._last_emit[runtime_signal_id] = now_mono
-                self._last_fingerprint[runtime_signal_id] = fp
+                if not self.s2_policy:
+                    self._last_emit[runtime_signal_id] = now_mono
+                    self._last_fingerprint[runtime_signal_id] = fp
 
         messages = []
         for substream in S2_SUBSTREAMS:
@@ -242,25 +278,43 @@ class GeneralAssetProducer(ProducerLoopMixin):
             if not records:
                 continue
             try:
-                inserted, msg = await asyncio.to_thread(
-                    emit_message,
-                    config=self.config,
-                    outbox=self.outbox,
-                    stream=self.producer_config.stream,
-                    substream=substream,
-                    priority=self.producer_config.priority,
-                    records=records,
-                    created_at_utc=sampled_utc,
-                )
+                if self.s2_policy:
+                    chunks = split_s2_records(records, max_message_bytes=self.producer_config.s2_max_logical_message_bytes)
+                    emitted = await asyncio.to_thread(
+                        self.outbox.enqueue_s2_atomic,
+                        config=self.config,
+                        stream=self.producer_config.stream,
+                        substream=substream,
+                        priority=self.producer_config.priority,
+                        chunks=chunks,
+                        checkpoints=pending_checkpoints[substream],
+                        created_at_utc=sampled_utc,
+                        max_message_bytes=self.producer_config.s2_max_logical_message_bytes,
+                    )
+                    # Update the in-memory view only once SQLite COMMIT succeeds.
+                    self._s2_checkpoints.update(pending_checkpoints[substream])
+                else:
+                    inserted, msg = await asyncio.to_thread(
+                        emit_message,
+                        config=self.config,
+                        outbox=self.outbox,
+                        stream=self.producer_config.stream,
+                        substream=substream,
+                        priority=self.producer_config.priority,
+                        records=records,
+                        created_at_utc=sampled_utc,
+                    )
+                    emitted = [msg] if inserted else []
             except OutboxCapacityError as exc:
                 self.counters.failure_count += 1
                 self.counters.last_error = str(exc)
                 self._write_status()
                 return {"emitted": bool(messages), "reason": "outbox_capacity", "messages": messages, "error": str(exc)}
-            if inserted:
-                messages.append({"substream": substream, "message_id": msg.message_id, "sequence": msg.sequence, "record_count": len(records)})
+            for msg in emitted:
+                messages.append({"substream": substream, "message_id": msg.message_id,
+                                 "sequence": msg.sequence, "record_count": len(msg.records)})
                 self.counters.message_count += 1
-                self.counters.record_count += len(records)
+                self.counters.record_count += len(msg.records)
                 self.counters.last_message_id = msg.message_id
                 self.counters.last_sequence = msg.sequence
 

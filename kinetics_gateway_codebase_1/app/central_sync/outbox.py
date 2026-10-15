@@ -148,6 +148,20 @@ class OutboxStore:
                 CREATE INDEX IF NOT EXISTS idx_outbox_spill
                     ON outbox_messages(state, priority_rank DESC, created_epoch ASC, message_id ASC);
 
+                -- S2-only durable recording checkpoints: each row commits atomically
+                -- with its S2 messages and S2 sequence increment.
+                CREATE TABLE IF NOT EXISTS s2_recording_checkpoint (
+                    stream TEXT NOT NULL,
+                    substream TEXT NOT NULL,
+                    runtime_signal_id TEXT NOT NULL,
+                    last_emit_epoch REAL NOT NULL,
+                    last_fingerprint TEXT NOT NULL,
+                    policy_revision TEXT NOT NULL,
+                    PRIMARY KEY(stream, substream, runtime_signal_id)
+                );
+                CREATE INDEX IF NOT EXISTS idx_s2_checkpoints_stream
+                    ON s2_recording_checkpoint(stream, substream);
+
                 CREATE TABLE IF NOT EXISTS transport_attempts (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     request_id TEXT NOT NULL,
@@ -266,6 +280,105 @@ class OutboxStore:
             except sqlite3.IntegrityError:
                 # Same message_id or same stream/substream/sequence is already durable.
                 return False
+
+    def s2_load_checkpoints(self, stream: str) -> dict[str, tuple[float, str, str]]:
+        """Reconstruct S2 cadence after restart; outbox and checkpoints share SQLite."""
+        with self._lock:
+            rows = self.conn.execute(
+                "SELECT runtime_signal_id,last_emit_epoch,last_fingerprint,policy_revision "
+                "FROM s2_recording_checkpoint WHERE stream=?", (stream,)
+            ).fetchall()
+        return {str(r["runtime_signal_id"]): (
+            float(r["last_emit_epoch"]), str(r["last_fingerprint"]), str(r["policy_revision"])
+        ) for r in rows}
+
+    def enqueue_s2_atomic(self, *, config: Any, stream: str, substream: str,
+                          priority: str, chunks: list[list[dict[str, Any]]],
+                          checkpoints: dict[str, tuple[float, str, str]],
+                          created_at_utc: str, max_message_bytes: int) -> list[LogicalMessage]:
+        """One SQLite transaction for sequences + bounded messages + checkpoints.
+
+        A crash/error before COMMIT loses nothing from the due set. A crash
+        after COMMIT leaves durable outbox messages and matching checkpoints.
+        Other streams still use the original next_sequence/enqueue interface.
+        """
+        from .contracts import make_message
+        from .s2_chunks import json_bytes, S2RecordTooLarge
+
+        if not chunks:
+            return []
+        if any(not c for c in chunks):
+            raise ValueError("empty S2 chunk")
+        with self._lock:
+            capacity = self.capacity_status()
+            if not capacity["can_accept"]:
+                raise OutboxCapacityError("; ".join(capacity["reasons"]))
+            self.conn.execute("BEGIN IMMEDIATE")
+            try:
+                row = self.conn.execute(
+                    "SELECT last_sequence FROM sequences WHERE stream=? AND substream=?",
+                    (stream, substream),
+                ).fetchone()
+                seq = int(row["last_sequence"]) if row else 0
+                emitted: list[LogicalMessage] = []
+                total_size = 0
+                for records in chunks:
+                    seq += 1
+                    message = make_message(
+                        schema_version=config.identity.schema_version,
+                        gateway_id=config.identity.gateway_id,
+                        site_id=config.identity.site_id,
+                        organization_id=config.identity.organization_id,
+                        gateway_software_version=config.identity.software_version,
+                        stream=stream, substream=substream, sequence=seq, priority=priority,
+                        records=records,
+                        compression="gzip" if config.backend.gzip_enabled else "none",
+                        created_at_utc=created_at_utc,
+                    )
+                    payload_json = json_bytes(message.model_dump(mode="json")).decode("utf-8")
+                    payload_size = len(payload_json.encode("utf-8"))
+                    if payload_size > max_message_bytes:
+                        raise S2RecordTooLarge(f"S2 {substream} sequence={seq} is {payload_size} bytes (> {max_message_bytes})")
+                    total_size += payload_size
+                    self.conn.execute(
+                        """INSERT INTO outbox_messages(
+                            message_id,gateway_id,site_id,stream,substream,sequence,
+                            priority,priority_rank,created_at_utc,created_epoch,
+                            payload_json,payload_bytes,state,next_attempt_epoch
+                        ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,0)""",
+                        (message.message_id,message.gateway_id,message.site_id,
+                         message.stream,message.substream or "",message.sequence,
+                         message.priority,message.priority_rank,message.created_at_utc,
+                         _iso_to_epoch(message.created_at_utc),payload_json,payload_size,"pending"),
+                    )
+                    emitted.append(message)
+                max_db_size = capacity.get("max_db_size_bytes")
+                if max_db_size and int(capacity["logical_used_bytes"]) + total_size > int(max_db_size):
+                    raise OutboxCapacityError("S2 chunks exceed configured outbox capacity")
+                free = shutil.disk_usage(self.path.parent).free
+                if free < total_size + (self.min_free_space_mb * 1024 * 1024):
+                    raise OutboxCapacityError("S2 chunks exceed free-space reserve")
+                self.conn.execute(
+                    """INSERT INTO sequences(stream,substream,last_sequence,updated_utc)
+                       VALUES(?,?,?,?) ON CONFLICT(stream,substream) DO UPDATE SET
+                       last_sequence=excluded.last_sequence,updated_utc=excluded.updated_utc""",
+                    (stream, substream, seq, _utc_now()),
+                )
+                self.conn.executemany(
+                    """INSERT INTO s2_recording_checkpoint
+                       (stream,substream,runtime_signal_id,last_emit_epoch,last_fingerprint,policy_revision)
+                       VALUES(?,?,?,?,?,?) ON CONFLICT(stream,substream,runtime_signal_id)
+                       DO UPDATE SET last_emit_epoch=excluded.last_emit_epoch,
+                           last_fingerprint=excluded.last_fingerprint,
+                           policy_revision=excluded.policy_revision""",
+                    [(stream,substream,sid,ts,fp,revision) for sid,(ts,fp,revision) in checkpoints.items()],
+                )
+                self.conn.commit()
+                self._invalidate_stats_cache()
+                return emitted
+            except BaseException:
+                self.conn.rollback()
+                raise
 
     def eligible(
         self,

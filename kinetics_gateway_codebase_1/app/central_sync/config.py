@@ -138,6 +138,16 @@ class GeneralAssetProducerConfig(SimpleProducerConfig):
     priority: PriorityName = "P3"
     status_file: str = "/var/lib/ornate-central-sync/s2_status.json"
     catalog_dir: str = "generated_protocols"
+    s2_policy_manifest_path: str | None = None  # opt-in; default leaves legacy S2 behavior unchanged
+    s2_policy_expected_sha256: str | None = None  # immutable approved manifest pin
+    s2_max_logical_message_bytes: int = 96 * 1024
+
+    @field_validator("s2_max_logical_message_bytes")
+    @classmethod
+    def _validate_s2_limit(cls, value: int) -> int:
+        if value != 96 * 1024:
+            raise ValueError("Kalpa S2 v1.4 requires a 96 KiB logical-message bound")
+        return value
 
 
 class GatewayHealthProducerConfig(SimpleProducerConfig):
