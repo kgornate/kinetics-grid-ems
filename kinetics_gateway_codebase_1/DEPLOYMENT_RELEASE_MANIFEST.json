@@ -1,0 +1,20 @@
+{
+  "source": "User-provided kinetics_gateway_codebase_kalpa(1).zip",
+  "release_type": "v0.12 Central Sync + HMI deployment integration / fresh FRDM dev",
+  "not_included": [
+    "v0.13 protocol-level simulator",
+    "HDMI kiosk browser"
+  ],
+  "changes": [
+    "app/main.py mounts /hmi routes",
+    "Central Sync service paths corrected",
+    "Fresh FRDM install script is conservative and mock/read-only",
+    "Gateway API defaults to loopback for SSH-forwarded preview",
+    "Readme and HMI route integration test added"
+  ],
+  "tests": "95 passed",
+  "central_sync_default_enabled": false,
+  "field_write_enabled_in_dev_installer": false,
+  "service_autostart_by_dev_installer": false,
+  "network_services_touched_by_dev_installer": false
+}

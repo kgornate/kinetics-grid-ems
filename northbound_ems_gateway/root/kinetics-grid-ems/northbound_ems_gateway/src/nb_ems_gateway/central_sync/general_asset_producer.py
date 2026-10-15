@@ -25,8 +25,16 @@ _ALLOWED_POLICIES = {
     "SLOW_60S",
     "ON_CHANGE_HEARTBEAT",
     "STATIC_ON_CHANGE",
+    "PERIODIC",
 }
 _CHANGE_POLICIES = {"ON_CHANGE_HEARTBEAT", "STATIC_ON_CHANGE"}
+
+# Live upload's 128 KiB max_request_bytes is an advisory limit in the outbox.
+# S2 logical messages deliberately target <=75% of that budget, capped at
+# 96 KiB, leaving room for the TransportBatch wrapper and mixed-stream batches.
+_S2_MAX_MESSAGE_BYTES = 96 * 1024
+_S2_MAX_REQUEST_FRACTION = 0.75
+_MAX_SQLITE_SEQUENCE = 9223372036854775807
 
 
 @dataclass
@@ -217,87 +225,112 @@ class GeneralAssetProducer:
             }
 
         inserted_messages: list[dict[str, Any]] = []
-        committed_keys: set[str] = set()
+        committed_policy_counts: dict[str, int] = {}
+        committed_reason_counts: dict[str, int] = {}
 
-        # One logical message per S2 substream. This keeps backend routing and
-        # sequence spaces independent across the nine asset families.
-        for substream in sorted(due_by_substream):
-            records = due_by_substream[substream]
-            sequence = await asyncio.to_thread(
-                self.outbox.next_sequence,
-                self.producer_config.stream,
-                substream,
-            )
-            message = make_message(
-                schema_version=self.config.identity.schema_version,
-                gateway_id=self.config.identity.gateway_id,
-                site_id=self.config.identity.site_id,
-                stream=self.producer_config.stream,
-                substream=substream,
-                sequence=sequence,
-                priority=self.producer_config.priority,
-                records=records,
-                created_at_utc=sampled_utc,
-            )
-            try:
-                inserted = await asyncio.to_thread(self.outbox.enqueue, message)
-            except OutboxCapacityError as exc:
-                self.counters.enqueue_failure_count += 1
-                self.counters.last_error = f"outbox capacity backpressure: {_exc_text(exc)}"
-                self._write_status()
-                log.error("General asset producer paused by outbox capacity guard: %s", exc)
-                return {
-                    "emitted": bool(inserted_messages),
-                    "reason": "outbox_capacity",
-                    "message_count": len(inserted_messages),
-                    "messages": inserted_messages,
-                    "error": str(exc),
-                    "outbox": await asyncio.to_thread(self.outbox.stats),
-                }
-            except Exception as exc:
-                self.counters.enqueue_failure_count += 1
-                self.counters.last_error = f"outbox enqueue failed: {_exc_text(exc)}"
-                self._write_status()
-                raise
-            if not inserted:
-                continue
+        # Chunk within each original S2 substream, leaving stream/substream,
+        # payload shape, sequence namespace and per-message ACK semantics intact.
+        # All preflight size checks finish BEFORE any sequence is consumed.
+        try:
+            chunks_by_substream = {
+                substream: self._bounded_record_chunks(substream, records, sampled_utc)
+                for substream, records in sorted(due_by_substream.items())
+            }
+        except (TypeError, ValueError) as exc:
+            self.counters.enqueue_failure_count += 1
+            self.counters.last_error = f"S2 message split rejected: {_exc_text(exc)}"
+            self._write_status()
+            log.error("S2 message split preflight rejected: %s", exc)
+            return {
+                "emitted": False,
+                "reason": "message_size_error",
+                "error": str(exc),
+                "outbox": await asyncio.to_thread(self.outbox.stats),
+            }
 
-            for record in records:
-                committed_keys.add(str(record["runtime_signal_id"]))
-            self.counters.enqueue_count += 1
-            self.counters.message_count += 1
-            self.counters.record_count += len(records)
-            self.counters.last_message_ids[substream] = message.message_id
-            self.counters.last_sequences[substream] = sequence
-            self.counters.records_by_substream[substream] = (
-                self.counters.records_by_substream.get(substream, 0) + len(records)
-            )
-            inserted_messages.append({
-                "substream": substream,
-                "sequence": sequence,
-                "message_id": message.message_id,
-                "record_count": len(records),
-            })
+        for substream, chunks in chunks_by_substream.items():
+            for records in chunks:
+                sequence = await asyncio.to_thread(
+                    self.outbox.next_sequence,
+                    self.producer_config.stream,
+                    substream,
+                )
+                message = make_message(
+                    schema_version=self.config.identity.schema_version,
+                    gateway_id=self.config.identity.gateway_id,
+                    site_id=self.config.identity.site_id,
+                    stream=self.producer_config.stream,
+                    substream=substream,
+                    sequence=sequence,
+                    priority=self.producer_config.priority,
+                    records=records,
+                    created_at_utc=sampled_utc,
+                )
+                # Enforce the logical-message cap using the exact SQLite wire
+                # serialization; don't rely solely on an average bytes/record.
+                if _serialized_size(message.model_dump(mode="json")) > self._s2_message_budget():
+                    raise ValueError("S2 message exceeds budget after sequence assignment")
+                try:
+                    inserted = await asyncio.to_thread(self.outbox.enqueue, message)
+                except OutboxCapacityError as exc:
+                    self.counters.enqueue_failure_count += 1
+                    self.counters.last_error = f"outbox capacity backpressure: {_exc_text(exc)}"
+                    self._write_status()
+                    log.error("General asset producer paused by outbox capacity guard: %s", exc)
+                    return {
+                        "emitted": bool(inserted_messages),
+                        "reason": "outbox_capacity",
+                        "message_count": len(inserted_messages),
+                        "messages": inserted_messages,
+                        "error": str(exc),
+                        "outbox": await asyncio.to_thread(self.outbox.stats),
+                    }
+                except Exception as exc:
+                    self.counters.enqueue_failure_count += 1
+                    self.counters.last_error = f"outbox enqueue failed: {_exc_text(exc)}"
+                    self._write_status()
+                    raise
+                if not inserted:
+                    # Duplicate or conflicting sequence was NOT stored. Keep
+                    # signal state uncommitted for retry on the next snapshot.
+                    continue
 
-        for key in committed_keys:
-            emit_mono, fingerprint, reason = state_updates[key]
-            self._last_emitted_mono[key] = emit_mono
-            self._last_fingerprint[key] = fingerprint
-            if reason == "startup":
-                self.counters.startup_record_count += 1
-            elif reason == "change":
-                self.counters.change_record_count += 1
-            elif reason == "heartbeat":
-                self.counters.heartbeat_record_count += 1
-            elif reason == "periodic":
-                self.counters.periodic_record_count += 1
+                # Commit per successful chunk; if a later chunk hits capacity,
+                # we cannot lose bookkeeping for records already persisted.
+                for record in records:
+                    key = str(record["runtime_signal_id"])
+                    emit_mono, fingerprint, reason = state_updates[key]
+                    self._last_emitted_mono[key] = emit_mono
+                    self._last_fingerprint[key] = fingerprint
+                    if reason == "startup":
+                        self.counters.startup_record_count += 1
+                    elif reason == "change":
+                        self.counters.change_record_count += 1
+                    elif reason == "heartbeat":
+                        self.counters.heartbeat_record_count += 1
+                    elif reason == "periodic":
+                        self.counters.periodic_record_count += 1
+                    committed_reason_counts[reason] = committed_reason_counts.get(reason, 0) + 1
+                    name = str(record["policy"])
+                    committed_policy_counts[name] = committed_policy_counts.get(name, 0) + 1
+                    self.counters.records_by_policy[name] = (
+                        self.counters.records_by_policy.get(name, 0) + 1
+                    )
 
-        for policy_name, count in policy_due_counts.items():
-            # Only count records belonging to successfully inserted substreams.
-            # All substream inserts are expected to succeed in normal operation.
-            self.counters.records_by_policy[policy_name] = (
-                self.counters.records_by_policy.get(policy_name, 0) + count
-            )
+                self.counters.enqueue_count += 1
+                self.counters.message_count += 1
+                self.counters.record_count += len(records)
+                self.counters.last_message_ids[substream] = message.message_id
+                self.counters.last_sequences[substream] = sequence
+                self.counters.records_by_substream[substream] = (
+                    self.counters.records_by_substream.get(substream, 0) + len(records)
+                )
+                inserted_messages.append({
+                    "substream": substream,
+                    "sequence": sequence,
+                    "message_id": message.message_id,
+                    "record_count": len(records),
+                })
 
         self._last_sampled_epoch_ms = sampled_ms
         self.counters.last_enqueue_utc = now_utc if inserted_messages else self.counters.last_enqueue_utc
@@ -310,13 +343,71 @@ class GeneralAssetProducer:
             "message_count": len(inserted_messages),
             "record_count": sum(x["record_count"] for x in inserted_messages),
             "messages": inserted_messages,
-            "policy_due_counts": policy_due_counts,
-            "reason_counts": reason_counts,
+            "policy_due_counts": committed_policy_counts,
+            "reason_counts": committed_reason_counts,
             "sampled_at_utc": sampled_utc,
             "sampled_at_epoch_ms": sampled_ms,
             "snapshot_age_sec": snapshot.get("snapshot_age_sec"),
             "outbox": await asyncio.to_thread(self.outbox.stats),
         }
+
+    def _s2_message_budget(self) -> int:
+        uploader = getattr(self.config, "uploader", None)
+        request_bytes = int(getattr(uploader, "max_request_bytes", 128 * 1024))
+        if request_bytes < 8192:
+            raise ValueError("S2 requires max_request_bytes >= 8192")
+        return min(_S2_MAX_MESSAGE_BYTES, int(request_bytes * _S2_MAX_REQUEST_FRACTION))
+
+    def _bounded_record_chunks(
+        self,
+        substream: str,
+        records: list[dict[str, Any]],
+        sampled_utc: str,
+    ) -> list[list[dict[str, Any]]]:
+        """Greedy UTF-8 byte-accurate S2 splitting with NO backend schema change.
+
+        Size calculation uses a 19-digit sequence placeholder, guaranteeing
+        ordinary SQLite sequences have no larger encoding than our estimate.
+        The message_id is a fixed-width UUID generated by make_message.
+        """
+        if not records:
+            return []
+        budget = self._s2_message_budget()
+        prototype = make_message(
+            schema_version=self.config.identity.schema_version,
+            gateway_id=self.config.identity.gateway_id,
+            site_id=self.config.identity.site_id,
+            stream=self.producer_config.stream,
+            substream=substream,
+            sequence=_MAX_SQLITE_SEQUENCE,
+            priority=self.producer_config.priority,
+            records=[records[0]],
+            created_at_utc=sampled_utc,
+        )
+        first_record_len = _serialized_size(records[0])
+        # With one record, message bytes = envelope + record JSON bytes.
+        envelope_len = _serialized_size(prototype.model_dump(mode="json")) - first_record_len
+        chunks: list[list[dict[str, Any]]] = []
+        current: list[dict[str, Any]] = []
+        current_size = envelope_len
+        for record in records:
+            item_size = _serialized_size(record)
+            if envelope_len + item_size > budget:
+                raise ValueError(
+                    f"single S2 {substream} record {record.get('runtime_signal_id')} "
+                    f"requires {envelope_len + item_size} bytes; limit is {budget}"
+                )
+            additional = item_size + (1 if current else 0)  # comma in JSON array
+            if current and current_size + additional > budget:
+                chunks.append(current)
+                current = []
+                current_size = envelope_len
+                additional = item_size
+            current.append(record)
+            current_size += additional
+        if current:
+            chunks.append(current)
+        return chunks
 
     def _iter_runtime_signals(self, snapshot: dict[str, Any]):
         for asset_record in snapshot.get("records") or []:
@@ -529,3 +620,8 @@ def _float_or_none(value: Any) -> float | None:
         return float(value) if value is not None else None
     except Exception:
         return None
+
+
+def _serialized_size(value: Any) -> int:
+    """Match compact UTF-8 JSON stored by OutboxStore.enqueue."""
+    return len(json.dumps(value, separators=(",", ":"), ensure_ascii=False).encode("utf-8"))

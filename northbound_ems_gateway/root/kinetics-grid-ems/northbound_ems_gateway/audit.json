@@ -1,0 +1,30 @@
+{
+  "status": "OFFLINE TESTED; NOT APPROVED FOR PRODUCTION",
+  "authoritative_source": "northbound_gateway_FULL_DEPLOYMENT_20261009T092346Z.tar(3).gz",
+  "contract": "Central_Sync_9_Stream_Data_Contract_v1_4_S2_CADENCE_FROZEN_20261014.xlsx",
+  "files": {
+    "data/central_sync/canonical_signal_policy_frozen_v1_1.json": {
+      "old_sha256": "85aef47c0313de3f693363685dcd65e3a30f19bec29216c1f86a0fb94467fcdb",
+      "new_sha256": "986fa3617e390affef139b98f0d1aab9010081245d3ce5dfe6db4a8a8a7db975"
+    },
+    "src/nb_ems_gateway/central_sync/general_asset_producer.py": {
+      "old_sha256": "854f6687123e41585be4861b8c0b01be0692a997634151439c8e206d500b263b",
+      "new_sha256": "5d9cb506edfc066e0be9b7a167683ddc26e985d761eab407a75fff7f0b2294e1"
+    }
+  },
+  "s2_canonical_signals": 1350,
+  "s2_runtime_signals": 2700,
+  "other_canonical_signals_unchanged": 72,
+  "unmodified_components": [
+    "SQLite schema",
+    "Uploader",
+    "Batcher",
+    "Backend client",
+    "Modbus decoder",
+    "SOC controller",
+    "S1 and S3-S9 producers"
+  ],
+  "live_gateway_modified": false,
+  "max_s2_logical_bytes": 98304,
+  "transport_advisory_target_bytes": 131072
+}

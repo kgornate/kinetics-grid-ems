@@ -12,6 +12,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from app.api.routes import build_router
+from app.local_hmi.router import router as local_hmi_router
 from app.core.config import load_config
 from app.security.auth import AuthService
 from app.services.gateway_service import GatewayService
@@ -213,3 +214,4 @@ async def request_logging(request: Request, call_next):
 
 
 app.include_router(build_router(service, auth, runtime_metrics))
+app.include_router(local_hmi_router)
