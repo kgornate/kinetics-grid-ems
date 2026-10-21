@@ -1,0 +1,975 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
+
+import '../../models/gateway_models.dart';
+import '../api/gateway_api_client.dart';
+
+class GatewayController extends ChangeNotifier {
+  GatewayController({GatewayApiClient? api}) : api = api ?? GatewayApiClient();
+
+  final GatewayApiClient api;
+  final PlantSnapshot plant = PlantSnapshot();
+
+  GatewaySession? session;
+  bool busy = false;
+  bool restConnected = false;
+  bool wsConnected = false;
+  String? errorMessage;
+  String? lastEventMessage;
+  final Map<String, String> lastEventMessagesByPair = <String, String>{};
+
+  Map<String, dynamic> health = <String, dynamic>{};
+  Map<String, dynamic> storage = <String, dynamic>{};
+  Map<String, dynamic> polling = <String, dynamic>{};
+  Map<String, dynamic> dataRate = <String, dynamic>{};
+  List<Map<String, dynamic>> activeAlarms = <Map<String, dynamic>>[];
+  List<Map<String, dynamic>> assetMetadata = <Map<String, dynamic>>[];
+
+  ControlSequenceCapabilities? controlCapabilities;
+  ControlSequenceStatus? controlStatus;
+  final Map<String, ControlSequenceStatus> controlStatuses =
+      <String, ControlSequenceStatus>{};
+  Map<String, dynamic> controlPlantSummary = <String, dynamic>{};
+  Map<String, dynamic> lastControlResponse = <String, dynamic>{};
+  final Map<String, Map<String, dynamic>> lastControlResponsesByPair =
+      <String, Map<String, dynamic>>{};
+  final Set<String> _controlBusyPairs = <String>{};
+  final Set<String> _automaticTrackingPairs = <String>{};
+  final Map<String, Timer> _automaticTrackers = <String, Timer>{};
+  final Map<String, DateTime> _pairStatusReceivedAt = <String, DateTime>{};
+  final Map<String, DateTime> _pairPayloadTimestamps = <String, DateTime>{};
+  String selectedControlPair = 'pair_1';
+
+  WebSocket? _telemetrySocket;
+  StreamSubscription<dynamic>? _telemetrySubscription;
+  Timer? _diagnosticTimer;
+  Timer? _controlTimer;
+  Timer? _reconnectTimer;
+  int _reconnectAttempt = 0;
+  bool _controlStatusInFlight = false;
+  bool _controlStatusRefreshPending = false;
+  bool _controlPollingEnabled = false;
+  int _controlStatusGeneration = 0;
+  int controlStatusSkippedRefreshes = 0;
+  DateTime? controlStatusReceivedAt;
+  bool _disposed = false;
+  Timer? _kalpaTimer;
+  int _kalpaTick = 0;
+  bool _compactInFlight = false;
+  bool _normalizedInFlight = false;
+  bool _meterInFlight = false;
+  Map<String, dynamic> normalized = <String, dynamic>{};
+  Map<String, dynamic>? meter;
+  String? normalizedError;
+  String? meterError;
+  DateTime? normalizedReceivedAt;
+  DateTime? meterReceivedAt;
+
+  bool get normalizedLive =>
+      normalizedError == null &&
+      normalizedReceivedAt != null &&
+      DateTime.now().difference(normalizedReceivedAt!) <
+          const Duration(seconds: 20);
+  bool get meterLive =>
+      meterError == null &&
+      meterReceivedAt != null &&
+      DateTime.now().difference(meterReceivedAt!) <
+          const Duration(seconds: 20) &&
+      meter?['online'] == true;
+
+  Future<void> refreshNormalized() async {
+    if (!authenticated || _normalizedInFlight || _disposed) return;
+    _normalizedInFlight = true;
+    final activeSession = session;
+    try {
+      final data = await api.getJson(
+        '/api/normalized/snapshot',
+        timeout: const Duration(seconds: 10),
+      );
+      if (_disposed || !identical(session, activeSession)) return;
+      normalized = data;
+      normalizedError = null;
+      normalizedReceivedAt = DateTime.now();
+    } catch (error) {
+      if (identical(session, activeSession)) normalizedError = error.toString();
+    } finally {
+      _normalizedInFlight = false;
+      if (!_disposed) notifyListeners();
+    }
+  }
+
+  Future<void> refreshMeters() async {
+    if (!authenticated || _meterInFlight || _disposed) return;
+    _meterInFlight = true;
+    final activeSession = session;
+    try {
+      final data = await api.getJson(
+        '/api/meters',
+        timeout: const Duration(seconds: 10),
+      );
+      if (_disposed || !identical(session, activeSession)) return;
+      final items = data['meters'];
+      meter = items is Map && items['acrel_meter_1'] is Map
+          ? Map<String, dynamic>.from(items['acrel_meter_1'] as Map)
+          : null;
+      meterError = null;
+      meterReceivedAt = DateTime.now();
+    } catch (error) {
+      if (identical(session, activeSession)) meterError = error.toString();
+    } finally {
+      _meterInFlight = false;
+      if (!_disposed) notifyListeners();
+    }
+  }
+
+  Future<void> refreshKalpa() async {
+    await Future.wait<void>([
+      refreshNormalized(),
+      refreshMeters(),
+      refreshCompact(silent: true),
+    ]);
+  }
+
+  bool get authenticated => session != null;
+  bool get isInternal => session?.isInternal == true;
+
+  Future<void> login({
+    required String baseUrl,
+    required String username,
+    required String password,
+  }) async {
+    busy = true;
+    errorMessage = null;
+    notifyListeners();
+    try {
+      api.configure(baseUrl: baseUrl);
+      final response = await api.login(username: username, password: password);
+      final token = response['access_token']?.toString();
+      if (token == null || token.isEmpty) {
+        throw const ApiException(
+          'Login response did not contain an access token',
+        );
+      }
+      session = GatewaySession(
+        baseUrl: api.baseUrl,
+        token: token,
+        username: response['username']?.toString() ?? username,
+        role: response['role']?.toString() ?? 'customer',
+      );
+      api.configure(baseUrl: api.baseUrl, bearerToken: token);
+      await bootstrap();
+    } catch (error) {
+      session = null;
+      errorMessage = error.toString();
+      rethrow;
+    } finally {
+      busy = false;
+      if (!_disposed) notifyListeners();
+    }
+  }
+
+  Future<void> bootstrap() async {
+    await refreshCompact();
+    await refreshDiagnostics();
+    await refreshAlarms();
+    await refreshAssetMetadata();
+    if (isInternal) {
+      await refreshControlCapabilities(silent: true);
+      await refreshControlStatus(silent: true);
+    }
+    await Future.wait<void>([refreshNormalized(), refreshMeters()]);
+    unawaited(connectTelemetry());
+    _kalpaTimer?.cancel();
+    _kalpaTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (!authenticated || _disposed) return;
+      unawaited(refreshNormalized());
+      unawaited(refreshMeters());
+      _kalpaTick += 1;
+      if (!wsConnected || _kalpaTick % 6 == 0)
+        unawaited(refreshCompact(silent: true));
+    });
+    _diagnosticTimer?.cancel();
+    _diagnosticTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      refreshDiagnostics(silent: true);
+    });
+  }
+
+  Future<void> refreshCompact({bool silent = false}) async {
+    if (_compactInFlight || !authenticated || _disposed) return;
+    _compactInFlight = true;
+    final activeSession = session;
+    if (!silent) {
+      busy = true;
+      notifyListeners();
+    }
+    try {
+      final payload = await api.getJson('/api/telemetry/compact');
+      if (_disposed || !identical(session, activeSession)) return;
+      plant.applyMessage(payload);
+      restConnected = true;
+      errorMessage = null;
+    } catch (error) {
+      if (_disposed || !identical(session, activeSession)) return;
+      restConnected = false;
+      errorMessage = error.toString();
+      if (!silent) rethrow;
+    } finally {
+      _compactInFlight = false;
+      if (!silent) busy = false;
+      if (!_disposed) notifyListeners();
+    }
+  }
+
+  Future<void> forceCompleteExtraction() async {
+    busy = true;
+    errorMessage = null;
+    notifyListeners();
+    try {
+      final payload = await api.getJson(
+        '/api/telemetry/snapshot',
+        query: const <String, String>{
+          'refresh': 'true',
+          'include_slow': 'true',
+          'include_bulk': 'true',
+        },
+        timeout: const Duration(minutes: 5),
+      );
+      plant.applyMessage(payload);
+      restConnected = true;
+      lastEventMessage =
+          'Complete fast, normal, slow and bulk extraction finished.';
+    } catch (error) {
+      errorMessage = error.toString();
+      rethrow;
+    } finally {
+      busy = false;
+      if (!_disposed) notifyListeners();
+    }
+  }
+
+  Future<void> refreshAssetMetadata() async {
+    try {
+      final payload = await api.getJson('/api/assets');
+      final raw = payload['assets'];
+      if (raw is List) {
+        assetMetadata = raw
+            .whereType<Map>()
+            .map((item) => Map<String, dynamic>.from(item))
+            .toList();
+      }
+    } catch (error) {
+      errorMessage = error.toString();
+    }
+    if (!_disposed) notifyListeners();
+  }
+
+  Future<void> refreshAlarms({bool silent = false}) async {
+    try {
+      final payload = await api.getJson('/api/alarms');
+      final raw = payload['alarms'];
+      if (raw is List) {
+        activeAlarms = raw
+            .whereType<Map>()
+            .map((item) => Map<String, dynamic>.from(item))
+            .toList();
+        plant.alarms = List<Map<String, dynamic>>.from(activeAlarms);
+      }
+    } catch (error) {
+      if (!silent) errorMessage = error.toString();
+    }
+    if (!_disposed) notifyListeners();
+  }
+
+  Future<void> refreshDiagnostics({bool silent = false}) async {
+    try {
+      final results = await Future.wait<Map<String, dynamic>>(
+        <Future<Map<String, dynamic>>>[
+          api.getJson('/api/health'),
+          api.getJson('/api/storage/status'),
+          api.getJson('/api/diagnostics/polling'),
+          api.getJson('/api/diagnostics/data-rate'),
+        ],
+      );
+      health = results[0];
+      storage = results[1];
+      polling = results[2];
+      dataRate = results[3];
+      restConnected = true;
+      await refreshAlarms(silent: true);
+    } catch (error) {
+      restConnected = false;
+      if (!silent) errorMessage = error.toString();
+    }
+    if (!_disposed) notifyListeners();
+  }
+
+  Future<AssetSnapshot> loadRackDetails(int rackId) async {
+    final payload = await api.getJson(
+      '/api/bms/racks/$rackId/details',
+      timeout: const Duration(minutes: 5),
+    );
+    final asset = AssetSnapshot.fromJson(payload);
+    plant.assets[asset.assetId] = asset;
+    notifyListeners();
+    return asset;
+  }
+
+  Future<List<Map<String, dynamic>>> loadHistorian(
+    String assetId, {
+    int limit = 100,
+  }) async {
+    final payload = await api.getJson(
+      '/api/historian/$assetId',
+      query: <String, String>{'limit': '$limit'},
+      timeout: const Duration(seconds: 60),
+    );
+    final raw = payload['samples'];
+    if (raw is! List) return const <Map<String, dynamic>>[];
+    return raw
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList();
+  }
+
+  Future<List<Map<String, dynamic>>> loadAlarmHistory({int limit = 500}) async {
+    final payload = await api.getJson(
+      '/api/alarms/history',
+      query: <String, String>{'limit': '$limit'},
+    );
+    final raw = payload['history'];
+    if (raw is! List) return const <Map<String, dynamic>>[];
+    return raw
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList();
+  }
+
+  Future<Map<String, dynamic>> loadMockScenarios() {
+    return api.getJson('/api/mock/scenarios');
+  }
+
+  Future<void> setMockScenario(String scenario) async {
+    final result = await api.postJson('/api/mock/scenario/$scenario');
+    lastEventMessage = result['scenario']?.toString() == null
+        ? 'Mock scenario changed to $scenario.'
+        : 'Mock scenario changed to ${result['scenario']}.';
+    await refreshCompact(silent: true);
+  }
+
+  Future<void> refreshControlCapabilities({bool silent = false}) async {
+    if (!isInternal) return;
+    try {
+      final payload = await api.getJson('/api/control-sequence/capabilities');
+      controlCapabilities = ControlSequenceCapabilities.fromJson(payload);
+      final enabledPairs = controlCapabilities!.pairs
+          .where((pair) => pair.enabled)
+          .map((pair) => pair.pairId)
+          .toList();
+      if (enabledPairs.isNotEmpty &&
+          !enabledPairs.contains(selectedControlPair)) {
+        selectedControlPair = enabledPairs.first;
+      }
+    } catch (error) {
+      if (!silent) errorMessage = error.toString();
+      if (!silent) rethrow;
+    } finally {
+      if (!_disposed) notifyListeners();
+    }
+  }
+
+  Future<void> refreshControlStatus({bool silent = false}) async {
+    if (!isInternal || _disposed) return;
+
+    // Multi-pair overview polling is cache-only and single-flight. It never
+    // requests direct Modbus reads, so telemetry display cannot compete with
+    // startup, safe-stop or runtime safety monitoring.
+    if (_controlStatusInFlight) {
+      _controlStatusRefreshPending = true;
+      controlStatusSkippedRefreshes += 1;
+      return;
+    }
+
+    _controlStatusInFlight = true;
+    final generation = _controlStatusGeneration;
+    try {
+      final payload = await api.getJson(
+        '/api/control-sequence/status/all/compact',
+        timeout: const Duration(seconds: 10),
+      );
+      if (_disposed || generation != _controlStatusGeneration) return;
+
+      final parsed = <String, ControlSequenceStatus>{};
+      final byPair =
+          payload['by_pair_id'] ??
+          (payload['pairs'] is Map ? payload['pairs'] : null);
+      if (byPair is Map) {
+        for (final entry in byPair.entries) {
+          if (entry.value is Map) {
+            final status = ControlSequenceStatus.fromJson(
+              Map<String, dynamic>.from(entry.value as Map),
+            );
+            parsed[entry.key.toString()] = status;
+          }
+        }
+      } else {
+        final pairs = payload['pairs'];
+        if (pairs is List) {
+          for (final item in pairs.whereType<Map>()) {
+            final status = ControlSequenceStatus.fromJson(
+              Map<String, dynamic>.from(item),
+            );
+            parsed[status.pairId] = status;
+          }
+        }
+      }
+
+      for (final entry in parsed.entries) {
+        final currentPayloadTime = _pairPayloadTimestamps[entry.key];
+        final incomingTime = entry.value.timestamp == null
+            ? null
+            : DateTime.tryParse(entry.value.timestamp!);
+        if (currentPayloadTime != null &&
+            incomingTime != null &&
+            incomingTime.toUtc().isBefore(currentPayloadTime)) {
+          continue;
+        }
+        controlStatuses[entry.key] = entry.value;
+        if (incomingTime != null) {
+          _pairPayloadTimestamps[entry.key] = incomingTime.toUtc();
+        }
+        _pairStatusReceivedAt[entry.key] = DateTime.now().toUtc();
+      }
+      controlPlantSummary = payload['summary'] is Map
+          ? Map<String, dynamic>.from(payload['summary'] as Map)
+          : <String, dynamic>{};
+      controlStatus = controlStatuses[selectedControlPair];
+      controlStatusReceivedAt = DateTime.now().toUtc();
+      restConnected = true;
+    } catch (error) {
+      if (!silent) errorMessage = error.toString();
+      if (!silent) rethrow;
+    } finally {
+      _controlStatusInFlight = false;
+      final runPending = _controlStatusRefreshPending && !_disposed;
+      _controlStatusRefreshPending = false;
+      if (!_disposed) notifyListeners();
+      if (runPending) {
+        unawaited(refreshControlStatus(silent: true));
+      }
+    }
+  }
+
+  Future<void> refreshSelectedControlStatusFresh({bool silent = false}) async {
+    if (!isInternal || _disposed) return;
+    final pairId = selectedControlPair;
+    try {
+      final payload = await api.getJson(
+        '/api/control-sequence/$pairId/status',
+        query: const <String, String>{'fresh': 'true'},
+        timeout: const Duration(seconds: 120),
+      );
+      if (_disposed || pairId != selectedControlPair) return;
+      final status = ControlSequenceStatus.fromJson(payload);
+      controlStatuses[pairId] = status;
+      final payloadTime = status.timestamp == null
+          ? null
+          : DateTime.tryParse(status.timestamp!);
+      if (payloadTime != null) {
+        _pairPayloadTimestamps[pairId] = payloadTime.toUtc();
+      }
+      _pairStatusReceivedAt[pairId] = DateTime.now().toUtc();
+      controlStatus = status;
+      controlStatusReceivedAt = _pairStatusReceivedAt[pairId];
+      restConnected = true;
+    } catch (error) {
+      if (!silent) errorMessage = error.toString();
+      if (!silent) rethrow;
+    } finally {
+      if (!_disposed) notifyListeners();
+    }
+  }
+
+  void selectControlPair(String pairId) {
+    if (pairId == selectedControlPair) return;
+    selectedControlPair = pairId;
+    controlStatus = controlStatuses[pairId];
+    controlStatusReceivedAt = _pairStatusReceivedAt[pairId];
+    _controlStatusGeneration += 1;
+    notifyListeners();
+    unawaited(refreshControlStatus(silent: true));
+  }
+
+  void startControlPolling() {
+    if (!isInternal || _disposed) return;
+    _controlPollingEnabled = true;
+    _controlTimer?.cancel();
+    unawaited(refreshControlStatus(silent: true));
+    _controlTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (_controlPollingEnabled) {
+        unawaited(refreshControlStatus(silent: true));
+      }
+    });
+  }
+
+  void stopControlPolling() {
+    _controlPollingEnabled = false;
+    _controlTimer?.cancel();
+    _controlTimer = null;
+    _controlStatusRefreshPending = false;
+  }
+
+  bool get controlPollingActive =>
+      _controlPollingEnabled && _controlTimer?.isActive == true;
+
+  bool get controlStatusRequestActive => _controlStatusInFlight;
+
+  bool get controlBusy => _controlBusyPairs.contains(selectedControlPair);
+
+  bool get anyControlBusy => _controlBusyPairs.isNotEmpty;
+
+  bool get selectedAutomaticTracking =>
+      _automaticTrackingPairs.contains(selectedControlPair);
+
+  bool isControlPairBusy(String pairId) =>
+      _controlBusyPairs.contains(pairId) ||
+      _automaticTrackingPairs.contains(pairId);
+
+  Map<String, dynamic> controlResponseFor(String pairId) =>
+      lastControlResponsesByPair[pairId] ?? const <String, dynamic>{};
+
+  String? controlEventFor(String pairId) => lastEventMessagesByPair[pairId];
+
+  ControlSequenceStatus? controlStatusFor(String pairId) =>
+      controlStatuses[pairId];
+
+  double get totalControlSetpointKw =>
+      _asControllerDouble(controlPlantSummary['total_setpoint_kw']) ?? 0.0;
+
+  double get totalControlActualPowerKw =>
+      _asControllerDouble(controlPlantSummary['total_actual_power_kw']) ?? 0.0;
+
+  String get controlStatusSource {
+    final refresh = controlStatus?.raw['refresh'];
+    if (refresh is Map) {
+      return refresh['source']?.toString() ?? 'cached_runtime';
+    }
+    return 'cached_runtime';
+  }
+
+  bool get controlStatusIsStale {
+    final refresh = controlStatus?.raw['refresh'];
+    if (refresh is Map && refresh['stale'] == true) return true;
+    final timestamp = controlStatus?.timestamp;
+    final parsed = timestamp == null ? null : DateTime.tryParse(timestamp);
+    if (parsed == null) return controlStatus == null;
+    return DateTime.now().toUtc().difference(parsed.toUtc()) >
+        const Duration(seconds: 20);
+  }
+
+  Duration? get controlStatusAge {
+    final timestamp = controlStatus?.timestamp;
+    final parsed = timestamp == null ? null : DateTime.tryParse(timestamp);
+    if (parsed == null) return null;
+    final age = DateTime.now().toUtc().difference(parsed.toUtc());
+    return age.isNegative ? Duration.zero : age;
+  }
+
+  Future<Map<String, dynamic>> automaticStart({
+    required String direction,
+    required double targetPowerKw,
+    double? rampStepKw,
+    double? rampIntervalSeconds,
+  }) async {
+    final pairId = selectedControlPair;
+    final phrase =
+        controlCapabilities?.automaticConfirmationPhrase ??
+        'EXECUTE_AUTOMATIC_SEQUENCE';
+    final result = await _executeControl(
+      '/api/control-sequence/$pairId/automatic-start',
+      <String, dynamic>{
+        'direction': direction,
+        'power_kw': targetPowerKw,
+        'ramp_step_kw': rampStepKw,
+        'ramp_interval_seconds': rampIntervalSeconds,
+        'confirmation': phrase,
+      },
+      successMessage:
+          'Automatic $direction sequence accepted for $pairId at ${targetPowerKw.toStringAsFixed(1)} kW.',
+      pairIdOverride: pairId,
+      refreshAfter: false,
+      timeout: const Duration(seconds: 15),
+    );
+    if (result['accepted'] == true) {
+      _startAutomaticTracking(pairId);
+      await _refreshOneControlPair(pairId, silent: true);
+    }
+    return result;
+  }
+
+  Future<Map<String, dynamic>> nextControlStep({
+    required String direction,
+    required double targetPowerKw,
+  }) {
+    return _executeControl(
+      '/api/control-sequence/$selectedControlPair/next-step',
+      <String, dynamic>{
+        'direction': direction,
+        'power_kw': targetPowerKw,
+        'confirmation': _stageConfirmation,
+      },
+      successMessage: 'Commissioning step executed.',
+    );
+  }
+
+  Future<Map<String, dynamic>> setControlPower({
+    required String direction,
+    required double powerKw,
+  }) {
+    return _executeControl(
+      '/api/control-sequence/$selectedControlPair/set-power',
+      <String, dynamic>{
+        'direction': direction,
+        'power_kw': powerKw,
+        'confirmation': _stageConfirmation,
+      },
+      successMessage:
+          '${direction == 'charge' ? 'Charge' : 'Discharge'} setpoint sent: ${powerKw.toStringAsFixed(1)} kW.',
+    );
+  }
+
+  Future<Map<String, dynamic>> zeroControlPower() {
+    return _executeControl(
+      '/api/control-sequence/$selectedControlPair/zero-power',
+      <String, dynamic>{'confirmation': _stageConfirmation},
+      successMessage: 'Zero-power command sent and verified.',
+    );
+  }
+
+  Future<Map<String, dynamic>> safeStopControl({bool openBms = true}) {
+    return _executeControl(
+      '/api/control-sequence/$selectedControlPair/safe-stop',
+      <String, dynamic>{
+        'confirmation': _stageConfirmation,
+        'open_bms': openBms,
+      },
+      successMessage: openBms
+          ? 'Safe shutdown completed; PCS stopped and BMS opened.'
+          : 'PCS safe stop completed.',
+      timeout: const Duration(seconds: 60),
+    );
+  }
+
+  Future<Map<String, dynamic>> safeStopAllControl({bool openBms = true}) async {
+    if (!isInternal) {
+      throw const ApiException('Internal role is required for control');
+    }
+    if (_controlBusyPairs.isNotEmpty) {
+      throw const ApiException(
+        'Wait for active pair commands to finish before Safe Stop All.',
+      );
+    }
+    final pairIds =
+        controlCapabilities?.pairs
+            .where((pair) => pair.enabled)
+            .map((pair) => pair.pairId)
+            .toSet() ??
+        <String>{'pair_1', 'pair_2', 'pair_3', 'pair_4'};
+    _controlBusyPairs.addAll(pairIds);
+    errorMessage = null;
+    notifyListeners();
+    try {
+      final result = await api.postJson(
+        '/api/control-sequence/safe-stop-all',
+        body: <String, dynamic>{
+          'confirmation': _stageConfirmation,
+          'open_bms': openBms,
+        },
+        timeout: const Duration(minutes: 5),
+      );
+      lastControlResponse = result;
+      lastEventMessage = result['ok'] == true
+          ? 'All enabled pairs were safely stopped.'
+          : 'Safe Stop All completed with one or more pair failures.';
+      await refreshControlStatus(silent: true);
+      return result;
+    } catch (error) {
+      errorMessage = error.toString();
+      rethrow;
+    } finally {
+      _controlBusyPairs.removeAll(pairIds);
+      if (!_disposed) notifyListeners();
+    }
+  }
+
+  Future<Map<String, dynamic>> abortControl({bool openBms = true}) {
+    return _executeControl(
+      '/api/control-sequence/$selectedControlPair/abort',
+      <String, dynamic>{
+        'confirmation': _stageConfirmation,
+        'open_bms': openBms,
+      },
+      successMessage: 'Sequence abort requested and safe-stop executed.',
+      timeout: const Duration(seconds: 60),
+    );
+  }
+
+  String get _stageConfirmation =>
+      controlCapabilities?.confirmationPhrase ?? 'EXECUTE_STAGE_WRITE';
+
+  Future<Map<String, dynamic>> _executeControl(
+    String path,
+    Map<String, dynamic> body, {
+    required String successMessage,
+    Duration timeout = const Duration(seconds: 150),
+    String? pairIdOverride,
+    bool refreshAfter = true,
+  }) async {
+    if (!isInternal) {
+      throw const ApiException('Internal role is required for control');
+    }
+    final pairId = pairIdOverride ?? selectedControlPair;
+    if (_controlBusyPairs.contains(pairId)) {
+      throw ApiException(
+        'A control command is already in progress for $pairId.',
+      );
+    }
+    _controlBusyPairs.add(pairId);
+    errorMessage = null;
+    notifyListeners();
+    try {
+      body.removeWhere((key, value) => value == null);
+      final result = await api.postJson(path, body: body, timeout: timeout);
+      lastControlResponse = result;
+      lastControlResponsesByPair[pairId] = Map<String, dynamic>.from(result);
+      lastEventMessage = successMessage;
+      lastEventMessagesByPair[pairId] = successMessage;
+      if (refreshAfter) {
+        await _refreshOneControlPair(pairId, silent: true);
+      }
+      return result;
+    } catch (error) {
+      errorMessage = error.toString();
+      rethrow;
+    } finally {
+      _controlBusyPairs.remove(pairId);
+      if (!_disposed) notifyListeners();
+    }
+  }
+
+  Future<void> _refreshOneControlPair(
+    String pairId, {
+    bool silent = false,
+  }) async {
+    try {
+      final payload = await api.getJson(
+        '/api/control-sequence/$pairId/status',
+        query: const <String, String>{'fresh': 'false'},
+        timeout: const Duration(seconds: 12),
+      );
+      if (_disposed) return;
+      final status = ControlSequenceStatus.fromJson(payload);
+      final incomingTime = status.timestamp == null
+          ? null
+          : DateTime.tryParse(status.timestamp!);
+      final currentPayloadTime = _pairPayloadTimestamps[pairId];
+      if (currentPayloadTime == null ||
+          incomingTime == null ||
+          !incomingTime.toUtc().isBefore(currentPayloadTime)) {
+        controlStatuses[pairId] = status;
+        if (incomingTime != null) {
+          _pairPayloadTimestamps[pairId] = incomingTime.toUtc();
+        }
+      }
+      _pairStatusReceivedAt[pairId] = DateTime.now().toUtc();
+      if (selectedControlPair == pairId) {
+        controlStatus = status;
+        controlStatusReceivedAt = _pairStatusReceivedAt[pairId];
+      }
+      if (!status.automaticRunning &&
+          status.runStatus != 'accepted' &&
+          status.runStatus != 'queued') {
+        _stopAutomaticTracking(pairId);
+      }
+      restConnected = true;
+    } catch (error) {
+      if (!silent) {
+        errorMessage = error.toString();
+        rethrow;
+      }
+    } finally {
+      if (!_disposed) notifyListeners();
+    }
+  }
+
+  void _startAutomaticTracking(String pairId) {
+    _automaticTrackingPairs.add(pairId);
+    _automaticTrackers.remove(pairId)?.cancel();
+    _automaticTrackers[pairId] = Timer.periodic(
+      const Duration(seconds: 2),
+      (_) => unawaited(_refreshOneControlPair(pairId, silent: true)),
+    );
+    if (!_disposed) notifyListeners();
+  }
+
+  void _stopAutomaticTracking(String pairId) {
+    _automaticTrackingPairs.remove(pairId);
+    _automaticTrackers.remove(pairId)?.cancel();
+  }
+
+  Future<void> connectTelemetry() async {
+    if (!authenticated || _disposed) return;
+    final activeSession = session;
+    await _closeSocket();
+    try {
+      final socket = await api.openTelemetrySocket(mode: 'delta');
+      if (_disposed || !identical(session, activeSession)) {
+        await socket.close();
+        return;
+      }
+      _telemetrySocket = socket;
+      wsConnected = true;
+      _reconnectAttempt = 0;
+      _telemetrySubscription = socket.listen(
+        _handleSocketData,
+        onError: (Object error, StackTrace stack) {
+          if (_disposed || !identical(session, activeSession)) return;
+          wsConnected = false;
+          errorMessage = 'WebSocket: $error';
+          notifyListeners();
+          _scheduleReconnect();
+        },
+        onDone: () {
+          if (_disposed || !identical(session, activeSession)) return;
+          wsConnected = false;
+          notifyListeners();
+          _scheduleReconnect();
+        },
+        cancelOnError: true,
+      );
+    } catch (error) {
+      if (_disposed || !identical(session, activeSession)) return;
+      wsConnected = false;
+      errorMessage = 'WebSocket connection failed: $error';
+      _scheduleReconnect();
+    }
+    if (!_disposed) notifyListeners();
+  }
+
+  void _handleSocketData(dynamic data) {
+    if (!authenticated || _disposed) return;
+    try {
+      final decoded = jsonDecode(data.toString());
+      if (decoded is Map) {
+        plant.applyMessage(Map<String, dynamic>.from(decoded));
+        final type = decoded['type']?.toString();
+        if (type == 'telemetry_update') {
+          lastEventMessage =
+              '${decoded['poll_class'] ?? 'telemetry'} update, sequence ${decoded['sequence'] ?? plant.sequence}';
+        } else {
+          lastEventMessage = 'Live snapshot received.';
+        }
+      }
+      wsConnected = true;
+      errorMessage = null;
+    } catch (error) {
+      errorMessage = 'Invalid WebSocket payload: $error';
+    }
+    if (!_disposed) notifyListeners();
+  }
+
+  void _scheduleReconnect() {
+    if (_disposed || session == null || _reconnectTimer?.isActive == true)
+      return;
+    _reconnectAttempt += 1;
+    final exponent = _reconnectAttempt.clamp(0, 5).toInt();
+    final seconds = (1 << exponent).clamp(2, 30).toInt();
+    _reconnectTimer = Timer(Duration(seconds: seconds), () {
+      connectTelemetry();
+    });
+  }
+
+  Future<void> _closeSocket() async {
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
+    await _telemetrySubscription?.cancel();
+    _telemetrySubscription = null;
+    await _telemetrySocket?.close();
+    _telemetrySocket = null;
+    wsConnected = false;
+  }
+
+  Future<void> logout() async {
+    _kalpaTimer?.cancel();
+    _kalpaTimer = null;
+    session = null;
+    normalized = <String, dynamic>{};
+    meter = null;
+    normalizedError = null;
+    meterError = null;
+    normalizedReceivedAt = null;
+    meterReceivedAt = null;
+    _diagnosticTimer?.cancel();
+    _diagnosticTimer = null;
+    stopControlPolling();
+    for (final tracker in _automaticTrackers.values) {
+      tracker.cancel();
+    }
+    _automaticTrackers.clear();
+    _automaticTrackingPairs.clear();
+    _pairStatusReceivedAt.clear();
+    lastControlResponsesByPair.clear();
+    lastEventMessagesByPair.clear();
+    await _closeSocket();
+    session = null;
+    api.token = null;
+    plant.assets.clear();
+    activeAlarms = <Map<String, dynamic>>[];
+    assetMetadata = <Map<String, dynamic>>[];
+    controlCapabilities = null;
+    controlStatus = null;
+    controlStatuses.clear();
+    _pairPayloadTimestamps.clear();
+    controlPlantSummary = <String, dynamic>{};
+    controlStatusReceivedAt = null;
+    _controlBusyPairs.clear();
+    _controlStatusInFlight = false;
+    _controlStatusRefreshPending = false;
+    _controlPollingEnabled = false;
+    _controlStatusGeneration += 1;
+    controlStatusSkippedRefreshes = 0;
+    lastControlResponse = <String, dynamic>{};
+    health = <String, dynamic>{};
+    storage = <String, dynamic>{};
+    polling = <String, dynamic>{};
+    dataRate = <String, dynamic>{};
+    restConnected = false;
+    errorMessage = null;
+    lastEventMessage = null;
+    notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    _kalpaTimer?.cancel();
+    _diagnosticTimer?.cancel();
+    _controlTimer?.cancel();
+    for (final timer in _automaticTrackers.values) {
+      timer.cancel();
+    }
+    _automaticTrackers.clear();
+    _reconnectTimer?.cancel();
+    _telemetrySubscription?.cancel();
+    _telemetrySocket?.close();
+    api.close();
+    super.dispose();
+  }
+}
+
+double? _asControllerDouble(dynamic value) {
+  if (value is num) return value.toDouble();
+  return double.tryParse(value?.toString() ?? '');
+}

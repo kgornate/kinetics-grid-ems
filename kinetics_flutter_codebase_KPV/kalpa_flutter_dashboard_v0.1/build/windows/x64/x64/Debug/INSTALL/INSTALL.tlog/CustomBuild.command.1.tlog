@@ -1,0 +1,10 @@
+^C:\USERS\KUNAL\DOWNLOADS\KALPA_FLUTTER_DASHBOARD_V0.1 (1)\KALPA_FLUTTER_DASHBOARD_V0.1\BUILD\WINDOWS\X64\CMAKEFILES\24E4FD723412C44FF222D975E4665533\INSTALL_FORCE.RULE
+setlocal
+cd .
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd

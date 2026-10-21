@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\kunal\Downloads\kalpa_flutter_dashboard_v0.1 (1)\kalpa_flutter_dashboard_v0.1\build\windows\x64\CMakeFiles\f2ffcafab38c96b3c254621504b8ebae\INSTALL_force.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="CMake Rules">
+      <UniqueIdentifier>{8688F94F-6FA1-35F3-AEA5-F4EC36691BF3}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>
