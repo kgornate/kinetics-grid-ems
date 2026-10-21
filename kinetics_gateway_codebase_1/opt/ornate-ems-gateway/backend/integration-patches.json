@@ -1,0 +1,78 @@
+{
+  "app/main.py": [
+    {
+      "old": "                await child\n\n\n@asynccontextmanager\nasync def lifespan(app: FastAPI):\n    tasks = [asyncio.create_task(polling_supervisor(), name=\"ornate-ems-polling-supervisor\")]\n    tasks.append(asyncio.create_task(maintenance_loop(), name=\"ornate-ems-maintenance\"))\n    tasks.append(asyncio.create_task(event_loop_monitor(), name=\"ornate-ems-runtime-metrics\"))\n    store.event(\n",
+      "new": "                await child\n\n\nasync def meter_polling_loop() -> None:\n    # Independent of BMS/PCS warm-up; a slow or missing meter cannot delay them.\n    await asyncio.to_thread(service.poll_meter)\n    await periodic_loop(\"meter\", config.meter.poll_seconds, service.poll_meter)\n\n\n@asynccontextmanager\nasync def lifespan(app: FastAPI):\n    tasks = [asyncio.create_task(polling_supervisor(), name=\"ornate-ems-polling-supervisor\")]\n    if config.meter.enabled:\n        tasks.append(asyncio.create_task(meter_polling_loop(), name=\"ornate-ems-meter\"))\n    tasks.append(asyncio.create_task(maintenance_loop(), name=\"ornate-ems-maintenance\"))\n    tasks.append(asyncio.create_task(event_loop_monitor(), name=\"ornate-ems-runtime-metrics\"))\n    store.event(\n"
+    },
+    {
+      "old": "        for task in tasks:\n            with contextlib.suppress(asyncio.CancelledError):\n                await task\n        store.event(\"gateway\", \"Gateway application stopped\")\n\n\n",
+      "new": "        for task in tasks:\n            with contextlib.suppress(asyncio.CancelledError):\n                await task\n        await asyncio.to_thread(service.meter_driver.close)\n        store.event(\"gateway\", \"Gateway application stopped\")\n\n\n"
+    }
+  ],
+  "app/core/config.py": [
+    {
+      "old": "from typing import Literal\n\nfrom pydantic import BaseModel, Field, model_validator\n\n\nclass EndpointConfig(BaseModel):\n",
+      "new": "from typing import Literal\n\nfrom pydantic import BaseModel, Field, model_validator\n\nfrom app.core.acrel_config import AcrelMeterConfig\n\n\nclass EndpointConfig(BaseModel):\n"
+    },
+    {
+      "old": "    pcs_catalog_file: str = \"generated_protocols/pcs_catalog.json\"\n    bms: BmsConfig = Field(default_factory=BmsConfig)\n    pcs: PcsConfig = Field(default_factory=PcsConfig)\n    storage: StorageConfig = Field(default_factory=StorageConfig)\n    security: SecurityConfig = Field(default_factory=SecurityConfig)\n    mock: MockConfig = Field(default_factory=MockConfig)\n",
+      "new": "    pcs_catalog_file: str = \"generated_protocols/pcs_catalog.json\"\n    bms: BmsConfig = Field(default_factory=BmsConfig)\n    pcs: PcsConfig = Field(default_factory=PcsConfig)\n    meter: AcrelMeterConfig = Field(default_factory=AcrelMeterConfig)\n    storage: StorageConfig = Field(default_factory=StorageConfig)\n    security: SecurityConfig = Field(default_factory=SecurityConfig)\n    mock: MockConfig = Field(default_factory=MockConfig)\n"
+    },
+    {
+      "old": "\n    @model_validator(mode=\"after\")\n    def validate_write_mode(self) -> \"GatewayConfig\":\n        if self.websocket_max_clients < 1:\n            raise ValueError(\"websocket_max_clients must be at least 1\")\n        if self.websocket_send_timeout_seconds <= 0:\n",
+      "new": "\n    @model_validator(mode=\"after\")\n    def validate_write_mode(self) -> \"GatewayConfig\":\n        if self.meter.enabled and self.meter.mode == \"hardware\" and self.pcs.enabled and self.pcs.transport == \"rtu\":\n            if Path(self.meter.device).resolve() == Path(self.pcs.serial.device).resolve():\n                raise ValueError(\"Meter and PCS cannot independently own the same serial bus\")\n        if self.websocket_max_clients < 1:\n            raise ValueError(\"websocket_max_clients must be at least 1\")\n        if self.websocket_send_timeout_seconds <= 0:\n"
+    }
+  ],
+  "app/services/gateway_service.py": [
+    {
+      "old": "from datetime import datetime, timezone\nfrom typing import Any\n\nfrom app.assets.bms_driver import BmsModbusDriver\nfrom app.assets.mock_plant import MockPlant, SCENARIOS\nfrom app.assets.pcs_driver import PcsModbusDriver\n",
+      "new": "from datetime import datetime, timezone\nfrom typing import Any\n\nfrom app.assets.acrel_meter import AcrelMeterDriver\nfrom app.assets.bms_driver import BmsModbusDriver\nfrom app.assets.mock_plant import MockPlant, SCENARIOS\nfrom app.assets.pcs_driver import PcsModbusDriver\n"
+    },
+    {
+      "old": "        eager_initialization: bool = True,\n    ) -> None:\n        self.config = config\n        self.store = store\n        self.runtime_metrics = runtime_metrics\n        self.bms_catalog = ProtocolCatalog.load(resolve_path(config.bms_catalog_file))\n",
+      "new": "        eager_initialization: bool = True,\n    ) -> None:\n        self.config = config\n        self.meter_driver = AcrelMeterDriver(config.meter)\n        self.store = store\n        self.runtime_metrics = runtime_metrics\n        self.bms_catalog = ProtocolCatalog.load(resolve_path(config.bms_catalog_file))\n"
+    },
+    {
+      "old": "                \"last_event_bytes\": 0,\n                \"total_event_bytes\": 0,\n            }\n            for name in (*POLL_CLASSES, \"pcs\")\n        }\n        self._storage_sample_stats = {\n            \"samples\": 0,\n",
+      "new": "                \"last_event_bytes\": 0,\n                \"total_event_bytes\": 0,\n            }\n            for name in (*POLL_CLASSES, \"pcs\", *((\"meter\",) if config.meter.enabled else ()))\n        }\n        self._storage_sample_stats = {\n            \"samples\": 0,\n"
+    },
+    {
+      "old": "            result = deepcopy(event)\n        self._store_prepared_historian_samples(historian_samples)\n        return result\n\n    def poll_pcs(self) -> dict[str, Any]:\n        \"\"\"Poll all configured PCS slaves sequentially on the shared transport.\"\"\"\n",
+      "new": "            result = deepcopy(event)\n        self._store_prepared_historian_samples(historian_samples)\n        return result\n\n    def poll_meter(self) -> dict[str, Any]:\n        if not self.config.meter.enabled:\n            return {}\n        started = time.perf_counter()\n        started_at = now_iso()\n        update = self.meter_driver.poll()\n        errors = update.get(\"read_errors\", [])\n        with self._lock:\n            self._snapshot[\"meters\"] = {update[\"asset_id\"]: update}\n            event = self._finalize_poll(\n                \"meter\", [update], started_at,\n                (time.perf_counter() - started) * 1000,\n                \"; \".join(item[\"error\"] for item in errors) if errors else None,\n            )\n            samples = self._prepare_historian_samples_if_due_locked(self._snapshot)\n            result = deepcopy(event)\n        self._store_prepared_historian_samples(samples)\n        return result\n\n    def meters(self) -> dict[str, Any]:\n        if not self.config.meter.enabled:\n            return {}\n        asset = self.meter_driver.snapshot()\n        return {asset[\"asset_id\"]: asset}\n\n    def poll_pcs(self) -> dict[str, Any]:\n        \"\"\"Poll all configured PCS slaves sequentially on the shared transport.\"\"\"\n"
+    },
+    {
+      "old": "\n    def snapshot(self) -> dict[str, Any]:\n        with self._lock:\n            return deepcopy(self._snapshot)\n\n    def compact_snapshot(self) -> dict[str, Any]:\n        with self._lock:\n",
+      "new": "\n    def snapshot(self) -> dict[str, Any]:\n        with self._lock:\n            result = deepcopy(self._snapshot)\n        result[\"meters\"] = self.meters()\n        return result\n\n    def compact_snapshot(self) -> dict[str, Any]:\n        with self._lock:\n"
+    },
+    {
+      "old": "                    asset_id: self._compact_asset(asset)\n                    for asset_id, asset in self._snapshot.get(\"pcs_devices\", {}).items()\n                },\n                \"normalized\": deepcopy(self._snapshot.get(\"normalized\", {})),\n                \"alarms\": deepcopy(self._snapshot.get(\"alarms\", [])),\n            }\n",
+      "new": "                    asset_id: self._compact_asset(asset)\n                    for asset_id, asset in self._snapshot.get(\"pcs_devices\", {}).items()\n                },\n                \"meters\": {key: self._compact_asset(asset) for key, asset in self.meters().items()},\n                \"normalized\": deepcopy(self._snapshot.get(\"normalized\", {})),\n                \"alarms\": deepcopy(self._snapshot.get(\"alarms\", [])),\n            }\n"
+    },
+    {
+      "old": "            for asset_id, asset in snapshot.get(\"bms_banks\", {}).items()\n            if asset_id != \"bms_bank_1\"\n        )\n        assets = [*bank_assets, *snapshot[\"racks\"], *snapshot[\"environment\"].values(), *pcs_assets]\n        return [asset for asset in assets if isinstance(asset, dict)]\n\n    def _update_alarms(self, snapshot: dict[str, Any]) -> list[dict[str, Any]]:\n",
+      "new": "            for asset_id, asset in snapshot.get(\"bms_banks\", {}).items()\n            if asset_id != \"bms_bank_1\"\n        )\n        meter_assets = self.meters() if snapshot is self._snapshot else snapshot.get(\"meters\", {})\n        assets = [*bank_assets, *snapshot[\"racks\"], *snapshot[\"environment\"].values(), *pcs_assets, *meter_assets.values()]\n        return [asset for asset in assets if isinstance(asset, dict)]\n\n    def _update_alarms(self, snapshot: dict[str, Any]) -> list[dict[str, Any]]:\n"
+    },
+    {
+      "old": "        return list(current.values())\n\n    def _history_asset(self, asset: dict[str, Any]) -> dict[str, Any]:\n        if not self.config.storage.compact_history:\n            return {\n                \"online\": asset.get(\"online\"),\n",
+      "new": "        return list(current.values())\n\n    def _history_asset(self, asset: dict[str, Any]) -> dict[str, Any]:\n        if asset.get(\"asset_type\") == \"energy_meter\":\n            return deepcopy(asset)\n        if not self.config.storage.compact_history:\n            return {\n                \"online\": asset.get(\"online\"),\n"
+    },
+    {
+      "old": "\n    def execute_control(self, username: str, asset_id: str, point_key: str, value: Any) -> dict[str, Any]:\n        try:\n            # New-vendor safety boundary: the generic raw-point endpoint must not\n            # bypass the pair controller's commissioning gates. Kinetics behavior\n            # is preserved; only Elecod/Lineage critical writes are redirected.\n",
+      "new": "\n    def execute_control(self, username: str, asset_id: str, point_key: str, value: Any) -> dict[str, Any]:\n        try:\n            if asset_id == self.config.meter.asset_id:\n                raise PermissionError(\"ACREL meter integration is strictly read-only\")\n            # New-vendor safety boundary: the generic raw-point endpoint must not\n            # bypass the pair controller's commissioning gates. Kinetics behavior\n            # is preserved; only Elecod/Lineage critical writes are redirected.\n"
+    },
+    {
+      "old": "        total_registers_per_minute += pcs_registers_min\n        total_modbus_bytes_per_minute += pcs_payload_min\n        total_wire_bytes_per_minute += pcs_wire_min\n        return {\n            \"transport\": f\"BMS Modbus TCP + PCS Modbus {self.config.pcs.transport.upper()}\",\n            \"groups\": groups,\n",
+      "new": "        total_registers_per_minute += pcs_registers_min\n        total_modbus_bytes_per_minute += pcs_payload_min\n        total_wire_bytes_per_minute += pcs_wire_min\n        if self.config.meter.enabled:\n            meter = self.config.meter\n            cycles = 60.0 / meter.poll_seconds if meter.mode == \"hardware\" else 0.0\n            energy_cycles = (60.0 / meter.energy_poll_seconds) if meter.energy_enabled and meter.mode == \"hardware\" else 0.0\n            meter_requests = cycles + energy_cycles\n            meter_registers = 54 * cycles + 14 * energy_cycles\n            meter_bytes = 121 * cycles + 41 * energy_cycles\n            groups[\"meter\"] = {\n                \"enabled\": True, \"transport\": \"rtu\", \"mode\": meter.mode,\n                \"interval_seconds\": meter.poll_seconds,\n                \"energy_interval_seconds\": meter.energy_poll_seconds,\n                \"requests_per_minute\": round(meter_requests, 2),\n                \"registers_per_minute\": round(meter_registers, 2),\n                \"estimated_wire_bytes_per_minute\": round(meter_bytes, 2),\n            }\n            total_requests_per_minute += meter_requests\n            total_registers_per_minute += meter_registers\n            total_modbus_bytes_per_minute += meter_bytes\n            total_wire_bytes_per_minute += meter_bytes\n        return {\n            \"transport\": f\"BMS Modbus TCP + PCS Modbus {self.config.pcs.transport.upper()}\",\n            \"groups\": groups,\n"
+    },
+    {
+      "old": "            \"pcs\": self.config.pcs.poll_seconds,\n        }\n        stream_bytes_per_minute = 0.0\n        groups: dict[str, Any] = {}\n        for name, interval in intervals.items():\n            stats = self._poll_stats[name]\n",
+      "new": "            \"pcs\": self.config.pcs.poll_seconds,\n        }\n        stream_bytes_per_minute = 0.0\n        if self.config.meter.enabled:\n            intervals[\"meter\"] = self.config.meter.poll_seconds\n        groups: dict[str, Any] = {}\n        for name, interval in intervals.items():\n            stats = self._poll_stats[name]\n"
+    }
+  ],
+  "app/api/routes.py": [
+    {
+      "old": "    def assets(user: User = Depends(current_user)) -> dict[str, Any]:\n        items = service.assets()\n        return {\"assets\": items, \"count\": len(items)}\n\n    @router.get(\"/api/telemetry/snapshot\")\n    def telemetry_snapshot(\n",
+      "new": "    def assets(user: User = Depends(current_user)) -> dict[str, Any]:\n        items = service.assets()\n        return {\"assets\": items, \"count\": len(items)}\n\n    @router.get(\"/api/meters\")\n    def meters(user: User = Depends(current_user)) -> dict[str, Any]:\n        items = service.meters()\n        return {\"meters\": items, \"count\": len(items)}\n\n    @router.get(\"/api/meters/config\")\n    def meter_config(user: User = Depends(require_internal)) -> dict[str, Any]:\n        return service.config.meter.model_dump()\n\n    @router.get(\"/api/meters/{asset_id}\")\n    def meter_details(asset_id: str, user: User = Depends(current_user)) -> dict[str, Any]:\n        items = service.meters()\n        if asset_id not in items:\n            raise HTTPException(status_code=404, detail=\"Meter is not enabled or does not exist\")\n        return items[asset_id]\n\n    @router.get(\"/api/meters/{asset_id}/history\")\n    def meter_history(\n        asset_id: str,\n        limit: int = Query(500, ge=1, le=5000),\n        since: str | None = Query(None),\n        user: User = Depends(current_user),\n    ) -> dict[str, Any]:\n        if asset_id != service.config.meter.asset_id:\n            raise HTTPException(status_code=404, detail=\"Unknown meter\")\n        items = service.store.query_telemetry(asset_id, limit=limit, since=since)\n        return {\"asset_id\": asset_id, \"samples\": items, \"count\": len(items)}\n\n    @router.get(\"/api/telemetry/snapshot\")\n    def telemetry_snapshot(\n"
+    }
+  ]
+}

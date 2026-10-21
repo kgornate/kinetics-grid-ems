@@ -1,6 +1,0 @@
-○ kinetics-gateway.service - Kinetics EMS Gateway V2
-     Loaded: loaded (/etc/systemd/system/kinetics-gateway.service; enabled; preset: disabled)
-    Drop-In: /etc/systemd/system/kinetics-gateway.service.d
-             └─20-sd-storage.conf, network-guard.conf, override.conf
-     Active: inactive (dead)
-        Job: 120

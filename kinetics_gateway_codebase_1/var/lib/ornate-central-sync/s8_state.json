@@ -1,0 +1,27 @@
+{
+  "fingerprint": "314b3aae2ab627aa552bba7217176f89ad97420f9d9ed849fb0a9c041b4ca81c",
+  "initialized": true,
+  "values": {
+    "central_sync.command_poll_sec": 2.0,
+    "central_sync.enabled": true,
+    "central_sync.endpoint_url": "https://bess-ems-api.unityess.cloud/api/v1/ingest/batch",
+    "central_sync.fast_bess_sample_interval_sec": 1.0,
+    "central_sync.general_policy_revision": "kalpa_vendor_catalog_mapping_v1",
+    "central_sync.outbox_max_db_size_mb": 1024,
+    "central_sync.tls_verify": true,
+    "gateway.bms.address_offset": 0,
+    "gateway.bms.host": "192.0.2.10",
+    "gateway.bms.vendor": "lineage",
+    "gateway.bms.word_order": "big",
+    "gateway.control.allow_full_automatic_sequence": false,
+    "gateway.control.enabled": false,
+    "gateway.control.max_abs_power_kw": null,
+    "gateway.mode": "mock",
+    "gateway.pcs.address_offset": 0,
+    "gateway.pcs.host": "192.0.2.20",
+    "gateway.pcs.port": 502,
+    "gateway.pcs.transport": "tcp",
+    "gateway.pcs.vendor": "elecod",
+    "gateway.software_version": "kalpa-central-sync-v0.12"
+  }
+}

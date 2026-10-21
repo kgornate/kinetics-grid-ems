@@ -1,0 +1,11 @@
+[Unit]
+Description=Periodically verify EMS Wi-Fi connectivity
+
+[Timer]
+OnBootSec=25s
+OnUnitInactiveSec=60s
+Unit=ems-wifi-ensure.service
+Persistent=false
+
+[Install]
+WantedBy=timers.target

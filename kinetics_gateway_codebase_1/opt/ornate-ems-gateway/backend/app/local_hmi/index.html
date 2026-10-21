@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>ORNATE EMS · Local Monitor</title>
+  <link rel="stylesheet" href="/hmi/styles.css?v=acrel-hmi-0.1">
+  <script src="/hmi/app.js?v=acrel-hmi-0.1" defer></script>
+</head>
+<body>
+<div id="login" class="login-layer">
+  <form id="login-form" class="login-card" autocomplete="on">
+    <div class="brand-logo"><span class="brand-dot"></span> ORNATE <span>EMS</span></div>
+    <h1>Local site monitoring</h1>
+    <p class="muted">Sign in with the gateway's existing Customer or Internal account. Read-only access.</p>
+    <label for="username">Username</label><input id="username" autocomplete="username" value="customer" required>
+    <label for="password">Password</label><input id="password" type="password" autocomplete="current-password" required>
+    <button class="primary" type="submit">Open dashboard</button>
+    <div id="login-error" role="alert" class="login-error" aria-live="polite"></div>
+    <small>No credentials are stored in the browser or written into this dashboard.</small>
+  </form>
+</div>
+<div class="shell">
+  <aside class="sidebar" aria-label="Dashboard navigation">
+    <div class="brand-logo"><span class="brand-dot"></span> ORNATE <span>EMS</span></div>
+    <div class="sidebar-label">SITE MONITORING</div>
+    <nav id="tabs">
+      <button class="nav-btn active" data-tab="overview">▦ <span>Overview</span></button>
+      <button class="nav-btn" data-tab="battery">▤ <span>Battery / BMS</span></button>
+      <button class="nav-btn" data-tab="pcs">◫ <span>PCS / Power</span></button>
+      <button class="nav-btn" data-tab="meter">◉ <span>Energy meter</span></button>
+      <button class="nav-btn" data-tab="alarms">⚠ <span>Alarms</span></button>
+      <button class="nav-btn" data-tab="gateway">◇ <span>Gateway health</span></button>
+    </nav>
+    <div class="sidebar-foot"><span id="role-label">READ ONLY</span><button id="logout" class="text-btn">Sign out</button></div>
+  </aside>
+  <main class="main">
+    <header class="header">
+      <div><p class="eyebrow">LOCAL ENERGY MANAGEMENT SYSTEM</p><h1 id="page-title">Site overview</h1></div>
+      <div class="header-right"><span id="badge" class="pill muted-pill">Waiting for login</span><div class="clock"><strong id="clock-time">--:--</strong><small id="clock-date">--</small></div></div>
+    </header>
+    <div id="warning" class="warning hidden" role="alert"></div>
+    <section id="view-overview" class="view active">
+      <div class="kpi-grid">
+        <div class="panel kpi"><span class="meta">Battery SOC</span><strong id="soc" class="kpi-value">—</strong><span class="kpi-foot" id="soc-source">BMS system telemetry</span></div>
+        <div class="panel kpi"><span class="meta">Total PCS active power</span><strong id="power" class="kpi-value">—</strong><span id="power-state" class="kpi-foot">Positive: discharge</span></div>
+        <div class="panel kpi"><span class="meta">Connected pairs</span><strong id="online-pairs" class="kpi-value">—</strong><span id="pair-total" class="kpi-foot">BMS + PCS</span></div>
+        <div class="panel kpi"><span class="meta">Active alarms</span><strong id="alarm-count" class="kpi-value">—</strong><span class="kpi-foot">Gateway alarm engine</span></div>
+      </div>
+      <div class="section-row"><h2>Battery / PCS pairs</h2><span class="subtle">Live normalized gateway model</span></div>
+      <div id="pair-grid" class="pair-grid"></div>
+      <div class="bottom-grid">
+        <section class="panel lower"><h2>Battery system</h2><div id="system-summary" class="metrics-grid"></div></section>
+        <section class="panel lower"><h2>Connectivity</h2><div id="connect-summary" class="metrics-grid"></div></section>
+      </div>
+      <section class="panel meter-overview" aria-label="Energy meter summary">
+        <div class="meter-heading"><div><h2>Energy meter</h2><span class="subtle">ACREL APM520 · Independent RS485 measurement</span></div><div class="meter-heading-actions"><span id="meter-overview-status" class="pill muted-pill">Waiting</span><button id="open-meter" class="outline-btn" type="button">View meter →</button></div></div>
+        <div id="meter-overview-values" class="metrics-grid meter-summary-grid"></div>
+      </section>
+    </section>
+    <section id="view-battery" class="view"><div class="section-row"><h2>Lineage / BMS rack status</h2><span class="subtle">Vendor-neutral read model</span></div><div id="rack-table" class="panel table-shell"></div><div class="section-row"><h2>System battery readings</h2></div><div id="battery-system-detail" class="panel metrics-grid padded"></div></section>
+    <section id="view-pcs" class="view"><div class="section-row"><h2>PCS operating status</h2><span class="subtle">Actual telemetry, not requested setpoint</span></div><div id="pcs-table" class="panel table-shell"></div><div class="section-row"><h2>Grid and DC measurements</h2></div><div id="pcs-metrics" class="pcs-metric-grid"></div></section>
+    <section id="view-meter" class="view">
+      <div class="meter-heading meter-page-heading"><div><h2 id="meter-label">ACREL APM520</h2><span id="meter-subtitle" class="subtle">Waiting for meter status</span></div><span id="meter-status" class="pill muted-pill" aria-live="polite">Waiting</span></div>
+      <div id="meter-notice" class="warning" role="status">Waiting for meter data.</div>
+      <div class="kpi-grid">
+        <div class="panel kpi"><span class="meta">Total active power</span><strong id="meter-active" class="kpi-value">—</strong><span class="kpi-foot">Signed reading from meter</span></div>
+        <div class="panel kpi"><span class="meta">Total reactive power</span><strong id="meter-reactive" class="kpi-value">—</strong><span class="kpi-foot">Three-phase total</span></div>
+        <div class="panel kpi"><span class="meta">Total power factor</span><strong id="meter-pf" class="kpi-value">—</strong><span class="kpi-foot">Meter-reported power factor</span></div>
+        <div class="panel kpi"><span class="meta">Frequency</span><strong id="meter-frequency" class="kpi-value">—</strong><span class="kpi-foot">Measured supply frequency</span></div>
+      </div>
+      <div class="section-row"><h2>Three-phase measurements</h2><span class="subtle">Voltage · Current · Power</span></div>
+      <div id="meter-phase-table" class="panel table-shell"></div>
+      <div class="section-row"><h2>Energy counters</h2><span class="subtle">Primary-side readings</span></div>
+      <div id="meter-energy" class="panel metrics-grid padded"></div>
+      <p class="meter-note">Forward / reverse follow the meter’s direction convention. Import / export labels will be assigned after site commissioning.</p>
+      <div class="section-row"><h2>Meter connection</h2><span class="subtle">Independent of BMS / PCS simulation mode</span></div>
+      <div id="meter-details" class="panel metrics-grid padded"></div>
+      <div class="section-row"><div><h2>Recent history</h2><span id="meter-history-caption" class="subtle">Latest 60 stored samples · newest first</span></div><button id="meter-history-refresh" class="outline-btn" type="button">Refresh history</button></div>
+      <div id="meter-history-message" class="meter-note" role="status"></div>
+      <div id="meter-history-table" class="panel table-shell meter-history-table"></div>
+    </section>
+    <section id="view-alarms" class="view"><div class="section-row"><h2>Active faults and warnings</h2><span class="subtle">Automatic refresh, read-only</span></div><div id="alarm-table" class="panel table-shell"></div></section>
+    <section id="view-gateway" class="view"><div class="section-row"><h2>Local gateway / network status</h2><span class="subtle">Independent of cloud access</span></div><div id="gateway-health" class="panel metrics-grid padded"></div><div class="section-row"><h2>Control application status (read-only)</h2></div><div id="control-state" class="panel table-shell"></div></section>
+    <footer><span id="gateway-id">Gateway: —</span><span id="last-update">Waiting for telemetry</span><span>LOCAL HMI · DISPLAY ONLY · NO FIELD COMMANDS</span></footer>
+  </main>
+</div>
+</body>
+</html>

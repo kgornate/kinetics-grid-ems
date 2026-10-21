@@ -1,0 +1,21 @@
+[Unit]
+Description=Kalpa Native GTK3 Local HDMI HMI (read-only)
+After=weston.service ornate-ems-gateway.service
+Wants=weston.service ornate-ems-gateway.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/kalpa-native-hmi/src
+Environment=XDG_RUNTIME_DIR=/run/user/0
+Environment=WAYLAND_DISPLAY=wayland-0
+Environment=GDK_BACKEND=wayland
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/usr/bin/python3 /opt/kalpa-native-hmi/src/native_hmi.py --fullscreen
+Restart=always
+RestartSec=7
+NoNewPrivileges=true
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

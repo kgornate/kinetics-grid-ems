@@ -1,0 +1,12 @@
+[Unit]
+Description=EMS Wi-Fi association and DHCP recovery (mlan0)
+After=connman.service
+Wants=connman.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/ems-wifi-ensure.sh
+TimeoutStartSec=120
+
+[Install]
+WantedBy=multi-user.target
