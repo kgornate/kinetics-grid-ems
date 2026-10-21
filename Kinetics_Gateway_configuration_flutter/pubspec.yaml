@@ -1,0 +1,11 @@
+name: kalpa_gateway_setup
+description: Wired Ethernet Wi-Fi commissioning for Kalpa DEBIX gateways.
+publish_to: none
+version: 0.2.0+2
+environment:
+  sdk: '>=3.4.0 <4.0.0'
+dependencies:
+  flutter:
+    sdk: flutter
+flutter:
+  uses-material-design: true
