@@ -1,8 +1,8 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../core/state/gateway_controller.dart';
-import '../models/gateway_models.dart';
 import '../widgets/common_widgets.dart';
+import 'kalpa_asset_detail_screen.dart';
+export 'kalpa_asset_detail_screen.dart' show KalpaAssetScreen;
 
 Map<String, dynamic> kalpaMap(dynamic value) =>
     value is Map ? Map<String, dynamic>.from(value) : <String, dynamic>{};
@@ -37,7 +37,7 @@ class KalpaMonitoringScreen extends StatelessWidget {
                 KalpaAssetScreen(controller: controller, assetId: assetId),
           ),
         ),
-        icon: const Icon(Icons.table_chart_outlined),
+        icon: const Icon(Icons.dashboard_outlined),
         label: Text(label),
       );
 
@@ -111,7 +111,7 @@ class KalpaMonitoringScreen extends StatelessWidget {
           ),
         );
         children.add(const SizedBox(height: 16));
-        children.add(_raw(context, 'bms_bank', 'All system BMS signals'));
+        children.add(_raw(context, 'bms_bank', 'Open system BMS dashboard'));
       }
       if (section == 'overview') {
         final enabledPairs = pairs.values
@@ -262,13 +262,17 @@ class KalpaMonitoringScreen extends StatelessWidget {
           children.add(
             _assetCard(
               context,
-              entry.key,
+              section == 'racks'
+                  ? 'Rack ${entry.key}'
+                  : entry.key.toUpperCase(),
               valid,
               rows,
               action: _raw(
                 context,
                 asset['asset_id']?.toString() ?? entry.key,
-                'All signals / cells / alarms',
+                section == 'racks'
+                    ? 'Open rack dashboard'
+                    : 'Open PCS dashboard',
               ),
             ),
           );
@@ -280,7 +284,7 @@ class KalpaMonitoringScreen extends StatelessWidget {
             _assetCard(context, asset.label ?? asset.assetId, asset.online, [
               '${asset.telemetry.length} signals',
               'Last sample: ${kalpaTime(asset.timestamp)}',
-            ], action: _raw(context, asset.assetId, 'All auxiliary signals')),
+            ], action: _raw(context, asset.assetId, 'Open asset dashboard')),
           );
         }
         if (controller.plant.environment.isEmpty)
@@ -335,132 +339,4 @@ class KalpaMonitoringScreen extends StatelessWidget {
       ),
     ),
   );
-}
-
-class KalpaAssetScreen extends StatefulWidget {
-  const KalpaAssetScreen({
-    super.key,
-    required this.controller,
-    required this.assetId,
-  });
-  final GatewayController controller;
-  final String assetId;
-  @override
-  State<KalpaAssetScreen> createState() => _KalpaAssetScreenState();
-}
-
-class _KalpaAssetScreenState extends State<KalpaAssetScreen> {
-  String query = '';
-  @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: Text(widget.assetId)),
-    body: AnimatedBuilder(
-      animation: widget.controller,
-      builder: (context, _) {
-        final asset = widget.controller.plant.assets[widget.assetId];
-        final items =
-            asset?.telemetry.entries
-                .where(
-                  (entry) => '${entry.key} ${entry.value.nameEn ?? ''}'
-                      .toLowerCase()
-                      .contains(query.toLowerCase()),
-                )
-                .toList() ??
-            [];
-        items.sort((a, b) => a.key.compareTo(b.key));
-        return ListView(
-          padding: const EdgeInsets.all(20),
-          children: [
-            Text(
-              '${asset?.online == true ? 'Online' : 'Offline'} · ${asset?.telemetry.length ?? 0} published points · ${kalpaTime(asset?.timestamp)}',
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              decoration: const InputDecoration(
-                labelText: 'Search any signal or cell',
-                prefixIcon: Icon(Icons.search),
-              ),
-              onChanged: (text) => setState(() => query = text),
-            ),
-            const SizedBox(height: 12),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: OutlinedButton.icon(
-                onPressed: widget.controller.refreshKalpa,
-                icon: const Icon(Icons.refresh),
-                label: const Text('Refresh cached signals'),
-              ),
-            ),
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: PaginatedDataTable(
-                key: ValueKey('${widget.assetId}:$query'),
-                rowsPerPage: 25,
-                header: Text('${items.length} matching signals'),
-                columns: const [
-                  DataColumn(label: Text('Signal')),
-                  DataColumn(label: Text('Value')),
-                  DataColumn(label: Text('Unit')),
-                  DataColumn(label: Text('Quality')),
-                ],
-                source: _SignalRows(items, asset?.online == true, context),
-              ),
-            ),
-          ],
-        );
-      },
-    ),
-  );
-}
-
-class _SignalRows extends DataTableSource {
-  _SignalRows(this.items, this.online, this.context);
-  final List<MapEntry<String, TelemetryPoint>> items;
-  final bool online;
-  final BuildContext context;
-  @override
-  DataRow? getRow(int index) {
-    if (index >= items.length) return null;
-    final entry = items[index], point = entry.value;
-    final valid =
-        online && (point.quality == 'good' || point.quality == 'mock');
-    return DataRow(
-      cells: [
-        DataCell(Text(entry.key)),
-        DataCell(
-          Text(valid ? point.displayValue : '—'),
-          onTap: () => showDialog<void>(
-            context: context,
-            builder: (context) => AlertDialog(
-              title: Text(entry.key),
-              content: SizedBox(
-                width: 650,
-                height: 400,
-                child: SingleChildScrollView(
-                  child: SelectableText(
-                    const JsonEncoder.withIndent('  ').convert(point.toJson()),
-                  ),
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Close'),
-                ),
-              ],
-            ),
-          ),
-        ),
-        DataCell(Text(point.unit ?? '')),
-        DataCell(Text(online ? point.quality : 'offline')),
-      ],
-    );
-  }
-
-  @override
-  bool get isRowCountApproximate => false;
-  @override
-  int get rowCount => items.length;
-  @override
-  int get selectedRowCount => 0;
 }

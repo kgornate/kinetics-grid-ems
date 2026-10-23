@@ -1,6 +1,6 @@
-^C:\USERS\KUNAL\DOWNLOADS\KALPA_FLUTTER_DASHBOARD_V0.1 (1)\KALPA_FLUTTER_DASHBOARD_V0.1\BUILD\WINDOWS\X64\CMAKEFILES\49B9F960F780BC0AEC577C9AEB46A74C\FLUTTER_WINDOWS.DLL.RULE
+^C:\USERS\KUNAL\DOCUMENTS\ORNATE_PROJECTS\KINETICS-GRID-EMS\KINETICS_FLUTTER_CODEBASE_KPV\KALPA_FLUTTER_DASHBOARD_V0.1\BUILD\WINDOWS\X64\CMAKEFILES\A6689343BC706B0332D5EC01E43F3226\FLUTTER_WINDOWS.DLL.RULE
 setlocal
-"C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E env FLUTTER_ROOT=C:\Users\kunal\flutter\flutter "PROJECT_DIR=C:\Users\kunal\Downloads\kalpa_flutter_dashboard_v0.1 (1)\kalpa_flutter_dashboard_v0.1" FLUTTER_ROOT=C:\Users\kunal\flutter\flutter "FLUTTER_EPHEMERAL_DIR=C:\Users\kunal\Downloads\kalpa_flutter_dashboard_v0.1 (1)\kalpa_flutter_dashboard_v0.1\windows\flutter\ephemeral" "PROJECT_DIR=C:\Users\kunal\Downloads\kalpa_flutter_dashboard_v0.1 (1)\kalpa_flutter_dashboard_v0.1" "FLUTTER_TARGET=C:\Users\kunal\Downloads\kalpa_flutter_dashboard_v0.1 (1)\kalpa_flutter_dashboard_v0.1\lib\main.dart" DART_DEFINES=RkxVVFRFUl9WRVJTSU9OPTMuNDQuOA==,RkxVVFRFUl9DSEFOTkVMPXN0YWJsZQ==,RkxVVFRFUl9HSVRfVVJMPWh0dHBzOi8vZ2l0aHViLmNvbS9mbHV0dGVyL2ZsdXR0ZXIuZ2l0,RkxVVFRFUl9GUkFNRVdPUktfUkVWSVNJT049MDU4ZTBhZjJjMg==,RkxVVFRFUl9FTkdJTkVfUkVWSVNJT049MGNkNjEwNzE3Yg==,RkxVVFRFUl9EQVJUX1ZFUlNJT049My4xMi4y DART_OBFUSCATION=false TRACK_WIDGET_CREATION=true TREE_SHAKE_ICONS=false "PACKAGE_CONFIG=C:\Users\kunal\Downloads\kalpa_flutter_dashboard_v0.1 (1)\kalpa_flutter_dashboard_v0.1\.dart_tool\package_config.json" C:/Users/kunal/flutter/flutter/packages/flutter_tools/bin/tool_backend.bat windows-x64 Debug
+"C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E env FLUTTER_ROOT=C:\Users\kunal\flutter\flutter PROJECT_DIR=C:\Users\kunal\Documents\Ornate_Projects\kinetics-grid-ems\kinetics_flutter_codebase_KPV\kalpa_flutter_dashboard_v0.1 FLUTTER_ROOT=C:\Users\kunal\flutter\flutter FLUTTER_EPHEMERAL_DIR=C:\Users\kunal\Documents\Ornate_Projects\kinetics-grid-ems\kinetics_flutter_codebase_KPV\kalpa_flutter_dashboard_v0.1\windows\flutter\ephemeral PROJECT_DIR=C:\Users\kunal\Documents\Ornate_Projects\kinetics-grid-ems\kinetics_flutter_codebase_KPV\kalpa_flutter_dashboard_v0.1 FLUTTER_TARGET=C:\Users\kunal\Documents\Ornate_Projects\kinetics-grid-ems\kinetics_flutter_codebase_KPV\kalpa_flutter_dashboard_v0.1\lib\main.dart DART_DEFINES=RkxVVFRFUl9WRVJTSU9OPTMuNDQuOA==,RkxVVFRFUl9DSEFOTkVMPXN0YWJsZQ==,RkxVVFRFUl9HSVRfVVJMPWh0dHBzOi8vZ2l0aHViLmNvbS9mbHV0dGVyL2ZsdXR0ZXIuZ2l0,RkxVVFRFUl9GUkFNRVdPUktfUkVWSVNJT049MDU4ZTBhZjJjMg==,RkxVVFRFUl9FTkdJTkVfUkVWSVNJT049MGNkNjEwNzE3Yg==,RkxVVFRFUl9EQVJUX1ZFUlNJT049My4xMi4y DART_OBFUSCATION=false TRACK_WIDGET_CREATION=true TREE_SHAKE_ICONS=false PACKAGE_CONFIG=C:\Users\kunal\Documents\Ornate_Projects\kinetics-grid-ems\kinetics_flutter_codebase_KPV\kalpa_flutter_dashboard_v0.1\.dart_tool\package_config.json C:/Users/kunal/flutter/flutter/packages/flutter_tools/bin/tool_backend.bat windows-x64 Debug
 if %errorlevel% neq 0 goto :cmEnd
 :cmEnd
 endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
@@ -8,7 +8,7 @@ endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
 exit /b %1
 :cmDone
 if %errorlevel% neq 0 goto :VCEnd
-^C:\USERS\KUNAL\DOWNLOADS\KALPA_FLUTTER_DASHBOARD_V0.1 (1)\KALPA_FLUTTER_DASHBOARD_V0.1\BUILD\WINDOWS\X64\CMAKEFILES\F2FFCAFAB38C96B3C254621504B8EBAE\FLUTTER_ASSEMBLE.RULE
+^C:\USERS\KUNAL\DOCUMENTS\ORNATE_PROJECTS\KINETICS-GRID-EMS\KINETICS_FLUTTER_CODEBASE_KPV\KALPA_FLUTTER_DASHBOARD_V0.1\BUILD\WINDOWS\X64\CMAKEFILES\F8422C0B7064B1ABC0659719A4F29CB9\FLUTTER_ASSEMBLE.RULE
 setlocal
 :cmEnd
 endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
@@ -16,9 +16,9 @@ endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
 exit /b %1
 :cmDone
 if %errorlevel% neq 0 goto :VCEnd
-^C:\USERS\KUNAL\DOWNLOADS\KALPA_FLUTTER_DASHBOARD_V0.1 (1)\KALPA_FLUTTER_DASHBOARD_V0.1\WINDOWS\FLUTTER\CMAKELISTS.TXT
+^C:\USERS\KUNAL\DOCUMENTS\ORNATE_PROJECTS\KINETICS-GRID-EMS\KINETICS_FLUTTER_CODEBASE_KPV\KALPA_FLUTTER_DASHBOARD_V0.1\WINDOWS\FLUTTER\CMAKELISTS.TXT
 setlocal
-"C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" "-SC:/Users/kunal/Downloads/kalpa_flutter_dashboard_v0.1 (1)/kalpa_flutter_dashboard_v0.1/windows" "-BC:/Users/kunal/Downloads/kalpa_flutter_dashboard_v0.1 (1)/kalpa_flutter_dashboard_v0.1/build/windows/x64" --check-stamp-file "C:/Users/kunal/Downloads/kalpa_flutter_dashboard_v0.1 (1)/kalpa_flutter_dashboard_v0.1/build/windows/x64/flutter/CMakeFiles/generate.stamp"
+"C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -SC:/Users/kunal/Documents/Ornate_Projects/kinetics-grid-ems/kinetics_flutter_codebase_KPV/kalpa_flutter_dashboard_v0.1/windows -BC:/Users/kunal/Documents/Ornate_Projects/kinetics-grid-ems/kinetics_flutter_codebase_KPV/kalpa_flutter_dashboard_v0.1/build/windows/x64 --check-stamp-file C:/Users/kunal/Documents/Ornate_Projects/kinetics-grid-ems/kinetics_flutter_codebase_KPV/kalpa_flutter_dashboard_v0.1/build/windows/x64/flutter/CMakeFiles/generate.stamp
 if %errorlevel% neq 0 goto :cmEnd
 :cmEnd
 endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone

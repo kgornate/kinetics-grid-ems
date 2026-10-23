@@ -1,7 +1,7 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <CustomBuild Include="C:\Users\kunal\Downloads\kalpa_flutter_dashboard_v0.1 (1)\kalpa_flutter_dashboard_v0.1\windows\runner\CMakeLists.txt" />
+    <CustomBuild Include="C:\Users\kunal\Documents\Ornate_Projects\kinetics-grid-ems\kinetics_flutter_codebase_KPV\kalpa_flutter_dashboard_v0.1\windows\runner\CMakeLists.txt" />
   </ItemGroup>
   <ItemGroup>
   </ItemGroup>

@@ -1,20 +1,20 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <CustomBuild Include="C:\Users\kunal\Downloads\kalpa_flutter_dashboard_v0.1 (1)\kalpa_flutter_dashboard_v0.1\build\windows\x64\CMakeFiles\49b9f960f780bc0aec577c9aeb46a74c\flutter_windows.dll.rule">
+    <CustomBuild Include="C:\Users\kunal\Documents\Ornate_Projects\kinetics-grid-ems\kinetics_flutter_codebase_KPV\kalpa_flutter_dashboard_v0.1\build\windows\x64\CMakeFiles\a6689343bc706b0332d5ec01e43f3226\flutter_windows.dll.rule">
       <Filter>CMake Rules</Filter>
     </CustomBuild>
-    <CustomBuild Include="C:\Users\kunal\Downloads\kalpa_flutter_dashboard_v0.1 (1)\kalpa_flutter_dashboard_v0.1\build\windows\x64\CMakeFiles\f2ffcafab38c96b3c254621504b8ebae\flutter_assemble.rule">
+    <CustomBuild Include="C:\Users\kunal\Documents\Ornate_Projects\kinetics-grid-ems\kinetics_flutter_codebase_KPV\kalpa_flutter_dashboard_v0.1\build\windows\x64\CMakeFiles\f8422c0b7064b1abc0659719a4f29cb9\flutter_assemble.rule">
       <Filter>CMake Rules</Filter>
     </CustomBuild>
-    <CustomBuild Include="C:\Users\kunal\Downloads\kalpa_flutter_dashboard_v0.1 (1)\kalpa_flutter_dashboard_v0.1\windows\flutter\CMakeLists.txt" />
+    <CustomBuild Include="C:\Users\kunal\Documents\Ornate_Projects\kinetics-grid-ems\kinetics_flutter_codebase_KPV\kalpa_flutter_dashboard_v0.1\windows\flutter\CMakeLists.txt" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="C:\Users\kunal\Downloads\kalpa_flutter_dashboard_v0.1 (1)\kalpa_flutter_dashboard_v0.1\build\windows\x64\flutter\CMakeFiles\flutter_assemble" />
+    <None Include="C:\Users\kunal\Documents\Ornate_Projects\kinetics-grid-ems\kinetics_flutter_codebase_KPV\kalpa_flutter_dashboard_v0.1\build\windows\x64\flutter\CMakeFiles\flutter_assemble" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="CMake Rules">
-      <UniqueIdentifier>{8688F94F-6FA1-35F3-AEA5-F4EC36691BF3}</UniqueIdentifier>
+      <UniqueIdentifier>{36E08769-F226-3172-9CBB-A7D01F07D88C}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>

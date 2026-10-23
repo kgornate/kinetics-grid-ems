@@ -1,25 +1,25 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <ClCompile Include="C:\Users\kunal\Downloads\kalpa_flutter_dashboard_v0.1 (1)\kalpa_flutter_dashboard_v0.1\windows\flutter\ephemeral\cpp_client_wrapper\core_implementations.cc">
+    <ClCompile Include="C:\Users\kunal\Documents\Ornate_Projects\kinetics-grid-ems\kinetics_flutter_codebase_KPV\kalpa_flutter_dashboard_v0.1\windows\flutter\ephemeral\cpp_client_wrapper\core_implementations.cc">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Users\kunal\Downloads\kalpa_flutter_dashboard_v0.1 (1)\kalpa_flutter_dashboard_v0.1\windows\flutter\ephemeral\cpp_client_wrapper\standard_codec.cc">
+    <ClCompile Include="C:\Users\kunal\Documents\Ornate_Projects\kinetics-grid-ems\kinetics_flutter_codebase_KPV\kalpa_flutter_dashboard_v0.1\windows\flutter\ephemeral\cpp_client_wrapper\standard_codec.cc">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Users\kunal\Downloads\kalpa_flutter_dashboard_v0.1 (1)\kalpa_flutter_dashboard_v0.1\windows\flutter\ephemeral\cpp_client_wrapper\plugin_registrar.cc">
+    <ClCompile Include="C:\Users\kunal\Documents\Ornate_Projects\kinetics-grid-ems\kinetics_flutter_codebase_KPV\kalpa_flutter_dashboard_v0.1\windows\flutter\ephemeral\cpp_client_wrapper\plugin_registrar.cc">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <CustomBuild Include="C:\Users\kunal\Downloads\kalpa_flutter_dashboard_v0.1 (1)\kalpa_flutter_dashboard_v0.1\windows\flutter\CMakeLists.txt" />
+    <CustomBuild Include="C:\Users\kunal\Documents\Ornate_Projects\kinetics-grid-ems\kinetics_flutter_codebase_KPV\kalpa_flutter_dashboard_v0.1\windows\flutter\CMakeLists.txt" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="CMake Rules">
-      <UniqueIdentifier>{8688F94F-6FA1-35F3-AEA5-F4EC36691BF3}</UniqueIdentifier>
+      <UniqueIdentifier>{36E08769-F226-3172-9CBB-A7D01F07D88C}</UniqueIdentifier>
     </Filter>
     <Filter Include="Source Files">
-      <UniqueIdentifier>{D9063ADE-CDC5-3C26-A959-82EBCFD52956}</UniqueIdentifier>
+      <UniqueIdentifier>{CCD1396F-EDA2-3CCF-BA53-4F7D382D5F68}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>

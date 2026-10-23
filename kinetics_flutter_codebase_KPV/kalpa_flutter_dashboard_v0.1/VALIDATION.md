@@ -1,24 +1,32 @@
-# Validation — Kalpa Flutter dashboard v0.1
+# Validation — categorized Kalpa asset dashboards, 23 October 2026
 
-## Completed in this environment
+## Completed for this update
 
-- Dart format parsed all 27 Dart source/test/tool files.
-- Offline Dart static analysis of lib/ against actual Flutter framework and engine UI sources: zero errors, zero warnings; informational lints/deprecations remain in inherited/new code. This is not a Flutter build.
-- 27 executable pure-Dart contract checks passed using fixtures generated from an isolated current Kalpa backend with all hardware writes disabled.
-- Checks cover four racks/four PCS, normalized four-pair values, canonical Lineage signals, meter snapshot/delta/removal, auxiliary exclusion, Kalpa commissioning gates, compact-control fail-closed behavior, invalid base URLs, authenticated REST and WebSocket loopback transport, URL path prefixes, HTTP 530 reporting and absence of field-control writes, and the direct Ethernet URL default.
-- Fixtures were produced by the backend service functions, not captured from operating field hardware. The HTTP transport portion uses a local loopback server; it does not demonstrate live Cloudflare/gateway connectivity.
+- 135 executable standalone Dart category/formatting checks passed. These cover all 3,892 generated protocol metadata definitions, every published fixture point, reachable category tabs, all four racks and PCS devices, all environment assets, numeric channel ordering, enum labels, restored units/addresses, separate settings and alarm classification, missing/bad/offline masking and preservation of signed/zero engineering values.
+- The rack fixture retains all 2,272 points: 416 cell voltages, 416 cell temperatures, 416 cell SOC points and 832 charge/discharge balancing points, plus rack/sensor/alarm signals. Channel counts describe this simulated fixture, not a physical rack guarantee.
+- All 27 existing standalone model/API contract checks passed again, including loopback authenticated REST and WebSocket transport, direct Ethernet defaults, HTTP errors, meter ingestion and fail-closed control gates.
+- Offline Dart static analysis against the actual Flutter framework/engine UI sources found zero errors and zero warnings in lib/ and test/. Informational inherited/new lints remain. This is source analysis, not a Flutter build.
+- Dart format parsed the updated source/test/tool files. ZIP integrity and exact source inclusion were checked.
 
-## Not completed here
+Fixtures were generated from isolated backend service functions with hardware writes disabled. Loopback transport checks do not demonstrate live gateway/Cloudflare connectivity.
 
-The Flutter tool attempted to probe the cloud metadata address 169.254.169.254; automatic approval review blocked that action. It was not retried. Flutter widget/model test execution, graphical rendering and native builds therefore remain unverified. Direct Dart checks and offline analysis were used separately. No Windows EXE or Android APK is included.
+## Still to verify on Windows
 
-Run the included Windows script to perform flutter analyze, flutter test, contract checks and the native release build. The three new widget/formatter tests are included but have not been executed here. Existing model/presentation Flutter tests are retained; their execution also awaits that Windows run.
+Twelve widget regressions are included: four rack routes at desktop/narrow widths, Cells/Sensors tabs, live cell updates/search, missing assets, PCS tab separation and environment measurement/settings separation. These tests have not been executed here. Graphical rendering and native Windows/Android builds remain unverified.
 
-## Site acceptance after building
+An earlier Flutter-tool invocation was blocked by automatic approval review when it attempted a cloud metadata probe. It was not retried. Current checks used the standalone Dart SDK and Flutter source files without invoking the Flutter tool.
 
-1. Enable the direct listener if needed, close all SSH sessions, log in at http://192.168.10.2:8000 and confirm four rack/PCS pairs and raw signals.
-2. Confirm the customer account has no control tab. Confirm disabled backend gates cannot enable commands for the internal account. Do not enable hardware writes solely to test UI.
-3. Connect the ACREL meter and confirm online status, all relevant measurements and subsequent history samples. Compare energized measurements and direction against the physical display before accepting scaling.
-4. Disconnect the meter and confirm unavailable values are masked while BESS screens remain available.
-5. Unplug/reconnect Ethernet and confirm disconnection and recovery without fabricated zero readings. Repeat over WiFi IP and the Cloudflare API hostname without a laptop SSH tunnel.
-6. Close/reopen the desktop app: password should be requested again. Production upload and network settings should be unchanged; the optional API listener drop-in should persist after reboot.
+Run:
+
+```powershell
+flutter pub get
+flutter analyze --no-fatal-infos
+flutter test
+dart run tool/offline_contract_check.dart
+dart run tool/kalpa_category_contract_check.dart
+flutter run -d windows
+```
+
+Inspect all four rack detail dashboards, each PCS, System BMS and every environment asset. Confirm category tables, tab switching, scrolling, search, pagination, decoded flag labels and back navigation. Disconnect a physical meter to verify its independent offline behavior. Source/backend metadata determines units; energized measurements still need comparison with actual hardware.
+
+No gateway configuration, physical control interlock, field topology, cloud upload settings or WiFi settings were changed by this UI update.

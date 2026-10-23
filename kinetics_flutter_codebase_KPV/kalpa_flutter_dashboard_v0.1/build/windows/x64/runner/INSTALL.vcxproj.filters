@@ -1,13 +1,13 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <CustomBuild Include="C:\Users\kunal\Downloads\kalpa_flutter_dashboard_v0.1 (1)\kalpa_flutter_dashboard_v0.1\build\windows\x64\CMakeFiles\2eec63faa380654f4beadffb67b58920\INSTALL_force.rule">
+    <CustomBuild Include="C:\Users\kunal\Documents\Ornate_Projects\kinetics-grid-ems\kinetics_flutter_codebase_KPV\kalpa_flutter_dashboard_v0.1\build\windows\x64\CMakeFiles\62bac3f4af6f41082080ba8ae59bb888\INSTALL_force.rule">
       <Filter>CMake Rules</Filter>
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="CMake Rules">
-      <UniqueIdentifier>{8688F94F-6FA1-35F3-AEA5-F4EC36691BF3}</UniqueIdentifier>
+      <UniqueIdentifier>{36E08769-F226-3172-9CBB-A7D01F07D88C}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>

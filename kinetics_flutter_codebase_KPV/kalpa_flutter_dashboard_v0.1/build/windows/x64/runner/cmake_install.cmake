@@ -1,4 +1,4 @@
-# Install script for directory: C:/Users/kunal/Downloads/kalpa_flutter_dashboard_v0.1 (1)/kalpa_flutter_dashboard_v0.1/windows/runner
+# Install script for directory: C:/Users/kunal/Documents/Ornate_Projects/kinetics-grid-ems/kinetics_flutter_codebase_KPV/kalpa_flutter_dashboard_v0.1/windows/runner
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
@@ -35,6 +35,6 @@ endif()
 string(REPLACE ";" "\n" CMAKE_INSTALL_MANIFEST_CONTENT
        "${CMAKE_INSTALL_MANIFEST_FILES}")
 if(CMAKE_INSTALL_LOCAL_ONLY)
-  file(WRITE "C:/Users/kunal/Downloads/kalpa_flutter_dashboard_v0.1 (1)/kalpa_flutter_dashboard_v0.1/build/windows/x64/runner/install_local_manifest.txt"
+  file(WRITE "C:/Users/kunal/Documents/Ornate_Projects/kinetics-grid-ems/kinetics_flutter_codebase_KPV/kalpa_flutter_dashboard_v0.1/build/windows/x64/runner/install_local_manifest.txt"
      "${CMAKE_INSTALL_MANIFEST_CONTENT}")
 endif()

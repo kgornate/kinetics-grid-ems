@@ -1,6 +1,6 @@
-^C:\USERS\KUNAL\DOWNLOADS\KALPA_FLUTTER_DASHBOARD_V0.1 (1)\KALPA_FLUTTER_DASHBOARD_V0.1\BUILD\WINDOWS\X64\CMAKEFILES\24E4FD723412C44FF222D975E4665533\GENERATE.STAMP.RULE
+^C:\USERS\KUNAL\DOCUMENTS\ORNATE_PROJECTS\KINETICS-GRID-EMS\KINETICS_FLUTTER_CODEBASE_KPV\KALPA_FLUTTER_DASHBOARD_V0.1\BUILD\WINDOWS\X64\CMAKEFILES\12E075C716D4CAEC690A5F7DDA5CA3D1\GENERATE.STAMP.RULE
 setlocal
-"C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" "-SC:/Users/kunal/Downloads/kalpa_flutter_dashboard_v0.1 (1)/kalpa_flutter_dashboard_v0.1/windows" "-BC:/Users/kunal/Downloads/kalpa_flutter_dashboard_v0.1 (1)/kalpa_flutter_dashboard_v0.1/build/windows/x64" --check-stamp-list CMakeFiles/generate.stamp.list --vs-solution-file "C:/Users/kunal/Downloads/kalpa_flutter_dashboard_v0.1 (1)/kalpa_flutter_dashboard_v0.1/build/windows/x64/kalpa_gateway_dashboard.sln"
+"C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -SC:/Users/kunal/Documents/Ornate_Projects/kinetics-grid-ems/kinetics_flutter_codebase_KPV/kalpa_flutter_dashboard_v0.1/windows -BC:/Users/kunal/Documents/Ornate_Projects/kinetics-grid-ems/kinetics_flutter_codebase_KPV/kalpa_flutter_dashboard_v0.1/build/windows/x64 --check-stamp-list CMakeFiles/generate.stamp.list --vs-solution-file C:/Users/kunal/Documents/Ornate_Projects/kinetics-grid-ems/kinetics_flutter_codebase_KPV/kalpa_flutter_dashboard_v0.1/build/windows/x64/kalpa_gateway_dashboard.sln
 if %errorlevel% neq 0 goto :cmEnd
 :cmEnd
 endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
